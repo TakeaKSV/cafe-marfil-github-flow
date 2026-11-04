@@ -1,0 +1,13 @@
+{
+  "name": "cafe-marfil-practica",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test --test-reporter=spec",
+    "demo": "node demo.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
