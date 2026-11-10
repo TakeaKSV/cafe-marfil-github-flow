@@ -28,7 +28,7 @@ export default function BranchesScreen({
           Sucursales Café Marfil
         </h1>
         <p className="font-body text-sm sm:text-base text-[#1F1410]/80 leading-relaxed font-medium">
-          Tres atmósferas con identidad propia: Casona colonial en Calle Porras (Matriz), espacio acogedor con ludoteca en Barrio del Calvario y terraza contemporánea al aire libre en Plaza Vizcaya.
+          Dos atmósferas con identidad propia: Casona colonial en Calle Porras (Matriz) y espacio acogedor con ludoteca en Barrio del Calvario.
         </p>
       </div>
 

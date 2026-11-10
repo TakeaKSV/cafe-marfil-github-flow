@@ -289,11 +289,11 @@ export default function ReservationWizard({
           <div>
             <h2 className="font-display text-2xl sm:text-3xl font-bold text-[#1F1410]">Elige tu sucursal en Durango</h2>
             <p className="font-body text-xs sm:text-sm text-[#5A4840] mt-1 font-medium">
-              Contamos con tres ubicaciones únicas para compartir momentos memorables.
+              Contamos con dos ubicaciones únicas para compartir momentos memorables.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
             {sucursales.map((suc) => {
               const isSelected = selectedSucursalId === suc.id;
               return (
