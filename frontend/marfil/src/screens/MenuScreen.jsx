@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -14,7 +14,8 @@ import {
   ArrowDown,
   SlidersHorizontal,
   Grid,
-  ListFilter
+  ListFilter,
+  Utensils
 } from 'lucide-react';
 import { sounds } from '../utils/audio';
 
@@ -245,6 +246,9 @@ export default function MenuScreen({ onOrderNow, onNavigate }) {
   const [viewModeMobile, setViewModeMobile] = useState('carousel'); // 'carousel' | 'grid'
   const [activeTab, setActiveTab] = useState('todos'); // 'todos' | 'seccion-1' | 'seccion-2'
 
+  // Tamaño / porción seleccionada
+  const [selectedSize, setSelectedSize] = useState('Individual');
+
   // Control de acordeones para móvil (inician contraídos por defecto)
   const [expandedSections, setExpandedSections] = useState({
     'seccion-1': false,
@@ -265,12 +269,43 @@ export default function MenuScreen({ onOrderNow, onNavigate }) {
     'seccion-2': useRef(null)
   };
 
+  // Estado para saber si se puede scrollear a izquierda/derecha y ocultar el difuminado en extremos
+  const [scrollFades, setScrollFades] = useState({
+    'seccion-1': { canScrollLeft: false, canScrollRight: true },
+    'seccion-2': { canScrollLeft: false, canScrollRight: true }
+  });
+
+  const checkScrollFades = (seccionId) => {
+    const el = carouselRefs[seccionId]?.current;
+    if (el) {
+      const canLeft = el.scrollLeft > 10;
+      const canRight = el.scrollLeft < el.scrollWidth - el.clientWidth - 10;
+      setScrollFades((prev) => ({
+        ...prev,
+        [seccionId]: { canScrollLeft: canLeft, canScrollRight: canRight }
+      }));
+    }
+  };
+
+  useEffect(() => {
+    // Medir estado inicial de scroll
+    MENU_SECTIONS.forEach((s) => checkScrollFades(s.id));
+
+    const handleResize = () => {
+      MENU_SECTIONS.forEach((s) => checkScrollFades(s.id));
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const handleScroll = (seccionId, direction) => {
     sounds.playClick();
     const container = carouselRefs[seccionId]?.current;
     if (container) {
       const scrollAmount = direction === 'left' ? -260 : 260;
       container.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+      setTimeout(() => checkScrollFades(seccionId), 300);
     }
   };
 
@@ -334,11 +369,22 @@ export default function MenuScreen({ onOrderNow, onNavigate }) {
               </div>
             </div>
 
-            {/* CARRUSEL DE PRODUCTOS DESKTOP */}
+            {/* CARRUSEL DE PRODUCTOS DESKTOP CON DIFUMINADO DINÁMICO EN LOS BORDES */}
             <div className="relative w-full flex items-center">
+              {/* Degradado lateral izquierdo: se quita si es el primer elemento */}
+              {scrollFades[seccion.id]?.canScrollLeft && (
+                <div className="absolute left-0 top-0 bottom-0 w-10 bg-gradient-to-r from-white via-white/80 to-transparent z-20 pointer-events-none transition-opacity duration-300 animate-in fade-in" />
+              )}
+
+              {/* Degradado lateral derecho: se quita si es el último elemento */}
+              {scrollFades[seccion.id]?.canScrollRight && (
+                <div className="absolute right-0 top-0 bottom-0 w-10 bg-gradient-to-l from-white via-white/80 to-transparent z-20 pointer-events-none transition-opacity duration-300 animate-in fade-in" />
+              )}
+
               <div
                 ref={carouselRefs[seccion.id]}
-                className="w-full flex overflow-x-auto gap-5 pt-12 pb-6 px-1 scroll-smooth scrollbar-none snap-x snap-mandatory"
+                onScroll={() => checkScrollFades(seccion.id)}
+                className="w-full flex overflow-x-auto gap-7 pt-20 pb-10 px-8 scroll-smooth scrollbar-none snap-x snap-mandatory"
                 style={{
                   scrollbarWidth: 'none',
                   msOverflowStyle: 'none'
@@ -347,45 +393,57 @@ export default function MenuScreen({ onOrderNow, onNavigate }) {
                 {seccion.productos.map((producto) => (
                   <div
                     key={producto.id}
+                    onClick={() => handleOpenQueTrae(producto)}
                     style={{ backgroundColor: producto.colorCard || '#E2E2E2' }}
-                    className="relative shrink-0 w-44 sm:w-48 rounded-[26px] pt-10 pb-3 px-3 flex flex-col items-center justify-between shadow-xs hover:shadow-md transition-all duration-200 group snap-start border border-black/5 hover:border-[#E12927]/30"
+                    className="relative shrink-0 w-48 sm:w-52 rounded-[28px] pt-12 pb-4 px-3.5 flex flex-col items-center justify-between transition-transform duration-300 hover:scale-105 active:scale-95 group snap-start border border-black/5 hover:border-[#E12927]/40 cursor-pointer select-none"
                   >
-                    {/* IMAGEN SOBRESALIENDO POR ARRIBA */}
-                    <div className="absolute -top-10 sm:-top-12 left-1/2 -translate-x-1/2 w-28 sm:w-32 h-34 sm:h-38 flex items-center justify-center pointer-events-none z-10">
+                    {/* IMAGEN SOBRESALIENDO POR ARRIBA SIN SOMBRA */}
+                    <div className="absolute -top-14 sm:-top-16 left-1/2 -translate-x-1/2 w-32 sm:w-36 h-38 sm:h-42 flex items-center justify-center pointer-events-none z-10">
                       <img
                         src={producto.imagen}
                         alt={producto.nombreCompleto}
-                        className="w-full h-full object-contain filter drop-shadow-[0_10px_14px_rgba(0,0,0,0.25)] group-hover:scale-105 group-hover:-translate-y-0.5 transition-all duration-200"
+                        className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                       />
                     </div>
 
-                    {/* Espaciador transparente */}
-                    <div className="h-12 sm:h-14 w-full pointer-events-none" />
+                    {/* Espaciador para la imagen flotante */}
+                    <div className="h-14 sm:h-16 w-full pointer-events-none" />
 
-                    {/* TÍTULO EN MAYÚSCULAS CON FUENTE NUNITO EXTRABOLD */}
+                    {/* TÍTULO Y PRECIO REFINADOS */}
                     <div className="w-full text-center mt-1 flex flex-col items-center">
                       <h3
-                        className="font-bold text-base sm:text-lg text-[#1F1410] tracking-tight leading-tight uppercase"
+                        className="font-bold text-base sm:text-[17px] text-[#1F1410] tracking-tight leading-snug uppercase group-hover:text-[#E12927] transition-colors duration-200 line-clamp-1"
                         style={{ fontFamily: 'var(--font-menu-product)' }}
+                        title={producto.nombre}
                       >
                         {producto.nombre}
                       </h3>
-                      <span
-                        className="text-[11px] text-stone-500 font-extrabold mt-0.5"
-                        style={{ fontFamily: 'var(--font-menu-product)' }}
-                      >
-                        {producto.precio}
-                      </span>
+
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span
+                          className="text-xs sm:text-[13px] text-[#1F1410] font-black tracking-tight"
+                          style={{ fontFamily: 'var(--font-menu-product)' }}
+                        >
+                          {producto.precio}
+                        </span>
+                        <span className="font-mono text-[10px] text-stone-600/80 font-bold">
+                          · {producto.tamano}
+                        </span>
+                      </div>
                     </div>
 
-                    {/* BOTÓN ROJO "Que Trae?" FORMA DE PÍLDORA (ROUNDED-FULL) */}
+                    {/* BOTÓN ROJO "VER DETALLES" FORMA DE PÍLDORA SIN SOMBRA */}
                     <div className="w-full mt-3.5 mb-0.5">
                       <button
                         type="button"
-                        onClick={() => handleOpenQueTrae(producto)}
-                        className="w-full py-2 px-3 bg-[#E12927] hover:bg-[#C81E1C] active:scale-95 text-white font-body font-bold text-sm sm:text-base rounded-full shadow-xs transition-all duration-150 cursor-pointer flex items-center justify-center tracking-normal hover:shadow-sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenQueTrae(producto);
+                        }}
+                        className="w-full py-2 px-3 bg-[#E12927] hover:bg-[#C81E1C] active:scale-95 text-white font-body font-bold text-xs sm:text-sm rounded-full transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 tracking-wide group/btn"
                       >
-                        <span>Que Trae?</span>
+                        <span>Ver detalles</span>
+                        <ArrowRight size={14} className="stroke-[2.5] group-hover/btn:translate-x-0.5 transition-transform" />
                       </button>
                     </div>
                   </div>
@@ -533,89 +591,278 @@ export default function MenuScreen({ onOrderNow, onNavigate }) {
       </div>
 
       {/* ====================================================================
-          3. MODAL DE INFORMACIÓN DEL PRODUCTO (IDÉNTICO A LA FOTO DE REFERENCIA)
+          3. DETALLE DEL PRODUCTO: SIDEBAR LATERAL (DESKTOP) & BOTTOM SHEET (MÓVIL)
           ==================================================================== */}
       {selectedProduct && (
         <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:px-6 sm:pt-40 sm:pb-12 bg-black/75 backdrop-blur-xs animate-fade-in overflow-y-auto"
+          className="fixed inset-0 z-50 flex items-end md:items-stretch md:justify-end bg-black/60 backdrop-blur-[2px] transition-opacity animate-in fade-in duration-200 will-change-opacity"
           onClick={handleCloseModal}
           role="dialog"
           aria-modal="true"
         >
+          {/* =========================================================
+              A) VISTA DESKTOP: IMAGEN DETRÁS Y BARRA LATERAL DELANTE
+              ========================================================= */}
+          {/* 1. IMAGEN GIGANTE FUERA DEL ASIDE - ESTRICTAMENTE DETRÁS (Z-10) OPTIMIZADA CON GPU */}
+          <div className="hidden md:flex absolute right-[320px] lg:right-[380px] top-1/2 -translate-y-1/2 w-[440px] lg:w-[560px] h-[540px] lg:h-[700px] pointer-events-none z-10 items-center justify-center animate-in fade-in duration-200 will-change-transform">
+            <img
+              src={selectedProduct.imagen}
+              alt={selectedProduct.nombreCompleto}
+              loading="eager"
+              decoding="async"
+              className="w-full h-full object-contain drop-shadow-xl transform -rotate-3 select-none"
+            />
+          </div>
+
+          {/* 2. BARRA LATERAL POR DELANTE CON TRANSICIÓN ULTRA SUAVE */}
+          <aside
+            style={{ backgroundColor: selectedProduct.colorCard || '#FFFFFF' }}
+            className="hidden md:flex relative w-[480px] lg:w-[520px] max-w-[92vw] h-full flex-col justify-between animate-in slide-in-from-right duration-250 z-30 select-none shadow-2xl will-change-transform"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* CORTINA DE DEGRADADO MÁS CORTA Y SUTIL HACIA LA IZQUIERDA */}
+            <div
+              className="absolute -left-10 top-0 bottom-0 w-10 pointer-events-none z-30"
+              style={{
+                background: `linear-gradient(to right, transparent, ${selectedProduct.colorCard || '#FFFFFF'})`
+              }}
+            />
+
+            {/* Cabecera con botón de cerrar */}
+            <div className="w-full flex items-center justify-between p-6 pb-2 z-20">
+              <span className="font-mono text-xs font-black text-[#E12927] bg-white/90 backdrop-blur-xs px-3.5 py-1 rounded-full uppercase tracking-wider border border-white/60 shadow-xs">
+                {selectedProduct.categoria}
+              </span>
+
+              <button
+                type="button"
+                onClick={handleCloseModal}
+                className="w-10 h-10 rounded-full bg-white/90 hover:bg-white text-[#1F1410] hover:text-[#E12927] shadow-sm flex items-center justify-center transition-all cursor-pointer hover:scale-105 active:scale-95"
+                aria-label="Cerrar panel lateral"
+              >
+                <X size={22} className="stroke-[2.5]" />
+              </button>
+            </div>
+
+            {/* Contenedor central con scroll: texto directo y limpio */}
+            <div className="flex-1 overflow-y-auto px-8 py-6 flex flex-col justify-start scrollbar-none z-20 text-left">
+              {/* 1. TÍTULO DEL PLATILLO O BEBIDA */}
+              <div>
+                <span className="font-mono text-xs font-bold text-[#E12927] uppercase tracking-wider block mb-1">
+                  {selectedProduct.categoria}
+                </span>
+                <h3
+                  className="font-normal text-3xl lg:text-4xl text-[#1F1410] tracking-tight leading-snug"
+                  style={{ fontFamily: 'var(--font-menu-title)' }}
+                >
+                  {selectedProduct.nombre}
+                </h3>
+                <p className="font-body text-xs text-[#1F1410]/80 font-medium mt-1">
+                  {selectedProduct.nombreCompleto}
+                </p>
+
+                {/* 2. DESCRIPCIÓN / RECETA */}
+                <p className="font-body text-xs lg:text-[13px] text-[#1F1410]/90 leading-relaxed mt-3.5 text-justify">
+                  {selectedProduct.descripcion ||
+                    (selectedProduct.queTrae && selectedProduct.queTrae.length > 0
+                      ? selectedProduct.queTrae.join(' ')
+                      : 'Receta artesanal exclusiva de Café Marfil Durango elaborada con insumos de alta calidad, preparado al momento para garantizar frescura y textura insuperable.')}
+                </p>
+              </div>
+
+              {/* 3. SECCIÓN: TAMAÑO O PRESENTACIÓN (ADAPTABLE PARA BEBIDAS Y COMIDAS) */}
+              <div className="mt-6">
+                <span className="font-body font-bold text-sm text-[#1F1410] block mb-2.5">
+                  {selectedProduct.id?.startsWith('frappe') || selectedProduct.categoria?.toLowerCase().includes('bebida')
+                    ? 'Tamaño'
+                    : 'Presentación'}
+                </span>
+                <div className="flex items-center gap-3">
+                  {(selectedProduct.id?.startsWith('frappe') || selectedProduct.categoria?.toLowerCase().includes('bebida')
+                    ? [
+                      { label: 'Chico', desc: '12 oz' },
+                      { label: 'Mediano', desc: '16 oz' },
+                      { label: 'Grande', desc: '20 oz' }
+                    ]
+                    : [
+                      { label: 'Individual', desc: 'Con papas' },
+                      { label: 'Doble', desc: 'Porción extra' },
+                      { label: 'Combo', desc: 'Con bebida' }
+                    ]
+                  ).map((sizeItem, idx) => {
+                    const isSelected = selectedSize === sizeItem.label || (selectedSize === 'Individual' && idx === 1);
+                    return (
+                      <button
+                        key={sizeItem.label}
+                        type="button"
+                        onClick={() => {
+                          sounds.playClick();
+                          setSelectedSize(sizeItem.label);
+                        }}
+                        className={`flex-1 py-2 px-3 rounded-full text-xs lg:text-sm font-semibold transition-all duration-200 cursor-pointer border text-center ${isSelected
+                          ? 'bg-[#E12927] text-white border-[#E12927] shadow-xs'
+                          : 'bg-white/40 text-[#1F1410] border-[#1F1410]/20 hover:border-[#E12927] hover:bg-[#FCEAE9]'
+                          }`}
+                      >
+                        <span className={`block leading-tight font-body font-bold ${isSelected ? 'text-white' : 'text-[#1F1410]'}`}>{sizeItem.label}</span>
+                        <span className={`block text-[10px] font-mono mt-0.5 ${isSelected ? 'text-white/90' : 'text-[#1F1410]/70'}`}>
+                          {sizeItem.desc}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 4. PRECIO & PIE EDITORIAL (SIN BOTÓN PEDIR AHORA) */}
+              <div className="mt-8 pt-5 border-t border-[#1F1410]/15 flex items-baseline justify-between">
+                <div>
+                  <span className="font-mono text-[10px] font-bold text-[#1F1410]/70 uppercase tracking-wider block">
+                    Precio en sucursal
+                  </span>
+                  <span
+                    className="font-bold text-3xl text-[#1F1410] tracking-tight font-mono"
+                  >
+                    {selectedProduct.precio}
+                  </span>
+                </div>
+
+                <div className="text-right">
+                  <span className="font-mono text-[11px] font-bold text-[#E12927] uppercase tracking-wider block">
+                    {selectedProduct.calorias}
+                  </span>
+                  <span className="font-mono text-[10px] text-[#1F1410]/70 font-medium">
+                    Servicio en sala y para llevar
+                  </span>
+                </div>
+              </div>
+            </div>
+          </aside>
+
+          {/* =========================================================
+              B) VISTA MÓVIL: BOTTOM SHEET FLOTANTE
+              ========================================================= */}
           <div
             style={{ backgroundColor: selectedProduct.colorCard || '#D9D9D9' }}
-            className="relative w-full sm:max-w-[400px] h-[75vh] sm:h-auto rounded-t-[36px] sm:rounded-[42px] pt-20 sm:pt-24 pb-6 px-6 sm:px-8 flex flex-col justify-between shadow-2xl animate-scale-up border-t border-stone-200/40 sm:border-none sm:my-auto transition-colors duration-300"
+            className="md:hidden relative w-full h-[88vh] max-h-[92vh] rounded-t-[36px] pt-32 pb-8 px-6 flex flex-col justify-between shadow-2xl animate-in slide-in-from-bottom duration-250 border-t border-white/40 select-none overflow-visible will-change-transform"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Barra indicadora de deslizamiento para móvil */}
-            <div className="w-12 h-1 bg-stone-400/70 rounded-full mx-auto absolute top-3 left-1/2 -translate-x-1/2 sm:hidden" />
+            <div className="w-12 h-1 bg-[#1F1410]/30 rounded-full mx-auto absolute top-3 left-1/2 -translate-x-1/2" />
 
-            {/* BOTÓN CERRAR ROJO "X" EN LA ESQUINA SUPERIOR DERECHA */}
+            {/* Botón cerrar */}
             <button
               type="button"
               onClick={handleCloseModal}
-              className="absolute top-5 right-5 sm:top-6 sm:right-6 z-30 text-[#E12927] hover:scale-110 active:scale-90 transition-transform cursor-pointer"
+              className="absolute top-4 right-4 z-30 w-10 h-10 rounded-full bg-white/90 text-[#1F1410] hover:text-[#E12927] flex items-center justify-center shadow-xs cursor-pointer active:scale-90 transition-transform"
               aria-label="Cerrar modal"
             >
-              <X size={32} className="stroke-[3.5]" />
+              <X size={22} className="stroke-[2.5]" />
             </button>
 
-            {/* IMAGEN DEL VASO / PLATILLO FLOTANDO ALTO SOBRE EL BORDE SUPERIOR */}
-            <div className="absolute -top-32 sm:-top-38 left-1/2 -translate-x-1/2 w-44 sm:w-52 h-52 sm:h-64 flex items-center justify-center pointer-events-none z-20">
+            {/* Imagen flotante subida aún más para no estar pegada al título */}
+            <div className="absolute -top-48 sm:-top-52 left-1/2 -translate-x-1/2 w-64 h-68 flex items-center justify-center pointer-events-none z-20 will-change-transform">
               <img
                 src={selectedProduct.imagen}
                 alt={selectedProduct.nombreCompleto}
-                className="w-full h-full object-contain filter drop-shadow-[0_18px_30px_rgba(0,0,0,0.45)]"
+                loading="eager"
+                decoding="async"
+                className="w-full h-full object-contain drop-shadow-lg"
               />
             </div>
 
-            {/* CABECERA: TÍTULO Y METADATOS */}
-            <div className="w-full text-center shrink-0 mt-1 mb-2">
-              <h3
-                className="font-bold text-2xl sm:text-3xl text-[#1F1410] tracking-tight uppercase leading-tight"
-                style={{ fontFamily: 'var(--font-menu-product)' }}
-              >
-                {selectedProduct.nombre}
-              </h3>
-              <div className="flex items-center justify-center gap-2 mt-1.5">
-                <span className="font-mono text-[10px] font-bold text-[#E12927] bg-white/90 shadow-2xs px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+            {/* CUERPO CON EXACTAMENTE LA MISMA ESTRUCTURA QUE DESKTOP - ULTRA LEGIBLE */}
+            <div className="flex-1 overflow-y-auto pr-1 pt-3 flex flex-col justify-start scrollbar-none text-left">
+              {/* 1. TÍTULO Y NOMBRES CON MÁXIMO CONTRASTE Y TAMAÑO */}
+              <div>
+                <span className="font-mono text-xs sm:text-sm font-black text-[#E12927] uppercase tracking-wider block mb-1">
                   {selectedProduct.categoria}
                 </span>
-                <span className="font-mono text-xs text-[#1F1410] font-semibold">
-                  · {selectedProduct.tamano}
+                <h3
+                  className="font-normal text-4xl sm:text-5xl text-[#1F1410] tracking-tight leading-[1.1]"
+                  style={{ fontFamily: 'var(--font-menu-title)' }}
+                >
+                  {selectedProduct.nombre}
+                </h3>
+                <p className="font-body text-base sm:text-lg text-[#1F1410]/80 font-bold mt-1.5 leading-snug">
+                  {selectedProduct.nombreCompleto}
+                </p>
+
+                {/* 2. DESCRIPCIÓN CON LETRA GRANDE */}
+                <p className="font-body text-base sm:text-lg text-[#1F1410] leading-relaxed mt-4 opacity-100 text-justify font-medium">
+                  {selectedProduct.descripcion ||
+                    (selectedProduct.queTrae && selectedProduct.queTrae.length > 0
+                      ? selectedProduct.queTrae.join(' ')
+                      : 'Receta artesanal exclusiva de Café Marfil Durango elaborada con insumos de alta calidad, preparado al momento para garantizar frescura y textura insuperable.')}
+                </p>
+              </div>
+
+              {/* 3. SECCIÓN: TAMAÑO O PRESENTACIÓN */}
+              <div className="mt-6">
+                <span className="font-body font-black text-lg text-[#1F1410] block mb-3">
+                  {selectedProduct.id?.startsWith('frappe') || selectedProduct.categoria?.toLowerCase().includes('bebida')
+                    ? 'Tamaño'
+                    : 'Presentación'}
+                </span>
+                <div className="flex items-center gap-3">
+                  {(selectedProduct.id?.startsWith('frappe') || selectedProduct.categoria?.toLowerCase().includes('bebida')
+                    ? [
+                      { label: 'Chico', desc: '12 oz' },
+                      { label: 'Mediano', desc: '16 oz' },
+                      { label: 'Grande', desc: '20 oz' }
+                    ]
+                    : [
+                      { label: 'Individual', desc: 'Con papas' },
+                      { label: 'Doble', desc: 'Porción extra' },
+                      { label: 'Combo', desc: 'Con bebida' }
+                    ]
+                  ).map((sizeItem, idx) => {
+                    const isSelected = selectedSize === sizeItem.label || (selectedSize === 'Individual' && idx === 1);
+                    return (
+                      <button
+                        key={sizeItem.label}
+                        type="button"
+                        onClick={() => {
+                          sounds.playClick();
+                          setSelectedSize(sizeItem.label);
+                        }}
+                        className={`flex-1 py-3 px-3 rounded-full text-base sm:text-lg font-black transition-all duration-200 cursor-pointer border-2 text-center ${isSelected
+                          ? 'bg-[#E12927] text-white border-[#E12927] shadow-md'
+                          : 'bg-white/40 text-[#1F1410] border-[#1F1410]/20 hover:bg-[#FCEAE9]'
+                          }`}
+                      >
+                        <span className={`block leading-tight font-body font-bold ${isSelected ? 'text-white' : 'text-[#1F1410]'}`}>{sizeItem.label}</span>
+                        <span className={`block text-xs sm:text-sm font-mono mt-1 ${isSelected ? 'text-white/90' : 'text-[#1F1410]/70 font-bold'}`}>
+                          {sizeItem.desc}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* 4. PRECIO & METADATOS INFERIORES */}
+            <div className="w-full flex items-baseline justify-between pt-4 mt-3 border-t-2 border-[#1F1410]/15 shrink-0">
+              <div>
+                <span className="font-mono text-xs sm:text-sm font-bold text-[#1F1410]/70 uppercase tracking-wider block">
+                  Precio en sucursal
+                </span>
+                <span
+                  className="font-bold text-4xl sm:text-5xl text-[#1F1410] tracking-tight leading-none font-mono"
+                >
+                  {selectedProduct.precio}
                 </span>
               </div>
-            </div>
 
-            {/* CUERPO CENTRAL SCROLLABLE: DESCRIPCIÓN Y RECETA */}
-            <div className="flex-1 overflow-y-auto my-2 pr-1 flex flex-col justify-center gap-2.5">
-              <p className="font-body text-xs sm:text-[13px] text-[#1F1410] leading-relaxed text-justify px-1 opacity-95">
-                {selectedProduct.descripcion ||
-                  (selectedProduct.queTrae && selectedProduct.queTrae.length > 0
-                    ? selectedProduct.queTrae.join(' ')
-                    : 'Receta artesanal exclusiva de Café Marfil Durango elaborada con ingredientes seleccionados de la más alta calidad, café de especialidad y acompañamientos gourmet preparados al momento.')}
-              </p>
-
-              {/* Pills o datos nutricionales */}
-              <div className="flex items-center justify-between text-[11px] font-mono text-[#1F1410] bg-white/45 border border-black/5 px-3 py-1.5 rounded-xl font-semibold">
-                <span>{selectedProduct.calorias}</span>
-                <span>Alérgenos: {selectedProduct.alergenos?.join(', ')}</span>
+              <div className="text-right">
+                <span className="font-mono text-base font-black text-[#E12927] uppercase tracking-wider block">
+                  {selectedProduct.calorias}
+                </span>
+                <span className="font-mono text-xs sm:text-sm text-[#1F1410]/70 font-bold">
+                  En sala y para llevar
+                </span>
               </div>
-            </div>
-
-            {/* PIE DE MODAL: ORIGEN Y BOTÓN ROJO DE PRECIO EN LA DERECHA */}
-            <div className="w-full flex items-center justify-between pt-3 border-t border-stone-400/40 shrink-0">
-
-              {/* BOTÓN ROJO DE PRECIO — Nunito ExtraBold */}
-              <button
-                type="button"
-                onClick={() => handleOrderProduct(selectedProduct)}
-                className="bg-[#E12927] hover:bg-[#C81E1C] active:scale-95 text-white font-bold text-2xl sm:text-3xl px-6 py-2 rounded-2xl shadow-md transition-all cursor-pointer flex items-center justify-center tracking-tight"
-                style={{ fontFamily: 'var(--font-menu-product)' }}
-                title="Pedir este producto"
-              >
-                <span>{selectedProduct.precio.replace(' MXN', '')}</span>
-              </button>
             </div>
           </div>
         </div>
