@@ -106,7 +106,7 @@ export const TENDENCIAS_CATALOGO = [
  * 5. Promociones & Combos Semanales
  * 6. Reserva tu Mesa o Evento (Wizard)
  * 7. Pasaporte de Sellos y Club Marfil
- * 8. Nuestras 3 Sucursales en Durango
+ * 8. Nuestras 2 Sucursales en Durango
  */
 export default function HomeScreen({
   onOrderNow,
@@ -638,10 +638,10 @@ export default function HomeScreen({
                 <span>SUCURSALES REALES EN DURANGO, DGO.</span>
               </div>
               <h2 className="font-display text-2xl sm:text-4xl font-extrabold text-[#1F1410] tracking-tight">
-                Visítanos en Nuestras 3 Sucursales
+                Visítanos en Nuestras Sucursales
               </h2>
               <p className="font-body text-sm sm:text-base text-stone-600 max-w-2xl mt-1">
-                Conoce nuestras ubicaciones reales en Durango: Casona Matriz en Calle Porras, Barrio del Calvario y la terraza de Plaza Vizcaya.
+                Conoce nuestras ubicaciones reales en Durango: Casona Matriz en Calle Porras y Barrio del Calvario.
               </p>
             </div>
             <button
@@ -653,8 +653,8 @@ export default function HomeScreen({
             </button>
           </div>
 
-          {/* Grid de las 3 Sucursales Reales con Fotos Reales */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+          {/* Grid de las 2 Sucursales Reales con Fotos Reales */}
+          <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
             {SUCURSALES.map((sucursal) => {
               const isActive = activeSucursalId === sucursal.id;
               return (
@@ -766,7 +766,7 @@ export default function HomeScreen({
                 </div>
                 <div>
                   <h4 className="font-display font-bold text-base sm:text-lg text-white">
-                    Ubicación en Vivo: {activeSucursal.nombre}
+                    Ubicación: {activeSucursal.nombre}
                   </h4>
                   <p className="font-mono text-xs text-stone-300">
                     {activeSucursal.direccion}
@@ -816,16 +816,6 @@ export default function HomeScreen({
               />
             </div>
 
-            {/* Barra inferior informativa */}
-            <div className="bg-[#FAF8F5] border-t border-stone-200 px-6 py-3.5 flex flex-col sm:flex-row items-center justify-between text-xs font-mono text-stone-600 gap-2">
-              <span className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span>Horario habitual: {activeSucursal.horario}</span>
-              </span>
-              <span className="text-stone-500">
-                Tel: <strong className="text-[#1F1410]">{activeSucursal.telefono}</strong> · Duranguenses & Visitantes Bienvenidos
-              </span>
-            </div>
           </div>
         </div>
       </section>
