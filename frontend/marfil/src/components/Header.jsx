@@ -35,7 +35,7 @@ export default function Header({
         className={`${
           isHeroOverlay
             ? 'fixed top-0 inset-x-0 z-40 bg-transparent border-b border-white/15 backdrop-blur-xs text-white'
-            : 'sticky top-0 z-40 bg-white/90 dark:bg-[#1F1410]/90 backdrop-blur-xl border-b border-stone-200/60 dark:border-white/10 text-[#1F1410] dark:text-white shadow-xs'
+            : 'sticky top-0 z-40 bg-white/90 backdrop-blur-xl border-b border-stone-200/60 text-[#1F1410] shadow-xs'
         } transition-all duration-300`}
       >
         <div className="max-w-[1240px] mx-auto px-4 sm:px-6 h-[72px] flex items-center justify-between gap-4">
@@ -52,7 +52,7 @@ export default function Header({
             <div className="flex flex-col">
               <span
                 className={`font-display text-xl sm:text-2xl font-bold ${
-                  isHeroOverlay ? 'text-white' : 'text-[#1F1410] dark:text-white'
+                  isHeroOverlay ? 'text-white' : 'text-[#1F1410]'
                 } leading-none tracking-tight drop-shadow-sm`}
               >
                 Café Marfil
@@ -65,7 +65,7 @@ export default function Header({
             className={`hidden md:flex items-center p-1 rounded-full ${
               isHeroOverlay
                 ? 'bg-black/20 border border-white/15 backdrop-blur-md'
-                : 'bg-black/5 dark:bg-white/5 border border-stone-200/50 dark:border-white/10 backdrop-blur-sm'
+                : 'bg-black/5 border border-stone-200/50 backdrop-blur-sm'
             } gap-1`}
             aria-label="Navegación principal"
           >
@@ -79,7 +79,7 @@ export default function Header({
                       ? 'bg-[#E12927] text-white shadow-md shadow-[#E12927]/30'
                       : isHeroOverlay
                       ? 'text-white/90 hover:text-white hover:bg-white/20'
-                      : 'text-[#1F1410] dark:text-stone-200 hover:text-[#E12927] hover:bg-white/60 dark:hover:bg-white/10'
+                      : 'text-[#1F1410] hover:text-[#E12927] hover:bg-white/60'
                   }`}
                   onClick={() => handleNav(item.id)}
                 >
@@ -107,7 +107,7 @@ export default function Header({
               className={`relative w-10 h-10 rounded-full border ${
                 isHeroOverlay
                   ? 'border-white/25 bg-black/20 hover:bg-black/35 text-white backdrop-blur-md'
-                  : 'border-stone-200/80 dark:border-white/15 bg-white/60 dark:bg-white/10 text-[#1F1410] dark:text-white hover:bg-[#FCEAE9] hover:border-[#E12927] dark:hover:bg-white/20'
+                  : 'border-stone-200/80 bg-white/60 text-[#1F1410] hover:bg-[#FCEAE9] hover:border-[#E12927]'
               } flex items-center justify-center active:scale-95 transition-all cursor-pointer shadow-xs`}
               onClick={() => {
                 sounds.playClick();
@@ -118,27 +118,10 @@ export default function Header({
             >
               <Bell size={18} />
               {unreadCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-[#E12927] text-white text-[10px] font-mono font-bold shadow-md ring-2 ring-white dark:ring-[#1F1410]">
+                <span className="absolute -top-0.5 -right-0.5 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-[#E12927] text-white text-[10px] font-mono font-bold shadow-md ring-2 ring-white">
                   {unreadCount}
                 </span>
               )}
-            </button>
-
-            {/* Toggle Tema */}
-            <button
-              className={`w-10 h-10 rounded-full border ${
-                isHeroOverlay
-                  ? 'border-white/25 bg-black/20 hover:bg-black/35 text-white backdrop-blur-md'
-                  : 'border-stone-200/80 dark:border-white/15 bg-white/60 dark:bg-white/10 text-[#1F1410] dark:text-white hover:bg-[#FCEAE9] hover:border-[#E12927] dark:hover:bg-white/20'
-              } flex items-center justify-center active:scale-95 transition-all cursor-pointer shadow-xs`}
-              onClick={() => {
-                sounds.playClick();
-                toggleTheme();
-              }}
-              aria-label={`Cambiar a modo ${theme === 'dark' ? 'claro' : 'oscuro'}`}
-              title={`Modo ${theme === 'dark' ? 'claro' : 'oscuro'}`}
-            >
-              {theme === 'dark' ? <Sun size={18} className="text-amber-400" /> : <Moon size={18} className="text-inherit" />}
             </button>
 
             {/* Perfil */}
@@ -148,7 +131,7 @@ export default function Header({
                   ? 'bg-[#1F1410] text-white border-[#1F1410]'
                   : isHeroOverlay
                   ? 'border-white/25 bg-black/20 hover:bg-black/35 text-white backdrop-blur-md'
-                  : 'border-stone-200/80 dark:border-white/15 bg-white/60 dark:bg-white/10 backdrop-blur-md text-[#1F1410] dark:text-white hover:bg-[#FCEAE9] hover:border-[#E12927] dark:hover:bg-white/20'
+                  : 'border-stone-200/80 bg-white/60 backdrop-blur-md text-[#1F1410] hover:bg-[#FCEAE9] hover:border-[#E12927]'
               }`}
               onClick={() => handleNav('perfil')}
               aria-label="Mi Perfil y Reservaciones"

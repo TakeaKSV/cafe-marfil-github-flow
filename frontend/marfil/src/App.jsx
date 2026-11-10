@@ -439,7 +439,7 @@ export default function App() {
                 Barra de especialidad, frappés de autor, cocina salada y dulce contundente en Durango, México. Desayunos todo el día, chilaquiles con boneless y fresas estilo Dubái.
               </p>
               <div className="footer-city-badge font-mono">
-                DURANGO, DGO. · 3 SUCURSALES
+                DURANGO, DGO. · 2 SUCURSALES
               </div>
             </div>
 
