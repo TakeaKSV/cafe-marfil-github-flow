@@ -312,8 +312,8 @@ export const PROMOCIONES = [
     categoriaSlug: 'mes',
     descuentoBadge: 'COMBO $145',
     vigencia: 'Lunes a Domingo de 8:00 AM a 2:00 PM',
-    sucursalesAplicables: ['Centro Histórico', 'Lomas del Parque', 'Paseo Constitución'],
-    sucursalesValidas: ['Centro Histórico', 'Lomas del Parque', 'Paseo Constitución'],
+    sucursalesAplicables: ['Porras (Matriz)', 'Calvario'],
+    sucursalesValidas: ['Porras (Matriz)', 'Calvario'],
     imagen: '/images/desayunos_marfil.jpg',
     resumen: 'Mollete Mamut de masa madre con costra de queso asadero duranguense y chorizo artesanal más un Flat White doble de 12oz.',
     descripcion: 'Mollete Mamut de masa madre con costra de queso asadero duranguense y chorizo artesanal más un Flat White doble de 12oz.',
@@ -321,12 +321,12 @@ export const PROMOCIONES = [
     codigoCupon: 'MAMUTMARFIL',
     condiciones: [
       'Aplica en consumo en sucursal y para llevar.',
-      'Disponible en cualquier sucursal de Café Marfil en Durango.',
+      'Disponible en cualquiera de nuestras dos sucursales en Durango.',
       'Puedes cambiar tu Flat White por Cold Brew Tonic sin costo extra.'
     ],
     terminos: [
       'Aplica en consumo en sucursal y para llevar.',
-      'Disponible en cualquier sucursal de Café Marfil en Durango.',
+      'Disponible en cualquiera de nuestras dos sucursales en Durango.',
       'Puedes cambiar tu Flat White por Cold Brew Tonic sin costo extra.'
     ],
     comoUsar: 'Presiona "Mostrar cupón al barista", presenta tu código al ordenar en mostrador y disfruta tu experiencia.'
@@ -338,8 +338,8 @@ export const PROMOCIONES = [
     categoriaSlug: 'temporada',
     descuentoBadge: '2x1 JUEVES',
     vigencia: 'Todos los Jueves de 4:00 PM a 8:00 PM',
-    sucursalesAplicables: ['Centro Histórico', 'Paseo Constitución'],
-    sucursalesValidas: ['Centro Histórico', 'Paseo Constitución'],
+    sucursalesAplicables: ['Porras (Matriz)', 'Calvario'],
+    sucursalesValidas: ['Porras (Matriz)', 'Calvario'],
     imagen: '/images/dubai_frappes.jpg',
     resumen: 'Pide tu frappé favorito de Kinder Bueno, Gansito, Barbie Pink o Mazapán y el segundo va por nuestra cuenta.',
     descripcion: 'Pide tu frappé favorito de Kinder Bueno, Gansito, Barbie Pink o Mazapán y el segundo va por nuestra cuenta.',
@@ -364,20 +364,20 @@ export const PROMOCIONES = [
     categoriaSlug: 'sucursal',
     descuentoBadge: '15% DTO',
     vigencia: 'Válido durante todo Octubre 2026',
-    sucursalesAplicables: ['Centro Histórico', 'Lomas del Parque'],
-    sucursalesValidas: ['Centro Histórico', 'Lomas del Parque'],
+    sucursalesAplicables: ['Porras (Matriz)', 'Calvario'],
+    sucursalesValidas: ['Porras (Matriz)', 'Calvario'],
     imagen: '/images/dubai_frappes.jpg',
     resumen: 'Prueba la sensación gastronómica: fresas frescas bañadas en crema pura de pistache siciliano y pasta kataifi tostada en mantequilla.',
     descripcion: 'Prueba la sensación gastronómica: fresas frescas bañadas en crema pura de pistache siciliano y pasta kataifi tostada en mantequilla.',
     beneficioDetalle: '15% de descuento directo en cualquier copa de Fresas Estilo Dubái.',
     codigoCupon: 'DUBAIMARFIL',
     condiciones: [
-      'Válido en sucursales Centro Histórico y Lomas del Parque.',
+      'Válido en sucursales Porras (Matriz) y Calvario.',
       'Sujeto a disponibilidad diaria de pasta kataifi artesanal.',
       'Presentar código desde la aplicación web al ordenar.'
     ],
     terminos: [
-      'Válido en sucursales Centro Histórico y Lomas del Parque.',
+      'Válido en sucursales Porras (Matriz) y Calvario.',
       'Sujeto a disponibilidad diaria de pasta kataifi artesanal.',
       'Presentar código desde la aplicación web al ordenar.'
     ],
@@ -390,8 +390,8 @@ export const PROMOCIONES = [
     categoriaSlug: 'frecuentes',
     descuentoBadge: '15% ALL-DAY',
     vigencia: 'Lunes a Viernes todo el ciclo escolar',
-    sucursalesAplicables: ['Centro Histórico', 'Paseo Constitución'],
-    sucursalesValidas: ['Centro Histórico', 'Paseo Constitución'],
+    sucursalesAplicables: ['Porras (Matriz)', 'Calvario'],
+    sucursalesValidas: ['Porras (Matriz)', 'Calvario'],
     imagen: '/images/hero_cafe.jpg',
     resumen: '15% de descuento en barra de especialidad, chilaquiles con boneless y uso de ludoteca para estudiantes y docentes.',
     descripcion: '15% de descuento en barra de especialidad, chilaquiles con boneless y uso de ludoteca para estudiantes y docentes.',
