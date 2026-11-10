@@ -1,0 +1,243 @@
+@import "tailwindcss";
+
+@theme {
+  --color-rojo-marfil: #E12927;
+  --color-negro-cafe: #1F1410;
+  --color-blanco: #FFFFFF;
+  --color-rosa-claro: #FCEAE9;
+  --color-app-bg: #FAF7F5;
+  --color-surface-soft: #F5EFEB;
+  --color-border-card: rgba(31, 20, 16, 0.12);
+  --color-border-focus: #E12927;
+
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'Space Mono', monospace;
+}
+
+:root {
+  --rojo-marfil: #E12927;
+  --negro-cafe: #1F1410;
+  --blanco: #FFFFFF;
+  --rosa-claro: #FCEAE9;
+  --bg-app: #FAF7F5;
+  
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  color: #1F1410;
+  background-color: #FAF7F5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Tipografías */
+.font-display {
+  font-family: 'Fraunces', Georgia, serif;
+}
+
+.font-body {
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.font-mono {
+  font-family: 'Space Mono', monospace;
+}
+
+/* Scrollbars estilizadas */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #FAF7F5;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D9D2CD;
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #E12927;
+}
+
+/* Variables de Easing fluidas (Animations on the Web / Emil Kowalski) */
+:root {
+  --ease-out-quint: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out-cubic: cubic-bezier(0.645, 0.045, 0.355, 1);
+  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Efectos de elevación e interacción universal */
+.hover-lift {
+  transition: transform 220ms var(--ease-out-quint), box-shadow 220ms var(--ease-out-quint), border-color 220ms ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 25px -5px rgba(31, 20, 16, 0.08), 0 8px 10px -6px rgba(31, 20, 16, 0.05);
+}
+
+.hover-lift-sm {
+  transition: transform 180ms var(--ease-out-quint), box-shadow 180ms var(--ease-out-quint);
+}
+
+.hover-lift-sm:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px -2px rgba(31, 20, 16, 0.07);
+}
+
+/* Micro-rebote al hacer clic / click press */
+.btn-press {
+  transition: transform 100ms ease-out, filter 150ms ease;
+}
+
+.btn-press:active {
+  transform: scale(0.96);
+}
+
+/* Efectos sutiles */
+.badge-pulse {
+  animation: pulse-border 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse-border {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.65;
+    transform: scale(0.98);
+  }
+}
+
+/* Animación de entrada y cambio de pestañas */
+@keyframes slideFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-tab-slide {
+  animation: slideFadeIn 280ms var(--ease-out-quint) forwards;
+}
+
+/* Animaciones fluidas para Ventanas Modales */
+@keyframes modalBackdropFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modalContentZoomIn {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-modal-backdrop {
+  animation: modalBackdropFadeIn 200ms ease-out forwards;
+}
+
+.animate-modal-card {
+  animation: modalContentZoomIn 280ms var(--ease-spring) forwards;
+}
+
+/* Animación de flotación orgánica suave */
+@keyframes floatSlow {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(0.8deg);
+  }
+}
+
+.animate-float-slow {
+  animation: floatSlow 5s ease-in-out infinite;
+}
+
+/* Entrada escalonada de elementos (Stagger fade in) */
+@keyframes staggerFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  animation: staggerFadeUp 320ms var(--ease-out-quint) both;
+}
+
+.stagger-1 { animation-delay: 50ms; }
+.stagger-2 { animation-delay: 100ms; }
+.stagger-3 { animation-delay: 150ms; }
+.stagger-4 { animation-delay: 200ms; }
+.stagger-5 { animation-delay: 250ms; }
+.stagger-6 { animation-delay: 300ms; }
+
+/* Menú dropdown / popover fade & scale */
+@keyframes menuIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-menu-in {
+  animation: menuIn 160ms var(--ease-out-quint) forwards;
+}
+
+/* Animación sutil de pulso vivo para indicadores en tiempo real */
+@keyframes liveDot {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(225, 41, 39, 0.5);
+  }
+  50% {
+    opacity: 0.8;
+    box-shadow: 0 0 0 6px rgba(225, 41, 39, 0);
+  }
+}
+
+.animate-live-dot {
+  animation: liveDot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Saludo animado */
+@keyframes handWave {
+  0%, 100% { transform: rotate(0deg); }
+  20%, 60% { transform: rotate(14deg); }
+  40%, 80% { transform: rotate(-10deg); }
+}
+
+.animate-wave {
+  display: inline-block;
+  transform-origin: 70% 70%;
+  animation: handWave 2s ease-in-out infinite;
+}
+
