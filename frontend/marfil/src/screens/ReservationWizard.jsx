@@ -11,11 +11,13 @@ import {
   Sparkles
 } from 'lucide-react';
 import { sounds } from '../utils/audio';
+import { fechaEnDias, fechasSugeridas as calcularFechasSugeridas } from '../api/adaptadores';
 
 export default function ReservationWizard({
   sucursales,
   actividades,
   initialData,
+  contacto,
   onCancel,
   onCompleteReservation
 }) {
@@ -25,14 +27,15 @@ export default function ReservationWizard({
   // Estado del formulario
   const [reservaTipo, setReservaTipo] = useState(initialData?.tipo || 'mesa');
   const [selectedActividadId, setSelectedActividadId] = useState(initialData?.actividadId || '');
-  const [selectedSucursalId, setSelectedSucursalId] = useState(initialData?.sucursalId || 'centro-historico');
-  const [selectedDate, setSelectedDate] = useState('2026-10-02');
+  const [selectedSucursalId, setSelectedSucursalId] = useState(initialData?.sucursalId || sucursales[0]?.id || '');
+  const [selectedDate, setSelectedDate] = useState(() => fechaEnDias(1)); // por defecto, mañana
   const [selectedTime, setSelectedTime] = useState('11:00 AM');
   const [personas, setPersonas] = useState(initialData?.personas || 2);
-  const [nombre, setNombre] = useState('Sofía Navarro Morales');
-  const [telefono, setTelefono] = useState('(618) 154-8920');
-  const [correo, setCorreo] = useState('sofia.navarro@gmail.com');
-  const [notas, setNotas] = useState('');
+  const [nombre, setNombre] = useState(contacto?.nombre ?? '');
+  const [telefono, setTelefono] = useState(contacto?.telefono ?? '');
+  const [correo, setCorreo] = useState(contacto?.correo ?? '');
+  const [notas, setNotas] = useState(initialData?.notas ?? initialData?.nota ?? '');
+  const [enviando, setEnviando] = useState(false);
   const [validationError, setValidationError] = useState('');
 
   // Preselección si viene de actividad o sucursal
@@ -85,12 +88,7 @@ export default function ReservationWizard({
     { hora: '08:30 PM', turno: 'Noche de Sala' }
   ];
 
-  const fechasSugeridas = [
-    { label: 'Hoy', dia: 'Jueves 1 Oct', iso: '2026-10-01' },
-    { label: 'Mañana', dia: 'Viernes 2 Oct', iso: '2026-10-02' },
-    { label: 'Fin de Semana', dia: 'Sábado 3 Oct', iso: '2026-10-03' },
-    { label: 'Domingo Brunch', dia: 'Domingo 4 Oct', iso: '2026-10-04' }
-  ];
+  const fechasSugeridas = calcularFechasSugeridas();
 
   const sucursalObj = sucursales.find((s) => s.id === selectedSucursalId) || sucursales[0];
   const actividadObj = actividades.find((a) => a.id === selectedActividadId);
@@ -130,8 +128,10 @@ export default function ReservationWizard({
       }
       setCurrentStep(6);
     } else if (currentStep === 6) {
+      // El folio, el QR y el estado los asigna la API; aquí solo va lo que eligió el cliente.
       const nuevaReserva = {
-        id: `MF-${Math.floor(1000 + Math.random() * 9000)}`,
+        tipoId: reservaTipo,
+        actividadId: reservaTipo === 'actividad' ? selectedActividadId : null,
         tipo:
           reservaTipo === 'actividad' && actividadObj
             ? `Actividad: ${actividadObj.nombre}`
@@ -145,12 +145,17 @@ export default function ReservationWizard({
         nombreCliente: nombre,
         telefonoCliente: telefono,
         correoCliente: correo,
-        notas: notas,
-        estado: 'Confirmada',
-        qrCode: `MF-${Date.now()}-CONFIRMED`,
-        esHistorica: false
+        notas: notas
       };
-      onCompleteReservation(nuevaReserva);
+      if (enviando) return;
+      setEnviando(true);
+      // Si la API la rechaza (sin cupo, fecha pasada...) devuelve el motivo para mostrarlo aquí.
+      Promise.resolve(onCompleteReservation(nuevaReserva)).then((error) => {
+        if (typeof error === 'string') {
+          setValidationError(error);
+          setEnviando(false);
+        }
+      });
     }
   };
 
@@ -411,7 +416,7 @@ export default function ReservationWizard({
             <input
               type="date"
               value={selectedDate}
-              min="2026-10-01"
+              min={fechaEnDias(0)}
               onChange={(e) => setSelectedDate(e.target.value)}
               className="p-3.5 rounded-md border-2 border-stone-300 bg-white font-mono text-sm text-[#1F1410] focus:outline-none focus:border-[#E12927]"
             />

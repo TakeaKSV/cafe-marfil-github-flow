@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Header from './components/Header';
 import BottomNav from './components/BottomNav';
 import NotificationsDrawer from './components/NotificationsDrawer';
@@ -16,20 +16,21 @@ import ReservationSuccessScreen from './screens/ReservationSuccessScreen';
 import MyReservationsScreen from './screens/MyReservationsScreen';
 import BranchesScreen from './screens/BranchesScreen';
 import ProfileScreen from './screens/ProfileScreen';
+import AuthScreen from './screens/AuthScreen';
 import HeroSection from './components/HeroSection';
 import MenuScreen from './screens/MenuScreen';
 
-// Datos oficiales
+// Datos: todo llega de la API
+import { alExpirarSesion, api, reservasDeInvitado, sesion } from './api/cliente';
 import {
-  SUCURSALES,
-  ACTIVIDADES,
-  PROMOCIONES,
-  PERFIL_USUARIO,
-  BENEFICIOS_USUARIO,
-  NOTIFICACIONES_INICIALES,
-  RESERVACIONES_INICIALES
-} from './data/marfilData';
-import { sounds } from './utils/audio';
+  aActividad,
+  aBeneficio,
+  aNotificacion,
+  aPerfil,
+  aPromocion,
+  aReservacion,
+  aSeccionesDeMenu
+} from './api/adaptadores';
 
 export default function App() {
   // 1. Estado de Pantalla Activa con soporte para URL /hero, /menu o hashes
@@ -88,47 +89,134 @@ export default function App() {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
 
-  // 4. Reservaciones con persistencia
-  const [reservaciones, setReservaciones] = useState(() => {
-    const saved = localStorage.getItem('marfil_reservaciones');
-    return saved ? JSON.parse(saved) : RESERVACIONES_INICIALES;
-  });
+  // 4. Catálogo público (sucursales, actividades, promociones y menú)
+  const [sucursales, setSucursales] = useState([]);
+  const [actividades, setActividades] = useState([]);
+  const [promociones, setPromociones] = useState([]);
+  const [secciones, setSecciones] = useState([]);
+  const [catalogoListo, setCatalogoListo] = useState(false);
+  const [errorCatalogo, setErrorCatalogo] = useState('');
 
-  useEffect(() => {
-    localStorage.setItem('marfil_reservaciones', JSON.stringify(reservaciones));
-  }, [reservaciones]);
-
-  // 5. Beneficios con persistencia
-  const [beneficios, setBeneficios] = useState(() => {
-    const saved = localStorage.getItem('marfil_beneficios');
-    return saved ? JSON.parse(saved) : BENEFICIOS_USUARIO;
-  });
-
-  useEffect(() => {
-    localStorage.setItem('marfil_beneficios', JSON.stringify(beneficios));
-  }, [beneficios]);
-
-  // 6. Notificaciones con persistencia
-  const [notificaciones, setNotificaciones] = useState(() => {
-    const saved = localStorage.getItem('marfil_notificaciones');
-    return saved ? JSON.parse(saved) : NOTIFICACIONES_INICIALES;
-  });
-
-  useEffect(() => {
-    localStorage.setItem('marfil_notificaciones', JSON.stringify(notificaciones));
-  }, [notificaciones]);
-
+  // 5. Cuenta del cliente. `cliente` es null cuando se navega como invitado.
+  const [cliente, setCliente] = useState(null);
+  const [reservaciones, setReservaciones] = useState([]);
+  const [beneficios, setBeneficios] = useState([]);
+  const [notificaciones, setNotificaciones] = useState([]);
   const [isNotifDrawerOpen, setIsNotifDrawerOpen] = useState(false);
+  const perfil = cliente ? aPerfil(cliente) : null;
 
-  // 7. Perfil con persistencia
-  const [perfil, setPerfil] = useState(() => {
-    const saved = localStorage.getItem('marfil_perfil');
-    return saved ? JSON.parse(saved) : PERFIL_USUARIO;
-  });
-
+  // Aviso flotante para errores de la API
+  const [aviso, setAviso] = useState(null);
   useEffect(() => {
-    localStorage.setItem('marfil_perfil', JSON.stringify(perfil));
-  }, [perfil]);
+    if (!aviso) return undefined;
+    const temporizador = setTimeout(() => setAviso(null), 6000);
+    return () => clearTimeout(temporizador);
+  }, [aviso]);
+
+  const cargarCatalogo = useCallback(async () => {
+    const [s, a, p, productos] = await Promise.all([
+      api('/sucursales'),
+      api('/actividades'),
+      api('/promociones'),
+      api('/menu/productos')
+    ]);
+    setSucursales(s);
+    setActividades(a.map(aActividad));
+    setPromociones(p.map(aPromocion));
+    setSecciones(aSeccionesDeMenu(productos));
+    setCatalogoListo(true);
+  }, []);
+
+  /**
+   * Reservaciones, beneficios y notificaciones. Con sesión salen de la cuenta;
+   * como invitado solo hay reservaciones: las que se hicieron en este dispositivo.
+   */
+  const cargarCuenta = useCallback(async (conSesion) => {
+    if (conSesion) {
+      const [r, b, n] = await Promise.all([
+        api('/mi/reservaciones'),
+        api('/mi/beneficios'),
+        api('/mi/notificaciones')
+      ]);
+      setReservaciones(r.map(aReservacion));
+      setBeneficios(b.map(aBeneficio));
+      setNotificaciones(n.map(aNotificacion));
+      return;
+    }
+    const delDispositivo = await Promise.all(
+      reservasDeInvitado.tokens().map((token) => api(`/reservaciones/publica/${token}`).catch(() => null))
+    );
+    setReservaciones(delDispositivo.filter(Boolean).map(aReservacion));
+    setBeneficios([]);
+    setNotificaciones([]);
+  }, []);
+
+  // Arranque: catálogo, y la sesión guardada si la hay.
+  useEffect(() => {
+    cargarCatalogo().catch((error) => setErrorCatalogo(error.message));
+
+    alExpirarSesion(() => {
+      setCliente(null);
+      setAviso('Tu sesión expiró. Inicia sesión de nuevo.');
+    });
+
+    const restaurarSesion = async () => {
+      if (!sesion.token) return false;
+      try {
+        const respuesta = await api('/auth/me');
+        if (respuesta.tipo !== 'cliente') throw new Error('La sesión guardada no es de un cliente.');
+        setCliente(respuesta.cliente);
+        return true;
+      } catch {
+        sesion.cerrar();
+        return false;
+      }
+    };
+    restaurarSesion()
+      .then(cargarCuenta)
+      .catch(() => {});
+  }, [cargarCatalogo, cargarCuenta]);
+
+  // Sesión -----------------------------------------------------------------
+
+  /** Los usa AuthScreen; si la API rechaza los datos lanzan el mensaje a mostrar. */
+  const entrar = async (respuesta) => {
+    sesion.guardar(respuesta.token);
+    setCliente(respuesta.cliente);
+    await cargarCuenta(true);
+  };
+  const iniciarSesion = async (email, password) =>
+    entrar(await api('/auth/clientes/login', { metodo: 'POST', body: { email, password } }));
+  const crearCuenta = async (datos) =>
+    entrar(await api('/auth/clientes/registro', { metodo: 'POST', body: datos }));
+
+  const cerrarSesion = () => {
+    sesion.cerrar();
+    setCliente(null);
+    cargarCuenta(false).catch(() => {});
+    navigateTo('inicio');
+  };
+
+  const handleUpdatePerfil = async (nuevo) => {
+    try {
+      const actualizado = await api('/mi/perfil', {
+        metodo: 'PATCH',
+        body: {
+          nombre: nuevo.nombre,
+          telefono: nuevo.telefono || null,
+          email: nuevo.correo,
+          preferencias: {
+            lechePreferida: nuevo.preferencias.lechePreferida,
+            bebidaFavorita: nuevo.preferencias.bebidaFavorita,
+            experienciaFavorita: nuevo.preferencias.experienciaFavorita
+          }
+        }
+      });
+      setCliente(actualizado);
+    } catch (error) {
+      setAviso(error.message);
+    }
+  };
 
   // Métodos de navegación y acciones
   const navigateTo = (screenId) => {
@@ -174,71 +262,57 @@ export default function App() {
   };
 
   // Filtrar actividades por sucursal
-  const handleFilterBranchActivities = (branchId) => {
+  const handleFilterBranchActivities = () => {
     navigateTo('actividades');
   };
 
-  // Completar reserva desde el wizard
-  const handleCompleteReservation = (newReservation) => {
-    setReservaciones((prev) => [newReservation, ...prev]);
-    setLastConfirmedReservation(newReservation);
-
-    // Agregar notificación de confirmación
-    const nuevaNotif = {
-      id: `notif-${Date.now()}`,
-      titulo: '¡Reservación confirmada!',
-      mensaje: `Tu reservación #${newReservation.id} para el ${newReservation.fecha} a las ${newReservation.hora} en ${newReservation.sucursalNombre} quedó registrada exitosamente.`,
-      tiempo: 'Justo ahora',
-      tipo: 'reservacion',
-      leida: false,
-      screenDestino: 'mis_reservaciones'
-    };
-    setNotificaciones((prev) => [nuevaNotif, ...prev]);
-
-    // Redirigir a pantalla de confirmación exitosa
-    navigateTo('confirmacion_reservacion');
+  /**
+   * Completar reserva desde el wizard. Devuelve el mensaje de error si la API
+   * la rechaza, para que el wizard lo muestre sin perder lo capturado.
+   */
+  const handleCompleteReservation = async (nueva) => {
+    try {
+      const creada = await api('/reservaciones', {
+        metodo: 'POST',
+        body: {
+          tipo: nueva.tipoId,
+          actividadId: nueva.actividadId || undefined,
+          sucursalId: nueva.sucursalId,
+          fecha: nueva.fechaISO,
+          hora: nueva.hora,
+          personas: nueva.personas,
+          comensal: nueva.nombreCliente,
+          telefono: nueva.telefonoCliente,
+          email: nueva.correoCliente || undefined,
+          notas: nueva.notas || undefined
+        }
+      });
+      if (!cliente) reservasDeInvitado.agregar(creada.tokenQR);
+      setLastConfirmedReservation(aReservacion(creada));
+      // Se refresca la cuenta (nueva reservación y su notificación) y el cupo de actividades.
+      cargarCuenta(Boolean(cliente)).catch(() => {});
+      cargarCatalogo().catch(() => {});
+      navigateTo('confirmacion_reservacion');
+      return null;
+    } catch (error) {
+      return error.message;
+    }
   };
 
-  // Cancelar reservación
-  const handleCancelReservation = (reservationId) => {
-    setReservaciones((prev) =>
-      prev.map((r) => (r.id === reservationId ? { ...r, estado: 'Cancelada' } : r))
-    );
-
-    // Agregar notificación de cancelación
-    const cancelNotif = {
-      id: `notif-${Date.now()}`,
-      titulo: 'Reservación cancelada',
-      mensaje: `La reservación #${reservationId} ha sido cancelada correctamente.`,
-      tiempo: 'Justo ahora',
-      tipo: 'reservacion',
-      leida: false,
-      screenDestino: 'mis_reservaciones'
-    };
-    setNotificaciones((prev) => [cancelNotif, ...prev]);
-  };
-
-  // Reclamar beneficio de la ruleta o código
-  const handleClaimBenefit = (newBenefit) => {
-    setBeneficios((prev) => [newBenefit, ...prev]);
-
-    // Aumentar puntos en el perfil
-    setPerfil((prev) => ({
-      ...prev,
-      puntosFidelidad: prev.puntosFidelidad + 25
-    }));
-
-    // Notificación
-    const notif = {
-      id: `notif-${Date.now()}`,
-      titulo: '¡Nuevo beneficio agregado!',
-      mensaje: `Has obtenido "${newBenefit.titulo}". Disponible en tu sección de beneficios.`,
-      tiempo: 'Justo ahora',
-      tipo: 'beneficio',
-      leida: false,
-      screenDestino: 'beneficios'
-    };
-    setNotificaciones((prev) => [notif, ...prev]);
+  // Cancelar reservación (`reservationId` es el folio)
+  const handleCancelReservation = async (reservationId) => {
+    try {
+      if (cliente) {
+        await api(`/mi/reservaciones/${reservationId}/cancelar`, { metodo: 'POST' });
+      } else {
+        const { qrCode } = reservaciones.find((r) => r.id === reservationId);
+        await api(`/reservaciones/publica/${qrCode}/cancelar`, { metodo: 'POST' });
+      }
+    } catch (error) {
+      setAviso(error.message);
+    }
+    cargarCuenta(Boolean(cliente)).catch(() => {});
+    cargarCatalogo().catch(() => {});
   };
 
   // Notificaciones
@@ -246,12 +320,14 @@ export default function App() {
 
   const handleMarkAllRead = () => {
     setNotificaciones((prev) => prev.map((n) => ({ ...n, leida: true })));
+    if (cliente) api('/mi/notificaciones/leer-todas', { metodo: 'POST' }).catch(() => {});
   };
 
   const handleNotificationClick = (notif) => {
     setNotificaciones((prev) =>
       prev.map((n) => (n.id === notif.id ? { ...n, leida: true } : n))
     );
+    if (cliente) api(`/mi/notificaciones/${notif.id}/leer`, { metodo: 'POST' }).catch(() => {});
     setIsNotifDrawerOpen(false);
     if (notif.screenDestino) {
       navigateTo(notif.screenDestino);
@@ -275,6 +351,12 @@ export default function App() {
 
       {/* Contenido Principal con Enrutador React */}
       <main className={activeScreen === 'hero' || activeScreen === 'inicio' ? 'w-full p-0 m-0 max-w-none flex-1' : 'main-content'} id="main-content">
+        {!catalogoListo && activeScreen !== 'hero' && (
+          <p className="font-mono text-xs font-bold text-[#8E7A74] uppercase tracking-wider text-center py-24">
+            {errorCatalogo || 'Cargando Café Marfil...'}
+          </p>
+        )}
+
         {/* PROTOTIPO HERO COFFEE & CO. (/hero) */}
         {activeScreen === 'hero' && (
           <HeroSection
@@ -290,7 +372,7 @@ export default function App() {
         )}
 
         {/* INICIO */}
-        {activeScreen === 'inicio' && (
+        {catalogoListo && activeScreen === 'inicio' && (
           <HomeScreen
             onNavigate={(s) => {
               setReservationWizardInitialData(null);
@@ -302,14 +384,16 @@ export default function App() {
             }}
             onSelectActivity={handleSelectActivity}
             onSelectPromo={handleSelectPromo}
-            actividades={ACTIVIDADES}
-            promociones={PROMOCIONES}
+            actividades={actividades}
+            promociones={promociones}
+            sucursales={sucursales}
           />
         )}
 
         {/* MENÚ OFICIAL (CAROUSEL & DESKTOP/MÓVIL) */}
-        {activeScreen === 'menu' && (
+        {catalogoListo && activeScreen === 'menu' && (
           <MenuScreen
+            secciones={secciones}
             initialProduct={initialMenuProduct}
             onClearInitialProduct={() => setInitialMenuProduct(null)}
             onOrderNow={(producto) => {
@@ -323,54 +407,63 @@ export default function App() {
         )}
 
         {/* ACTIVIDADES */}
-        {activeScreen === 'actividades' && (
+        {catalogoListo && activeScreen === 'actividades' && (
           <ActivitiesScreen
-            actividades={ACTIVIDADES}
-            sucursales={SUCURSALES}
+            actividades={actividades}
+            sucursales={sucursales}
             onSelectActivity={handleSelectActivity}
             onGoToReservation={() => navigateTo('reservar')}
           />
         )}
 
         {/* DETALLE DE ACTIVIDAD */}
-        {activeScreen === 'detalle_actividad' && (
+        {catalogoListo && activeScreen === 'detalle_actividad' && (
           <ActivityDetailScreen
-            activity={selectedActivity || ACTIVIDADES[0]}
+            activity={selectedActivity || actividades[0]}
             onBack={() => navigateTo('actividades')}
             onBookActivity={handleBookActivity}
           />
         )}
 
         {/* PROMOCIONES */}
-        {activeScreen === 'promociones' && (
+        {catalogoListo && activeScreen === 'promociones' && (
           <PromotionsScreen
-            promociones={PROMOCIONES}
+            promociones={promociones}
             onSelectPromo={handleSelectPromo}
           />
         )}
 
         {/* DETALLE DE PROMOCIÓN */}
-        {activeScreen === 'detalle_promocion' && (
+        {catalogoListo && activeScreen === 'detalle_promocion' && (
           <PromotionDetailScreen
-            promo={selectedPromo || PROMOCIONES[0]}
+            promo={selectedPromo || promociones[0]}
             onBack={() => navigateTo('promociones')}
           />
         )}
 
         {/* MIS BENEFICIOS / FIDELIDAD */}
         {activeScreen === 'beneficios' && (
-          <BenefitsScreen
-            perfil={perfil}
-            beneficios={beneficios}
-          />
+          perfil ? (
+            <BenefitsScreen
+              perfil={perfil}
+              beneficios={beneficios}
+            />
+          ) : (
+            <AuthScreen
+              onLogin={iniciarSesion}
+              onRegister={crearCuenta}
+              motivo="Inicia sesión para ver tu pasaporte de sellos y tus beneficios."
+            />
+          )
         )}
 
         {/* SISTEMA DE RESERVACIONES (WIZARD EN 6 PASOS) */}
-        {activeScreen === 'reservar' && (
+        {catalogoListo && activeScreen === 'reservar' && (
           <ReservationWizard
-            sucursales={SUCURSALES}
-            actividades={ACTIVIDADES}
+            sucursales={sucursales}
+            actividades={actividades}
             initialData={reservationWizardInitialData}
+            contacto={perfil}
             onCancel={() => navigateTo('inicio')}
             onCompleteReservation={handleCompleteReservation}
           />
@@ -398,25 +491,30 @@ export default function App() {
         )}
 
         {/* SUCURSALES */}
-        {activeScreen === 'sucursales' && (
+        {catalogoListo && activeScreen === 'sucursales' && (
           <BranchesScreen
-            sucursales={SUCURSALES}
+            sucursales={sucursales}
             onReserveBranch={handleReserveBranch}
             onFilterBranchActivities={handleFilterBranchActivities}
           />
         )}
 
         {/* PERFIL DEL CLIENTE */}
-        {activeScreen === 'perfil' && (
+        {activeScreen === 'perfil' && !perfil && (
+          <AuthScreen onLogin={iniciarSesion} onRegister={crearCuenta} />
+        )}
+        {activeScreen === 'perfil' && perfil && (
           <ProfileScreen
+            key={perfil.codigoCliente}
             perfil={perfil}
-            onUpdatePerfil={setPerfil}
+            onUpdatePerfil={handleUpdatePerfil}
+            onLogout={cerrarSesion}
             onViewReservations={() => navigateTo('mis_reservaciones')}
             onViewBenefits={() => navigateTo('beneficios')}
             theme={theme}
             toggleTheme={toggleTheme}
             reservacionesCount={reservaciones.filter((r) => r.estado !== 'Cancelada').length}
-            beneficiosCount={beneficios.length}
+            beneficiosCount={beneficios.filter((b) => b.estado === 'disponible').length}
           />
         )}
       </main>
@@ -493,6 +591,16 @@ export default function App() {
           navigateTo(s);
         }}
       />
+
+      {aviso && (
+        <div
+          role="alert"
+          onClick={() => setAviso(null)}
+          className="fixed left-1/2 -translate-x-1/2 bottom-24 z-[10000] w-[min(92vw,28rem)] p-3.5 rounded-md bg-[#1F1410] text-white border-l-4 border-[#E12927] shadow-lg font-body text-xs sm:text-sm font-medium cursor-pointer"
+        >
+          {aviso}
+        </div>
+      )}
 
       {/* Drawer Lateral de Notificaciones */}
       <NotificationsDrawer
