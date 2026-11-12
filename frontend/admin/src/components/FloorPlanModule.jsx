@@ -20,6 +20,7 @@ import {
   UserCheck
 } from 'lucide-react';
 import { playSound } from '../utils/audioFeedback';
+import { tiempoEnMesa } from '../api/adaptadores';
 
 export const FloorPlanModule = ({ 
   mesas, 
@@ -29,7 +30,7 @@ export const FloorPlanModule = ({
   soundEnabled,
   onOpenWalkInModal 
 }) => {
-  const [activeZone, setActiveZone] = useState('salon');
+  const [activeZone, setActiveZone] = useState('todas');
   const [showPropertiesMenu, setShowPropertiesMenu] = useState(false);
   const [selectedMesa, setSelectedMesa] = useState(null);
   const [zoomLevel, setZoomLevel] = useState(100);
@@ -62,61 +63,37 @@ export const FloorPlanModule = ({
 
   const activePropsCount = Object.values(visibleProperties).filter(Boolean).length;
 
-  // Lista de mesas con capacidad explícita (2, 4, 6 sillas) y estados (libre en gris, ocupada en rojo, limpieza en ámbar)
-  const defaultLayout = [
-    // FILA 1:
-    // T1: 4 sillas - Libre (Gris claro nítido)
-    { id: 'T1', numero: 'T1', shape: 'squircle', capacidad: 4, estado: 'libre', comensal: null, personas: 4, tiempoStr: '0:00h', mesero: 'Valeria S.' },
-    // T2: 2 sillas - Libre (Gris claro nítido) -> NOTA: Solo 2 sillas laterales enfrentadas
-    { id: 'T2', numero: 'T2', shape: 'squircle', capacidad: 2, estado: 'libre', comensal: null, personas: 2, tiempoStr: '0:00h', mesero: 'Valeria S.' },
-    // T3: 4 sillas - Libre (Gris claro nítido)
-    { id: 'T3', numero: 'T3', shape: 'squircle', capacidad: 4, estado: 'libre', comensal: null, personas: 4, tiempoStr: '0:00h', mesero: 'Mateo N.' },
-    // T4: 4 sillas - Ocupada (Rojo Marfil) con badge verde y check
-    { id: 'T4', numero: 'T4', shape: 'squircle', capacidad: 4, estado: 'ocupada', comensal: 'Carlos Mendoza', personas: 4, tiempoStr: '0:45h', mesero: 'Sofía V.', verified: true },
-    // T5: 2 sillas - Libre (Gris claro nítido) -> NOTA: Solo 2 sillas laterales enfrentadas
-    { id: 'T5', numero: 'T5', shape: 'squircle', capacidad: 2, estado: 'libre', comensal: null, personas: 2, tiempoStr: '0:00h', mesero: 'Mateo N.' },
+  // El plano se arma con las mesas reales de la sucursal elegida en el menú lateral
+  // (con "todas" se muestra la primera) y se puede acotar a una de sus zonas.
+  const sucursalDelPlano = selectedSucursal === 'todas' ? sucursales[0]?.id : selectedSucursal;
+  const mesasSucursal = mesas.filter(m => m.sucursalId === sucursalDelPlano);
+  const zonasDelPlano = [...new Set(mesasSucursal.map(m => m.zona).filter(Boolean))];
+  const zonaActiva = zonasDelPlano.includes(activeZone) ? activeZone : 'todas';
 
-    // FILA 2:
-    // T8: 4 sillas - Ocupada (Rojo Marfil)
-    { id: 'T8', numero: 'T8', shape: 'squircle', capacidad: 4, estado: 'ocupada', comensal: 'Andrea Garza', personas: 3, tiempoStr: '0:35h', mesero: 'Valeria S.', verified: false },
-    // T9: 4 sillas - Libre (Gris claro nítido)
-    { id: 'T9', numero: 'T9', shape: 'squircle', capacidad: 4, estado: 'libre', comensal: null, personas: 4, tiempoStr: '0:00h', mesero: 'Valeria S.' },
-    // T10: 4 sillas - En Limpieza & Desinfección (Ámbar)
-    { id: 'T10', numero: 'T10', shape: 'squircle', capacidad: 4, estado: 'limpieza', comensal: null, personas: 4, tiempoStr: '0:06h', mesero: 'Erick R.', verified: false },
-    // T11: 4 sillas - Ocupada (Rojo Marfil)
-    { id: 'T11', numero: 'T11', shape: 'squircle', capacidad: 4, estado: 'ocupada', comensal: 'Diana Luna', personas: 4, tiempoStr: '0:40h', mesero: 'Mateo N.', verified: false },
-    // T6 Lateral Derecho: Mesa rectangular vertical para 6 comensales (3 sillas izq + 3 sillas der)
-    { id: 'T6_RECT', numero: 'T6', shape: 'rectangle_vertical', capacidad: 6, estado: 'ocupada', comensal: 'Grupo Arquitectura', personas: 6, tiempoStr: '1:15h', mesero: 'Sofía V.', verified: true },
-
-    // FILA 3:
-    // T12: Redonda 2 sillas - Ocupada (Rojo Marfil) -> NOTA: Solo 2 sillas arriba y abajo
-    { id: 'T12', numero: 'T12', shape: 'circle', capacidad: 2, estado: 'ocupada', comensal: 'Lucía Benítez', personas: 2, tiempoStr: '0:25h', mesero: 'Valeria S.', verified: false },
-    // T13: Redonda 2 sillas - Libre (Gris claro nítido) -> NOTA: Solo 2 sillas arriba y abajo
-    { id: 'T13', numero: 'T13', shape: 'circle', capacidad: 2, estado: 'libre', comensal: null, personas: 2, tiempoStr: '0:00h', mesero: 'Valeria S.' },
-    // T14: Redonda 4 sillas - Libre (Gris claro nítido)
-    { id: 'T14', numero: 'T14', shape: 'circle', capacidad: 4, estado: 'libre', comensal: null, personas: 4, tiempoStr: '0:00h', mesero: 'Mateo N.' },
-    // T15: Redonda 4 sillas - Ocupada (Rojo Marfil)
-    { id: 'T15', numero: 'T15', shape: 'circle', capacidad: 4, estado: 'ocupada', comensal: 'Rodrigo Peña', personas: 4, tiempoStr: '0:50h', mesero: 'Mateo N.', verified: false },
-    // T16: Mesa Alargada Horizontal para 6 sillas (2 arriba, 2 abajo, 1 izq, 1 der) - Ocupada (Rojo Marfil)
-    { id: 'T16', numero: 'T16', shape: 'rectangle_horizontal', capacidad: 6, estado: 'ocupada', comensal: 'Mariana Soto', personas: 5, tiempoStr: '1:05h', mesero: 'Sofía V.', verified: true }
-  ];
-
-  const [tableLayout, setTableLayout] = useState(defaultLayout);
-
-  const handleUpdateStatus = (tableId, nuevoEstado) => {
-    setTableLayout(prev => prev.map(t => {
-      if (t.id === tableId) {
-        const isFree = nuevoEstado === 'libre';
-        const isClean = nuevoEstado === 'limpieza';
-        return {
-          ...t,
-          estado: nuevoEstado,
-          tiempoStr: isFree ? '0:00h' : isClean ? '0:05h' : t.tiempoStr || '0:15h',
-          comensal: isFree ? null : isClean ? null : t.comensal || 'Comensal en Sala'
-        };
-      }
-      return t;
+  // Cada mesa se adapta a lo que dibuja renderTable. Una mesa "reservada" sigue
+  // físicamente libre hasta el check-in, así que en el plano se ve libre.
+  const mesasDelPlano = mesasSucursal
+    .filter(m => zonaActiva === 'todas' || m.zona === zonaActiva)
+    .map(m => ({
+      id: m.id,
+      numero: m.numero,
+      shape: m.forma,
+      capacidad: m.capacidad,
+      estado: m.estado === 'reservada' ? 'libre' : m.estado,
+      comensal: m.estado === 'ocupada' ? m.comensal : null,
+      personas: m.estado === 'ocupada' ? m.personas : m.capacidad,
+      tiempoStr: tiempoEnMesa(m.tiempoMinutos),
+      mesero: m.mesero || 'Sin asignar',
+      verified: Boolean(m.reservaFolio)
     }));
+
+  // El lienzo tiene tres filas y un lugar lateral para una mesa rectangular vertical.
+  const mesaLateral = mesasDelPlano.find(m => m.shape === 'rectangle_vertical');
+  const mesasEnFilas = mesasDelPlano.filter(m => m !== mesaLateral);
+
+  // El panel (App) traduce el cambio de estado a la acción de la API y recarga las mesas.
+  const handleUpdateStatus = (tableId, nuevoEstado) => {
+    onUpdateMesa(tableId, nuevoEstado);
 
     if (soundEnabled) {
       playSound(nuevoEstado === 'libre' ? 'success' : nuevoEstado === 'ocupada' ? 'coin' : 'toggle');
@@ -124,9 +101,9 @@ export const FloorPlanModule = ({
     setSelectedMesa(null);
   };
 
-  const occupiedCount = tableLayout.filter(t => t.estado === 'ocupada').length;
-  const freeCount = tableLayout.filter(t => t.estado === 'libre').length;
-  const cleaningCount = tableLayout.filter(t => t.estado === 'limpieza').length;
+  const occupiedCount = mesasDelPlano.filter(t => t.estado === 'ocupada').length;
+  const freeCount = mesasDelPlano.filter(t => t.estado === 'libre').length;
+  const cleaningCount = mesasDelPlano.filter(t => t.estado === 'limpieza').length;
 
   // Escape key para cerrar modal de mesa
   useEffect(() => {
@@ -152,7 +129,7 @@ export const FloorPlanModule = ({
             Servicio en Sala
           </h2>
           <span className="px-3 py-1 rounded-full text-[11px] font-mono font-bold bg-[#FCEAE9] text-[#E12927]">
-            {activeZone === 'salon' ? 'Salón Principal' : activeZone === 'terraza' ? 'Terraza Colonial' : 'Ludoteca'}
+            {zonaActiva === 'todas' ? 'Todas las zonas' : zonaActiva}
           </span>
           <div className="flex items-center gap-2 text-xs font-mono">
             <span className="px-2.5 py-0.5 rounded-full bg-[#E12927]/10 text-[#E12927] font-semibold">
@@ -261,16 +238,17 @@ export const FloorPlanModule = ({
           {/* Selector de Plano en Español */}
           <div className="relative">
             <select
-              value={activeZone}
+              value={zonaActiva}
               onChange={(e) => {
                 setActiveZone(e.target.value);
                 if (soundEnabled) playSound('toggle');
               }}
               className="appearance-none bg-white border border-[#1F1410]/10 rounded-full px-4 py-1.5 pr-8 text-xs font-semibold text-[#1F1410] shadow-2xs hover:bg-[#FAF7F5] transition-colors cursor-pointer"
             >
-              <option value="salon">Plano · Salón Principal</option>
-              <option value="terraza">Plano · Terraza Colonial</option>
-              <option value="ludoteca">Plano · Ludoteca & Juegos</option>
+              <option value="todas">Plano · Todas las zonas</option>
+              {zonasDelPlano.map(zona => (
+                <option key={zona} value={zona}>Plano · {zona}</option>
+              ))}
             </select>
             <ChevronDown className="w-3.5 h-3.5 absolute right-3 top-1/2 -translate-y-1/2 text-[#1F1410]/40 pointer-events-none" />
           </div>
@@ -302,27 +280,31 @@ export const FloorPlanModule = ({
         className="transition-transform duration-200 py-12 px-4 sm:px-8 flex flex-col items-center justify-center space-y-14 sm:space-y-16 rounded-2xl bg-white/70 border border-slate-200/80 shadow-inner my-3"
       >
         
-        {/* FILA 1: Squircles: T1 (4 sillas gris libre), T2 (2 sillas gris libre), T3 (4 sillas gris libre), T4 (4 sillas rojo ocupada), T5 (2 sillas gris libre) */}
+        {/* FILA 1: las primeras cinco mesas */}
         <div className="flex items-center justify-center gap-8 sm:gap-12 flex-wrap">
-          {tableLayout.slice(0, 5).map(mesa => renderTable(mesa))}
+          {mesasEnFilas.slice(0, 5).map(mesa => renderTable(mesa))}
         </div>
 
-        {/* FILA 2: Squircles T8, T9, T10 (Limpieza), T11 + Mesa Lateral Derecha T6 (6 sillas) */}
+        {/* FILA 2: cuatro mesas más + la mesa rectangular vertical en el lateral derecho */}
         <div className="flex items-center justify-center gap-8 sm:gap-12 flex-wrap">
           <div className="flex items-center gap-8 sm:gap-12 flex-wrap justify-center">
-            {tableLayout.slice(5, 9).map(mesa => renderTable(mesa))}
+            {mesasEnFilas.slice(5, 9).map(mesa => renderTable(mesa))}
           </div>
 
-          {/* Mesa Rectangular Vertical T6 (con 6 sillas claramente visibles: 3 izq + 3 der) */}
+          {/* Mesa Rectangular Vertical (con 6 sillas claramente visibles: 3 izq + 3 der) */}
           <div className="pl-0 sm:pl-4">
-            {renderTable(tableLayout[9])}
+            {mesaLateral && renderTable(mesaLateral)}
           </div>
         </div>
 
-        {/* FILA 3: Redondas & Cápsula: T12 (2 sillas rojo), T13 (2 sillas gris), T14 (4 sillas gris), T15 (4 sillas rojo), T16 (6 sillas horizontal rojo) */}
+        {/* FILA 3: el resto de las mesas */}
         <div className="flex items-center justify-center gap-8 sm:gap-12 flex-wrap">
-          {tableLayout.slice(10, 15).map(mesa => renderTable(mesa))}
+          {mesasEnFilas.slice(9).map(mesa => renderTable(mesa))}
         </div>
+
+        {mesasDelPlano.length === 0 && (
+          <p className="text-xs font-body text-[#1F1410]/50">No hay mesas registradas en esta zona.</p>
+        )}
 
       </div>
 

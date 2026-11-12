@@ -19,8 +19,9 @@ import { playSound } from '../utils/audioFeedback';
 export const ScannerModule = ({ 
   reservaciones, 
   promociones, 
-  clientesClub, 
-  onUpdateReservacion, 
+  clientesClub,
+  historial,
+  onUpdateReservacion,
   onUpdatePromocion,
   onUpdateClienteClub,
   soundEnabled 
@@ -28,35 +29,9 @@ export const ScannerModule = ({
   const [tokenInput, setTokenInput] = useState('');
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState(null);
-  const [historialEscaneos, setHistorialEscaneos] = useState([
-    {
-      id: 1,
-      codigo: 'MF-PROMO-2X1',
-      tipo: 'Cupón de Promoción',
-      descripcion: 'Jueves 2x1 en Frappés de Confitería',
-      resultado: 'Canje Aprobado',
-      hora: '10:48 AM',
-      exito: true
-    },
-    {
-      id: 2,
-      codigo: 'MF-RES-88219',
-      tipo: 'Pase de Reservación',
-      descripcion: 'Andrea Garza (2 personas)',
-      resultado: 'Check-in Realizado (Mesa M01)',
-      hora: '10:02 AM',
-      exito: true
-    },
-    {
-      id: 3,
-      codigo: 'MF-CLUB-33109',
-      tipo: 'Club Marfil Pasaporte',
-      descripcion: 'Mariana Corrales · Sello sumado (4/8)',
-      resultado: 'Sello Acreditado',
-      hora: '09:41 AM',
-      exito: true
-    }
-  ]);
+  // La bitácora viene de la API (prop `historial`); cada validación la registra el servidor.
+  const [historialLocal, setHistorialEscaneos] = useState([]);
+  const historialEscaneos = historial ?? historialLocal;
 
   const quickTokens = [
     { codigo: 'MF-RES-90142', label: 'Reserva Familia Rivas (5 personas)', tipo: 'reserva' },
@@ -139,10 +114,12 @@ export const ScannerModule = ({
     }, 350);
   };
 
-  const handleConfirmReservationCheckin = () => {
+  // Las tres acciones esperan a la API: si la rechaza (onUpdate... devuelve false)
+  // el panel ya mostró el motivo y aquí no se anuncia un éxito que no ocurrió.
+  const handleConfirmReservationCheckin = async () => {
     if (!scanResult || scanResult.tipo !== 'reserva') return;
     const res = scanResult.datos;
-    onUpdateReservacion({ ...res, estado: 'en_curso' });
+    if ((await onUpdateReservacion({ ...res, estado: 'en_curso' })) === false) return;
 
     setHistorialEscaneos([
       {
@@ -165,10 +142,10 @@ export const ScannerModule = ({
     if (soundEnabled) playSound('success');
   };
 
-  const handleRedeemCoupon = () => {
+  const handleRedeemCoupon = async () => {
     if (!scanResult || scanResult.tipo !== 'promo') return;
     const promo = scanResult.datos;
-    onUpdatePromocion({ ...promo, canjesHoy: promo.canjesHoy + 1 });
+    if ((await onUpdatePromocion({ ...promo, canjesHoy: promo.canjesHoy + 1 })) === false) return;
 
     setHistorialEscaneos([
       {
@@ -190,7 +167,7 @@ export const ScannerModule = ({
     if (soundEnabled) playSound('coin');
   };
 
-  const handleAddLoyaltyStamp = () => {
+  const handleAddLoyaltyStamp = async () => {
     if (!scanResult || scanResult.tipo !== 'club') return;
     const cliente = scanResult.datos;
     const nuevoTotal = cliente.sellosActuales + 1;
@@ -204,7 +181,7 @@ export const ScannerModule = ({
       recompensaNombre: completo ? 'Copa Doble de Fresas Estilo Dubái GRATIS' : cliente.recompensaNombre
     };
 
-    onUpdateClienteClub(actualizado);
+    if ((await onUpdateClienteClub(actualizado)) === false) return;
 
     setHistorialEscaneos([
       {
@@ -231,7 +208,7 @@ export const ScannerModule = ({
     if (soundEnabled) playSound(completo ? 'success' : 'stamp');
   };
 
-  const handleRedeemReward = () => {
+  const handleRedeemReward = async () => {
     if (!scanResult || scanResult.tipo !== 'club') return;
     const cliente = scanResult.datos;
 
@@ -242,7 +219,7 @@ export const ScannerModule = ({
       recompensaNombre: null
     };
 
-    onUpdateClienteClub(reiniciado);
+    if ((await onUpdateClienteClub(reiniciado)) === false) return;
 
     setHistorialEscaneos([
       {

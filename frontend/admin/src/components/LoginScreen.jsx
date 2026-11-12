@@ -20,7 +20,7 @@ export const LoginScreen = ({ onLogin, soundEnabled = true }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMessage('');
 
@@ -33,16 +33,15 @@ export const LoginScreen = ({ onLogin, soundEnabled = true }) => {
     setIsLoading(true);
     if (soundEnabled) playSound('toggle');
 
-    // Simulación de autenticación suave
-    setTimeout(() => {
-      setIsLoading(false);
+    // onLogin valida las credenciales contra la API; si falla lanza el mensaje a mostrar.
+    try {
+      await onLogin(username.trim(), password);
       if (soundEnabled) playSound('success');
-      onLogin({
-        nombre: 'Sofía Valenzuela',
-        rol: 'Administradora General',
-        email: username
-      });
-    }, 450);
+    } catch (error) {
+      setErrorMessage(error.message);
+      if (soundEnabled) playSound('alert');
+      setIsLoading(false);
+    }
   };
 
   const handleQuickDemo = () => {
