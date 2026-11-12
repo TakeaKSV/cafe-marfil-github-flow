@@ -4,8 +4,12 @@ import { Volume2, VolumeX } from 'lucide-react';
 export const Topbar = ({
   activeTabTitle,
   soundEnabled,
-  onToggleSound
+  onToggleSound,
+  usuario
 }) => {
+  const nombre = usuario?.nombre ?? 'Café Marfil';
+  const puesto = usuario?.puesto ?? 'Panel Administrativo';
+
   return (
     <header className="h-14 sm:h-16 px-5 sm:px-7 flex items-center justify-between gap-4 border-b border-[#1F1410]/8 bg-white select-none shrink-0">
 
@@ -25,7 +29,7 @@ export const Topbar = ({
           <div className="w-9 h-9 rounded-full bg-[#1F1410] text-white flex items-center justify-center font-mono font-bold text-xs ring-2 ring-[#E12927]/20 overflow-hidden shadow-2xs shrink-0 transition-transform duration-200 group-hover:scale-105 group-hover:ring-[#E12927]">
             <img
               src="/images/logo_badge_rosa.png"
-              alt="Sofía Valenzuela"
+              alt={nombre}
               className="w-full h-full object-cover"
               onError={(e) => {
                 e.target.onerror = null;
@@ -36,9 +40,9 @@ export const Topbar = ({
 
           <div className="text-left">
             <div className="text-xs font-bold text-[#1F1410] leading-tight group-hover:text-[#E12927] transition-colors">
-              Sofía Valenzuela
+              {nombre}
             </div>
-            <div className="text-[10px] text-[#1F1410]/50 font-mono">Administradora General</div>
+            <div className="text-[10px] text-[#1F1410]/50 font-mono">{puesto}</div>
           </div>
         </div>
 

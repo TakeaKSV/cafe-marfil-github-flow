@@ -26,8 +26,14 @@ export const ReservationsTableView = ({
   promociones,
   sucursales,
   selectedSucursal,
-  soundEnabled 
+  soundEnabled,
+  codigosEscaneados = 0
 }) => {
+  // De las reservaciones que ya se resolvieron hoy, cuántas sí llegaron.
+  const llegaron = reservaciones.filter(r => r.estado === 'en_curso' || r.estado === 'asistida').length;
+  const noLlegaron = reservaciones.filter(r => r.estado === 'no_show' || r.estado === 'cancelada').length;
+  const tasaAsistencia = llegaron + noLlegaron > 0 ? ((llegaron / (llegaron + noLlegaron)) * 100).toFixed(1) : '0.0';
+
   const [activeTab, setActiveTab] = useState('todas');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedItems, setSelectedItems] = useState([]);
@@ -169,7 +175,7 @@ export const ReservationsTableView = ({
               {totalCount} Reservas
             </div>
             <div className="text-xs text-[#1F1410]/60 font-body mt-0.5">
-              Tasa de asistencia confirmada: <strong className="text-emerald-700">96.4%</strong>
+              Tasa de asistencia confirmada: <strong className="text-emerald-700">{tasaAsistencia}%</strong>
             </div>
           </div>
         </div>
@@ -179,7 +185,7 @@ export const ReservationsTableView = ({
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-baseline gap-2">
               <span className="font-display font-bold text-2xl text-[#1F1410]">
-                46 códigos
+                {codigosEscaneados} códigos
               </span>
               <span className="text-xs text-[#1F1410]/50 font-body">
                 escaneados & validados en turno
@@ -403,7 +409,7 @@ export const ReservationsTableView = ({
                         #{r.folio}
                       </span>
                       <span className="text-[11px] text-[#1F1410]/50 font-mono block">
-                        {r.personas} personas · Mesa {r.mesaAsignada || 'M01'}
+                        {r.personas} personas · {r.mesaAsignada ? `Mesa ${r.mesaAsignada}` : 'Mesa por asignar'}
                       </span>
                     </td>
 
@@ -591,7 +597,7 @@ export const ReservationsTableView = ({
               </div>
               <div className="flex justify-between">
                 <span className="text-[#1F1410]/60">Mesa asignada:</span>
-                <span className="font-bold">{qrModalItem.mesaAsignada}</span>
+                <span className="font-bold">{qrModalItem.mesaAsignada || 'Por asignar'}</span>
               </div>
               <div className="flex justify-between pt-1 border-t border-[#1F1410]/5">
                 <span className="text-[#1F1410]/60">Sucursal:</span>

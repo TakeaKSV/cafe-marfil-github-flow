@@ -27,21 +27,29 @@ export const DashboardView = ({
   const multiplier = timeRange === 'hoy' ? 1 : timeRange === 'semana' ? 6.5 : 28;
 
   const totalReservaciones = Math.round(metricas.reservasHoy * multiplier);
-  const codigosEscaneados = Math.round(46 * multiplier);
+  const codigosEscaneados = Math.round((metricas.codigosEscaneadosHoy ?? 0) * multiplier);
   const totalVisitors = Math.round(metricas.comensalesHoy * multiplier);
   const sellosEmitidos = Math.round(metricas.sellosEmitidosHoy * multiplier);
 
-  // Curva de afluencia de reservas y comensales por franja horaria (Gráfica de barras original)
-  const barData = [
-    { label: '8:00', reservas: 3, pax: 14, height: 25 },
-    { label: '10:00', reservas: 8, pax: 42, height: 95, isPeak: true },
-    { label: '12:00', reservas: 4, pax: 22, height: 40 },
-    { label: '14:00', reservas: 6, pax: 34, height: 68 },
-    { label: '16:00', reservas: 3, pax: 18, height: 32 },
-    { label: '18:00', reservas: 7, pax: 36, height: 65 },
-    { label: '20:00', reservas: 8, pax: 40, height: 80, isPeak: true },
-    { label: '22:00', reservas: 3, pax: 15, height: 26 }
-  ];
+  // Afluencia real del día: la API entrega comensales por hora y aquí se agrupan
+  // en franjas de dos horas (8:00, 10:00 ... 22:00) para el gráfico de barras.
+  const franjas = [8, 10, 12, 14, 16, 18, 20, 22].map((hora) => {
+    const pax = (metricas.distribucionHoraria ?? [])
+      .filter((f) => { const h = Number(f.hora.slice(0, 2)); return h === hora || h === hora + 1; })
+      .reduce((suma, f) => suma + f.comensales, 0);
+    return { label: `${hora}:00`, pax };
+  });
+  const maxPax = Math.max(...franjas.map((f) => f.pax));
+  const topeEje = Math.max(50, Math.ceil(maxPax / 50) * 50);
+  const barData = franjas.map((f) => ({
+    ...f,
+    height: Math.max(3, Math.round((f.pax / topeEje) * 100)),
+    isPeak: maxPax > 0 && f.pax >= maxPax * 0.9
+  }));
+
+  const etiquetaHoy = metricas.fecha
+    ? new Intl.DateTimeFormat('es-MX', { timeZone: 'UTC', day: 'numeric', month: 'long' }).format(new Date(`${metricas.fecha}T12:00:00Z`))
+    : 'hoy';
 
   // Mix de consumo en sala (Donut Chart original)
   const categories = [
@@ -77,9 +85,9 @@ export const DashboardView = ({
               }}
               className="appearance-none bg-white border border-[#1F1410]/10 rounded-full px-3 py-1 pr-7 text-[11px] font-semibold text-[#1F1410] shadow-2xs hover:border-[#1F1410]/30 transition-colors cursor-pointer"
             >
-              <option value="hoy">Hoy (02 Octubre)</option>
+              <option value="hoy">Hoy ({etiquetaHoy})</option>
               <option value="semana">Esta semana</option>
-              <option value="mes">Mes de Octubre</option>
+              <option value="mes">Este mes</option>
             </select>
             <ChevronDown className="w-3 h-3 absolute right-2.5 top-1/2 -translate-y-1/2 text-[#1F1410]/50 pointer-events-none" />
           </div>
@@ -124,7 +132,7 @@ export const DashboardView = ({
                 </span>
               </div>
               <p className="text-[10px] text-white/70">
-                {timeRange === 'hoy' ? '22 asistidas · 1 no-show' : 'Ciclo comparativo'}
+                {timeRange === 'hoy' ? `${metricas.reservasAsistidas ?? 0} asistidas · ${metricas.reservasNoShow ?? 0} no-show` : 'Ciclo comparativo'}
               </p>
             </div>
           </div>
@@ -150,7 +158,7 @@ export const DashboardView = ({
                 </span>
               </div>
               <p className="text-[10px] text-[#1F1410]/40">
-                26 cupones + 20 pases
+                {metricas.cuponesRedimidosHoy ?? 0} cupones canjeados hoy
               </p>
             </div>
           </div>
@@ -176,7 +184,7 @@ export const DashboardView = ({
                 </span>
               </div>
               <p className="text-[10px] text-[#1F1410]/40">
-                Aforo: 74% ocupado
+                Aforo: {metricas.aforoPorcentaje ?? 0}% ocupado
               </p>
             </div>
           </div>
@@ -202,7 +210,7 @@ export const DashboardView = ({
                 </span>
               </div>
               <p className="text-[10px] text-[#1F1410]/40">
-                14 recompensas Dubái
+                Visitas selladas hoy
               </p>
             </div>
           </div>
@@ -231,12 +239,9 @@ export const DashboardView = ({
           {/* Gráfico de Barras con escala en Y */}
           <div className="flex items-stretch gap-2 h-28 sm:h-32 pt-1">
             <div className="flex flex-col justify-between text-[9px] font-mono text-[#1F1410]/40 pb-5 text-right select-none w-8">
-              <span>50p</span>
-              <span>40p</span>
-              <span>30p</span>
-              <span>20p</span>
-              <span>10p</span>
-              <span>0p</span>
+              {[5, 4, 3, 2, 1, 0].map((paso) => (
+                <span key={paso}>{(topeEje / 5) * paso}p</span>
+              ))}
             </div>
 
             <div className="flex-1 flex items-end justify-between gap-1.5 sm:gap-2 border-b border-[#1F1410]/8 pb-1.5 h-full">
@@ -252,7 +257,7 @@ export const DashboardView = ({
                   >
                     {isHovered && (
                       <div className="absolute -top-7 px-2 py-0.5 bg-[#1F1410] text-white text-[9px] font-mono rounded-md shadow-md pointer-events-none whitespace-nowrap z-20 animate-menu-in">
-                        {bar.reservas} res ({bar.pax} pax)
+                        {bar.pax} comensales
                       </div>
                     )}
 
@@ -291,10 +296,10 @@ export const DashboardView = ({
 
           <div>
             <div className="font-display font-bold text-xl sm:text-2xl text-[#1F1410] mb-0.5 leading-none">
-              28 reservas
+              {metricas.reservasHoy ?? 0} reservas
             </div>
             <p className="text-[11px] text-[#1F1410]/60 font-body">
-              <strong className="text-[#E12927]">5 comensales</strong> próximos a llegar en tolerancia.
+              <strong className="text-[#E12927]">{metricas.reservasConfirmadas ?? 0} por llegar</strong> y {metricas.reservasEnCurso ?? 0} en sala ahora.
             </p>
           </div>
 
@@ -321,10 +326,10 @@ export const DashboardView = ({
 
           <div>
             <div className="font-display font-bold text-xl sm:text-2xl text-[#1F1410] mb-0.5 leading-none">
-              46 códigos
+              {metricas.codigosEscaneadosHoy ?? 0} códigos
             </div>
             <p className="text-[11px] text-[#1F1410]/60 font-body">
-              <strong className="text-emerald-700">26 cupones</strong> redimidos y aplicados hoy.
+              <strong className="text-emerald-700">{metricas.cuponesRedimidosHoy ?? 0} cupones</strong> redimidos y aplicados hoy.
             </p>
           </div>
         </div>
