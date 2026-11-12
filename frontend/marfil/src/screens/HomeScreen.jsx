@@ -115,10 +115,11 @@ export default function HomeScreen({
   onSelectActivity,
   onSelectPromo,
   actividades = ACTIVIDADES,
-  promociones = PROMOCIONES
+  promociones = PROMOCIONES,
+  sucursales = SUCURSALES // llegan de la API; el dato simulado queda solo como respaldo
 }) {
   const [activeSucursalId, setActiveSucursalId] = React.useState('porras-matriz');
-  const activeSucursal = SUCURSALES.find((s) => s.id === activeSucursalId) || SUCURSALES[0];
+  const activeSucursal = sucursales.find((s) => s.id === activeSucursalId) || sucursales[0];
 
   const handleHeroOrder = (drink) => {
     sounds.playClick();
@@ -655,7 +656,7 @@ export default function HomeScreen({
 
           {/* Grid de las 2 Sucursales Reales con Fotos Reales */}
           <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
-            {SUCURSALES.map((sucursal) => {
+            {sucursales.map((sucursal) => {
               const isActive = activeSucursalId === sucursal.id;
               return (
                 <div
@@ -776,7 +777,7 @@ export default function HomeScreen({
 
               {/* Selector de Sucursal en Pestañas */}
               <div className="flex flex-wrap items-center gap-2">
-                {SUCURSALES.map((suc) => (
+                {sucursales.map((suc) => (
                   <button
                     key={suc.id}
                     onClick={() => setActiveSucursalId(suc.id)}

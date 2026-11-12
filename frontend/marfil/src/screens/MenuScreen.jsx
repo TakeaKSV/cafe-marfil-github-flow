@@ -241,7 +241,8 @@ export const MENU_SECTIONS = [
   }
 ];
 
-export default function MenuScreen({ onOrderNow, onNavigate }) {
+// `secciones` llega de la API (ver aSeccionesDeMenu); MENU_SECTIONS queda como respaldo.
+export default function MenuScreen({ onOrderNow, onNavigate, secciones = MENU_SECTIONS }) {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [viewModeMobile, setViewModeMobile] = useState('carousel'); // 'carousel' | 'grid'
   const [activeTab, setActiveTab] = useState('todos'); // 'todos' | 'seccion-1' | 'seccion-2'
@@ -289,10 +290,10 @@ export default function MenuScreen({ onOrderNow, onNavigate }) {
 
   useEffect(() => {
     // Medir estado inicial de scroll
-    MENU_SECTIONS.forEach((s) => checkScrollFades(s.id));
+    secciones.forEach((s) => checkScrollFades(s.id));
 
     const handleResize = () => {
-      MENU_SECTIONS.forEach((s) => checkScrollFades(s.id));
+      secciones.forEach((s) => checkScrollFades(s.id));
     };
 
     window.addEventListener('resize', handleResize);
@@ -335,7 +336,7 @@ export default function MenuScreen({ onOrderNow, onNavigate }) {
           1. VISTA DESKTOP: SECCIÓN CON CARRUSEL HORIZONTAL & CARDS VERTICALES
           ==================================================================== */}
       <main className="hidden md:flex max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 flex-col gap-8">
-        {MENU_SECTIONS.map((seccion) => (
+        {secciones.map((seccion) => (
           <section key={seccion.id} className="w-full flex flex-col">
             {/* Título de la Sección ("Seccion 1", "Seccion 2") idéntico al diseño */}
             <div className="flex items-baseline justify-between mb-6">
@@ -473,7 +474,7 @@ export default function MenuScreen({ onOrderNow, onNavigate }) {
 
         </div>
 
-        {MENU_SECTIONS.map((seccion, sIdx) => {
+        {secciones.map((seccion, sIdx) => {
           const isExpanded = !!expandedSections[seccion.id];
           return (
             <div key={seccion.id} className="w-full flex flex-col">

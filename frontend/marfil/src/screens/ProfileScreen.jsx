@@ -20,6 +20,7 @@ import { sounds } from '../utils/audio';
 export default function ProfileScreen({
   perfil,
   onUpdatePerfil,
+  onLogout,
   onViewReservations,
   onViewBenefits,
   theme,
@@ -294,6 +295,20 @@ export default function ProfileScreen({
               {theme === 'dark' ? <Moon size={20} className="text-white" /> : <Sun size={20} className="text-amber-500" />}
             </button>
           </div>
+
+          {/* Cerrar sesión */}
+          {onLogout && (
+            <button
+              type="button"
+              className="p-3.5 rounded-md border-2 border-stone-300 bg-white font-mono text-xs font-bold uppercase tracking-wider text-[#1F1410] hover:bg-[#FCEAE9] hover:border-[#E12927] active:scale-[0.99] transition-all cursor-pointer shadow-xs"
+              onClick={() => {
+                sounds.playClick();
+                onLogout();
+              }}
+            >
+              Cerrar sesión
+            </button>
+          )}
 
           {/* Garantía de Comunidad */}
           <div className="bg-[#FCEAE9] rounded-lg border-2 border-[#E12927]/40 p-5 flex items-start gap-3.5 shadow-xs">

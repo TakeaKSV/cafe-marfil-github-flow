@@ -9,7 +9,8 @@ export const WalkInModal = ({
   mesas, 
   onAssignWalkIn, 
   selectedSucursal,
-  soundEnabled 
+  soundEnabled,
+  mesaInicial = null
 }) => {
   // Filtrar mesas libres de la sucursal activa
   const branchMesas = selectedSucursal === 'todas' 
@@ -33,6 +34,11 @@ export const WalkInModal = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
+
+  // Si el modal se abre desde una mesa del plano, esa mesa queda preseleccionada.
+  useEffect(() => {
+    if (isOpen && mesaInicial) setMesaId(mesaInicial);
+  }, [isOpen, mesaInicial]);
 
   // Actualizar mesa seleccionada si cambian disponibles
   useEffect(() => {
