@@ -1,0 +1,21 @@
+{
+  "name": "cafe-marfil-monorepo",
+  "version": "1.1.0",
+  "private": true,
+  "description": "Café Marfil Monorepo (PWA Cliente, Panel Admin y Backend API)",
+  "workspaces": [
+    "backend",
+    "frontend/marfil",
+    "frontend/admin"
+  ],
+  "scripts": {
+    "dev": "npm --prefix frontend/marfil run dev",
+    "dev:cliente": "npm --prefix frontend/marfil run dev",
+    "dev:admin": "npm --prefix frontend/admin run dev -- --port 5174",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:all": "concurrently \"npm:dev\" \"npm:dev:admin\"",
+    "start": "npm run dev",
+    "build": "npm --prefix frontend/marfil run build && npm --prefix frontend/admin run build",
+    "test": "npm --prefix backend test"
+  }
+}
