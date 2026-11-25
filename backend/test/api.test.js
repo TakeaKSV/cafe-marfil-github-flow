@@ -12,6 +12,8 @@ import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { after, before, test } from 'node:test';
 import jwt from 'jsonwebtoken';
+import { cargarReservacionesPanel } from '../../frontend/admin/src/api/reservaciones.js';
+import { aReservacion } from '../../frontend/admin/src/api/adaptadores.js';
 
 process.env.NODE_ENV = 'test';
 process.env.DB_NAME = 'cafe_marfil_test';
@@ -311,6 +313,62 @@ test('reservación de invitado desde la PWA y gestión con el token del QR', asy
   const cancelada = await api('POST', `/reservaciones/publica/${tokenQR}/cancelar`);
   assert.equal(cancelada.datos.estado, 'cancelada');
   assert.equal((await api('POST', `/reservaciones/publica/${tokenQR}/cancelar`)).status, 409);
+});
+
+test('el registro del admin muestra la reserva futura de la landing y mantiene separados los datos de hoy', async () => {
+  const creada = await api('POST', '/reservaciones', {
+    body: {
+      comensal: 'Prueba registro admin',
+      telefono: '618-555-0100',
+      sucursalId: 'porras-matriz',
+      fecha: MANANA,
+      hora: '16:30',
+      personas: 2
+    }
+  });
+  assert.equal(creada.status, 201);
+  const { folio } = creada.datos;
+
+  // Usa la misma carga de datos que App.jsx, contra la API y MySQL reales.
+  const consultar = async (ruta, { query }) => {
+    const params = new URLSearchParams();
+    for (const [clave, valor] of Object.entries(query)) {
+      if (valor !== undefined) params.set(clave, valor);
+    }
+    const respuesta = await api('GET', `${ruta}?${params}`, { token: sesion.admin });
+    assert.equal(respuesta.status, 200);
+    return respuesta.datos;
+  };
+
+  const todas = await cargarReservacionesPanel(consultar, { hoy: HOY });
+  const visible = todas.reservaciones.map(aReservacion(HOY)).find((r) => r.folio === folio);
+  assert.ok(visible, 'la reserva de mañana aparece sin tener que cambiar filtros');
+  assert.equal(visible.fechaISO, MANANA);
+  assert.equal(visible.estado, 'confirmada');
+  assert.ok(todas.reservacionesHoy.length > 0, 'hay reservas de hoy en los datos de prueba');
+  assert.ok(todas.reservacionesHoy.every((r) => r.fecha === HOY));
+  assert.ok(!todas.reservacionesHoy.some((r) => r.folio === folio));
+
+  const manana = await cargarReservacionesPanel(consultar, {
+    hoy: HOY,
+    fecha: MANANA,
+    sucursalId: 'porras-matriz'
+  });
+  assert.ok(manana.reservaciones.some((r) => r.folio === folio));
+  assert.ok(manana.reservaciones.every((r) => r.fecha === MANANA && r.sucursalId === 'porras-matriz'));
+  assert.ok(manana.reservacionesHoy.every((r) => r.fecha === HOY && r.sucursalId === 'porras-matriz'));
+
+  const hoy = await cargarReservacionesPanel(consultar, { hoy: HOY, fecha: HOY });
+  assert.deepEqual(hoy.reservaciones, todas.reservacionesHoy);
+  assert.deepEqual(hoy.reservacionesHoy, todas.reservacionesHoy);
+
+  const otraSucursal = await cargarReservacionesPanel(consultar, {
+    hoy: HOY,
+    fecha: MANANA,
+    sucursalId: 'calvario'
+  });
+  assert.ok(!otraSucursal.reservaciones.some((r) => r.folio === folio));
+  assert.ok(otraSucursal.reservaciones.every((r) => r.sucursalId === 'calvario'));
 });
 
 test('reservar una actividad respeta su fecha, su sucursal y su cupo', async () => {

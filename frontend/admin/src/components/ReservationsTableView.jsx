@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   Search, 
-  Filter, 
+  RefreshCw,
   Plus, 
   CalendarDays, 
   QrCode, 
@@ -21,6 +21,12 @@ import { playSound } from '../utils/audioFeedback';
 
 export const ReservationsTableView = ({ 
   reservaciones, 
+  reservacionesHoy,
+  fecha,
+  hoy,
+  onChangeFecha,
+  cargando,
+  onRecargar,
   onUpdateReservacion, 
   onAddReservacion,
   promociones,
@@ -30,8 +36,9 @@ export const ReservationsTableView = ({
   codigosEscaneados = 0
 }) => {
   // De las reservaciones que ya se resolvieron hoy, cuántas sí llegaron.
-  const llegaron = reservaciones.filter(r => r.estado === 'en_curso' || r.estado === 'asistida').length;
-  const noLlegaron = reservaciones.filter(r => r.estado === 'no_show' || r.estado === 'cancelada').length;
+  const delDia = reservacionesHoy.filter(r => selectedSucursal === 'todas' || r.sucursalId === selectedSucursal);
+  const llegaron = delDia.filter(r => r.estado === 'en_curso' || r.estado === 'asistida').length;
+  const noLlegaron = delDia.filter(r => r.estado === 'no_show' || r.estado === 'cancelada').length;
   const tasaAsistencia = llegaron + noLlegaron > 0 ? ((llegaron / (llegaron + noLlegaron)) * 100).toFixed(1) : '0.0';
 
   const [activeTab, setActiveTab] = useState('todas');
@@ -40,11 +47,13 @@ export const ReservationsTableView = ({
   const [showAddModal, setShowAddModal] = useState(false);
   const [activeActionMenu, setActiveActionMenu] = useState(null);
   const [qrModalItem, setQrModalItem] = useState(null);
+  const [guardando, setGuardando] = useState(false);
 
   // Formulario nueva reserva
   const [newRes, setNewRes] = useState({
     comensal: '',
     telefono: '',
+    fechaISO: hoy,
     sucursalId: selectedSucursal === 'todas' ? 'porras-matriz' : selectedSucursal,
     hora: '10:30 AM',
     personas: 2,
@@ -73,7 +82,7 @@ export const ReservationsTableView = ({
     let matchesTab = true;
     if (activeTab === 'en_sala') matchesTab = r.estado === 'en_curso';
     if (activeTab === 'proximas') matchesTab = r.estado === 'confirmada';
-    if (activeTab === 'completadas') matchesTab = r.estado === 'asistida' || r.estado === 'no_show';
+    if (activeTab === 'completadas') matchesTab = ['asistida', 'no_show', 'cancelada'].includes(r.estado);
     if (activeTab === 'cupones') matchesTab = true;
 
     const matchesSearch = searchTerm === '' ||
@@ -81,7 +90,7 @@ export const ReservationsTableView = ({
       r.comensal.toLowerCase().includes(searchTerm.toLowerCase()) ||
       r.telefono.includes(searchTerm);
 
-    return matchesBranch && matchesTab && matchesSearch;
+    return matchesBranch && matchesTab && matchesSearch && (!fecha || r.fechaISO === fecha);
   });
 
   const handleSelectAll = (e) => {
@@ -100,46 +109,32 @@ export const ReservationsTableView = ({
     }
   };
 
-  const handleStatusChange = (folio, nuevoEstado) => {
+  const handleStatusChange = async (folio, nuevoEstado) => {
     const res = reservaciones.find(r => r.folio === folio);
     if (!res) return;
-    onUpdateReservacion({ ...res, estado: nuevoEstado });
+    const actualizada = await onUpdateReservacion({ ...res, estado: nuevoEstado });
+    if (!actualizada) return;
     setActiveActionMenu(null);
     if (soundEnabled) playSound(nuevoEstado === 'en_curso' ? 'checkin' : 'success');
   };
 
-  const handleCreateReservation = (e) => {
+  const handleCreateReservation = async (e) => {
     e.preventDefault();
-    if (!newRes.comensal.trim()) return;
-
-    const randomFolio = `MF-RES-${Math.floor(10000 + Math.random() * 90000)}`;
-    const sucursalObj = sucursales.find(s => s.id === newRes.sucursalId) || sucursales[0];
-
-    const creada = {
-      folio: randomFolio,
-      comensal: newRes.comensal,
-      telefono: newRes.telefono || '618-123-4567',
-      email: 'comensal@cafemarfil.mx',
-      sucursalId: newRes.sucursalId,
-      sucursalNombre: sucursalObj.nombre,
-      fecha: 'Hoy (02 Oct 2026)',
-      hora: newRes.hora,
-      personas: Number(newRes.personas),
-      mesaAsignada: newRes.mesaAsignada || 'M03',
-      tipo: newRes.tipo,
-      tipoNombre: newRes.tipoNombre,
-      estado: 'confirmada',
-      notas: newRes.notas || 'Reservación registrada en Host Desk.',
-      tokenQR: `QR-${randomFolio}-AUTH`,
-      totalEstimado: `$${Number(newRes.personas) * 180} MXN`
-    };
-
-    onAddReservacion(creada);
+    if (!newRes.comensal.trim() || guardando) return;
+    setGuardando(true);
+    let creada;
+    try {
+      creada = await onAddReservacion({ ...newRes, personas: Number(newRes.personas) });
+    } finally {
+      setGuardando(false);
+    }
+    if (!creada) return;
     if (soundEnabled) playSound('success');
     setShowAddModal(false);
     setNewRes({
       comensal: '',
       telefono: '',
+      fechaISO: hoy,
       sucursalId: 'porras-matriz',
       hora: '10:30 AM',
       personas: 2,
@@ -151,10 +146,10 @@ export const ReservationsTableView = ({
   };
 
   // Resumen métrico superior exactamente como en Zendenta
-  const enSalaCount = reservaciones.filter(r => r.estado === 'en_curso').length;
-  const pendientesCount = reservaciones.filter(r => r.estado === 'confirmada').length;
-  const completadasCount = reservaciones.filter(r => r.estado === 'asistida').length;
-  const totalCount = reservaciones.length;
+  const enSalaCount = delDia.filter(r => r.estado === 'en_curso').length;
+  const pendientesCount = delDia.filter(r => r.estado === 'confirmada').length;
+  const completadasCount = delDia.filter(r => r.estado === 'asistida').length;
+  const totalCount = delDia.length;
 
   return (
     <div className="space-y-6 animate-menu-in">
@@ -169,7 +164,7 @@ export const ReservationsTableView = ({
           </div>
           <div>
             <div className="text-[11px] font-mono font-bold tracking-wider text-[#1F1410]/50 uppercase">
-              RESERVACIONES DEL DÍA
+              RESERVACIONES DE HOY
             </div>
             <div className="font-display font-bold text-2xl sm:text-3xl text-[#1F1410] mt-0.5">
               {totalCount} Reservas
@@ -199,17 +194,17 @@ export const ReservationsTableView = ({
           {/* Segmented Horizontal Bar como en Zendenta */}
           <div className="w-full h-2.5 bg-[#FAF7F5] rounded-full overflow-hidden flex gap-1 mb-3 p-0.5 border border-[#1F1410]/8">
             <div 
-              style={{ width: `${(enSalaCount / totalCount) * 100}%` }} 
+              style={{ width: `${(enSalaCount / Math.max(1, totalCount)) * 100}%` }}
               className="h-full bg-[#10B981] rounded-full transition-all" 
               title="En Sala"
             />
             <div 
-              style={{ width: `${(pendientesCount / totalCount) * 100}%` }} 
+              style={{ width: `${(pendientesCount / Math.max(1, totalCount)) * 100}%` }}
               className="h-full bg-[#F59E0B] rounded-full transition-all" 
               title="Pendientes de Llegada"
             />
             <div 
-              style={{ width: `${(completadasCount / totalCount) * 100}%` }} 
+              style={{ width: `${(completadasCount / Math.max(1, totalCount)) * 100}%` }}
               className="h-full bg-[#E12927] rounded-full transition-all" 
               title="Completadas / Canjeadas"
             />
@@ -265,7 +260,7 @@ export const ReservationsTableView = ({
       </div>
 
       {/* 3. Barra de Búsqueda, Filtros y Botón '+ Order Stock' estilo Zendenta */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         
         {/* Search Input con borde redondeado suave */}
         <div className="relative min-w-[280px]">
@@ -279,19 +274,46 @@ export const ReservationsTableView = ({
           />
         </div>
 
-        {/* Botones: Filtros & + Nueva Reservación */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <label className="flex items-center gap-2 text-xs font-semibold text-[#1F1410]/70">
+            Fecha de reservación
+            <input
+              type="date"
+              value={fecha}
+              onChange={(e) => onChangeFecha(e.target.value)}
+              className="px-3 py-2 bg-white border border-[#1F1410]/10 rounded-full focus:outline-hidden focus:border-[#E12927]"
+            />
+          </label>
           <button
-            onClick={() => alert('Filtro por sucursal, horario o experiencia de ludoteca activo.')}
+            onClick={() => onChangeFecha(hoy)}
+            className="px-3 py-2 text-xs font-semibold rounded-full border border-[#1F1410]/10 bg-white hover:bg-[#FAF7F5] cursor-pointer"
+          >
+            Hoy
+          </button>
+          <button
+            onClick={() => onChangeFecha('')}
+            aria-pressed={!fecha}
+            className={`px-3 py-2 text-xs font-semibold rounded-full border cursor-pointer ${!fecha ? 'border-[#E12927]/25 bg-[#FCEAE9] text-[#E12927]' : 'border-[#1F1410]/10 bg-white'}`}
+          >
+            Todas las fechas
+          </button>
+          <button
+            onClick={onRecargar}
+            disabled={cargando}
             className="flex items-center gap-1.5 px-3.5 py-2 bg-white border border-[#1F1410]/10 rounded-full text-xs font-semibold text-[#1F1410]/70 hover:text-[#1F1410] hover:bg-[#FAF7F5] shadow-2xs transition-colors cursor-pointer"
           >
-            <Filter className="w-3.5 h-3.5" />
-            <span>Filtros</span>
+            <RefreshCw className={`w-3.5 h-3.5 ${cargando ? 'animate-spin' : ''}`} />
+            <span>Actualizar</span>
           </button>
 
           <button
             onClick={() => {
               if (soundEnabled) playSound('toggle');
+              setNewRes((actual) => ({
+                ...actual,
+                fechaISO: fecha && fecha >= hoy ? fecha : hoy,
+                sucursalId: selectedSucursal === 'todas' ? sucursales[0]?.id : selectedSucursal
+              }));
               setShowAddModal(true);
             }}
             className="flex items-center gap-1.5 px-4 py-2 bg-[#E12927] hover:bg-[#c9201f] text-white text-xs font-semibold rounded-full shadow-xs transition-all hover:scale-102 cursor-pointer font-body"
@@ -302,6 +324,13 @@ export const ReservationsTableView = ({
         </div>
 
       </div>
+
+      <p className="text-xs text-[#1F1410]/60" role="status">
+        {cargando
+          ? 'Actualizando reservaciones...'
+          : `${filtered.length} reservaciones · ${fecha ? `Fecha: ${fecha}` : 'Todas las fechas'}`}
+        {reservaciones.length >= 500 && ' · Se muestran hasta 500 registros. Elige una fecha para acotar la consulta.'}
+      </p>
 
       {/* 4. Tabla de Datos Estilo Zendenta (Filas suaves, espaciosas y redondeadas) */}
       <div className="bg-white rounded-2xl border border-[#1F1410]/8 overflow-hidden shadow-xs">
@@ -355,8 +384,15 @@ export const ReservationsTableView = ({
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-[#1F1410]/5 font-body">
-              {filtered.map(r => {
+            <tbody className="divide-y divide-[#1F1410]/5 font-body" aria-busy={cargando}>
+              {!cargando && filtered.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="px-5 py-10 text-center text-[#1F1410]/60">
+                    No hay reservaciones que coincidan con los filtros seleccionados.
+                  </td>
+                </tr>
+              )}
+              {!cargando && filtered.map(r => {
                 const isSelected = selectedItems.includes(r.folio);
 
                 // Status Badge en Español
@@ -375,9 +411,9 @@ export const ReservationsTableView = ({
                     label: 'COMPLETADA',
                     className: 'border border-emerald-300 text-emerald-800 bg-emerald-50/50'
                   };
-                } else if (r.estado === 'no_show') {
+                } else if (r.estado === 'no_show' || r.estado === 'cancelada') {
                   statusBadge = {
-                    label: 'CANCELADA',
+                    label: r.estado === 'cancelada' ? 'CANCELADA' : 'NO ASISTIÓ',
                     className: 'border border-rose-300 text-rose-800 bg-rose-50/50'
                   };
                 }
@@ -662,6 +698,21 @@ export const ReservationsTableView = ({
                 />
               </div>
 
+              <div>
+                <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1.5" htmlFor="nueva-reserva-fecha">
+                  Fecha de la nueva reservación *
+                </label>
+                <input
+                  id="nueva-reserva-fecha"
+                  type="date"
+                  required
+                  min={hoy}
+                  value={newRes.fechaISO}
+                  onChange={(e) => setNewRes({ ...newRes, fechaISO: e.target.value })}
+                  className="w-full px-4 py-2.5 text-xs border border-[#1F1410]/15 rounded-xl focus:border-[#E12927] focus:outline-hidden"
+                />
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1.5">
@@ -740,9 +791,10 @@ export const ReservationsTableView = ({
                 </button>
                 <button
                   type="submit"
+                  disabled={guardando}
                   className="px-6 py-2.5 bg-[#E12927] hover:bg-[#c9201f] text-white text-xs font-bold rounded-full cursor-pointer shadow-md shadow-[#E12927]/25 font-mono transition-transform active:scale-[0.98]"
                 >
-                  Generar Folio QR
+                  {guardando ? 'Guardando...' : 'Generar Folio QR'}
                 </button>
               </div>
             </form>

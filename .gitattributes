@@ -1,0 +1,2 @@
+# El formato del backend debe ser idéntico en Windows y en CI (Linux).
+/backend/** text eol=lf
