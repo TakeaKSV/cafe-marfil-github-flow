@@ -16,6 +16,7 @@ export function crearLimites() {
   return {
     general: limitador(config.limitePeticiones),
     auth: limitador(config.limiteAuth),
-    escritura: limitador(config.limiteEscrituras)
+    escritura: limitador(config.limiteEscrituras),
+    reenvioCorreo: limitador(config.limiteReenvioCorreo, 60 * 60 * 1000)
   };
 }

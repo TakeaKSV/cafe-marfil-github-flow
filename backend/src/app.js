@@ -28,6 +28,7 @@ export function crearApp({ bitacora = !config.esProduccion } = {}) {
   app.use('/uploads', express.static(DIR_UPLOADS, { fallthrough: true, index: false }));
   const limites = crearLimites();
   app.use('/api', limites.general);
+  app.use('/api/auth/verificacion/reenviar', limites.reenvioCorreo);
   app.use('/api/auth', limites.auth);
   app.use('/api/reservaciones', (req, res, next) =>
     req.method === 'POST' ? limites.escritura(req, res, next) : next()

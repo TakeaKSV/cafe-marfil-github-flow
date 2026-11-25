@@ -29,7 +29,17 @@ const esquema = z.object({
   TRUST_PROXY: z.string().default(''),
   RATE_LIMIT_MAX: entero(600, 100000),
   AUTH_RATE_LIMIT_MAX: entero(20, 1000),
-  PUBLIC_WRITE_RATE_LIMIT_MAX: entero(30, 1000)
+  PUBLIC_WRITE_RATE_LIMIT_MAX: entero(30, 1000),
+  MAIL_RESEND_RATE_LIMIT_MAX: entero(3, 1000),
+  SMTP_HOST: z.string().default('127.0.0.1'),
+  SMTP_PORT: entero(1025, 65535),
+  SMTP_SECURE: z.string().default('false'),
+  SMTP_USER: z.string().default(''),
+  SMTP_PASS: z.string().default(''),
+  MAIL_FROM: z.string().default('Café Marfil <no-reply@cafemarfil.mx>'),
+  APP_URL: z.string().default('http://localhost:5173'),
+  MAIL_ENABLED: z.string().optional(),
+  MAIL_CHECK_MX: z.string().optional()
 });
 
 export function cargarConfig(env) {
@@ -93,6 +103,24 @@ export function cargarConfig(env) {
     limitePeticiones: datos.RATE_LIMIT_MAX,
     limiteAuth: datos.AUTH_RATE_LIMIT_MAX,
     limiteEscrituras: datos.PUBLIC_WRITE_RATE_LIMIT_MAX,
+    limiteReenvioCorreo: datos.MAIL_RESEND_RATE_LIMIT_MAX,
+    correo: {
+      habilitado:
+        datos.MAIL_ENABLED !== undefined
+          ? !['false', '0', 'no'].includes(datos.MAIL_ENABLED.toLowerCase())
+          : datos.NODE_ENV !== 'test',
+      verificarMx:
+        datos.MAIL_CHECK_MX !== undefined
+          ? !['false', '0', 'no'].includes(datos.MAIL_CHECK_MX.toLowerCase())
+          : datos.NODE_ENV !== 'test',
+      host: datos.SMTP_HOST,
+      puerto: datos.SMTP_PORT,
+      seguro: ['true', '1'].includes(datos.SMTP_SECURE.toLowerCase()),
+      usuario: datos.SMTP_USER,
+      password: datos.SMTP_PASS,
+      remitente: datos.MAIL_FROM,
+      appUrl: datos.APP_URL.replace(/\/+$/, '')
+    },
     zonaHoraria: datos.ZONA_HORARIA,
     ticketEstimadoPorPersona: 180,
     puntosPorSello: 50,

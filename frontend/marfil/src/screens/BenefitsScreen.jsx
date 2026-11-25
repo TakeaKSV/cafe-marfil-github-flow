@@ -6,16 +6,16 @@ import {
   Sparkles,
   QrCode,
   Clock,
-  Award,
-  Gift,
-  Check
+  Mail
 } from 'lucide-react';
 import { sounds } from '../utils/audio';
 import QRModal from '../components/QRModal';
 
 export default function BenefitsScreen({
   perfil,
-  beneficios
+  beneficios,
+  onResendVerification,
+  resendingVerification
 }) {
   const [selectedBenefit, setSelectedBenefit] = useState(null);
   const [showQR, setShowQR] = useState(false);
@@ -108,11 +108,40 @@ export default function BenefitsScreen({
         </div>
       </div>
 
+      {/* Banner de verificación requerida para canjear beneficios */}
+      {perfil.correo && !perfil.emailVerificado && (
+        <div className="bg-[#FCEAE9] rounded-lg border-2 border-[#E12927]/40 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-md bg-white text-[#E12927] border border-[#E12927]/30 flex items-center justify-center shrink-0">
+              <Mail size={18} />
+            </div>
+            <div>
+              <h3 className="font-display text-base font-bold text-[#1F1410] m-0">
+                Confirma tu correo para canjear tus beneficios
+              </h3>
+              <p className="font-body text-xs sm:text-sm text-[#1F1410]/80 mt-1 mb-0">
+                Enviamos un enlace de verificación a <strong>{perfil.correo}</strong>. Una vez verificado podrás redimir tus cupones en caja.
+              </p>
+            </div>
+          </div>
+          {onResendVerification && (
+            <button
+              type="button"
+              onClick={onResendVerification}
+              disabled={resendingVerification}
+              className="px-4 py-2.5 rounded-md bg-[#E12927] hover:bg-[#C81E1C] text-white font-mono text-xs font-bold uppercase tracking-wider shrink-0 cursor-pointer disabled:opacity-60"
+            >
+              {resendingVerification ? 'Enviando...' : 'Reenviar enlace'}
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Beneficios Desbloqueados HeroUI Cards */}
       <div className="flex flex-col gap-4">
         <div>
           <h2 className="font-display text-2xl font-bold text-[#1F1410]">Beneficios Disponibles</h2>
-          <p className="font-body text-xs sm:text-sm text-[#5A4840]">Presiona en cualquier beneficio para generar el cÃ³digo QR y mostrarlo en caja.</p>
+          <p className="font-body text-xs sm:text-sm text-[#5A4840]">Presiona en cualquier beneficio para generar el código QR y mostrarlo en caja.</p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">

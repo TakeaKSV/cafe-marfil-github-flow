@@ -22,23 +22,29 @@ test('migra una base 1.1.0 con datos sin perderlos y es idempotente', async () =
   await prepararBase();
   const despues = await conexion('clientes').orderBy('id');
   assert.deepEqual(
-    despues.map(({ session_version, ...cliente }) => {
+    despues.map(({ session_version, email_verificado_en, ...cliente }) => {
       assert.equal(session_version, 0);
+      assert.equal(email_verificado_en, null);
       return cliente;
     }),
     antes
   );
   assert.deepEqual(await conexion('reservaciones').orderBy('id'), reservas);
   assert.equal(await conexion.schema.hasColumn('productos', 'estado'), true);
-  assert.equal((await conexion('knex_migrations').count({ n: '*' }).first()).n, 3);
+  assert.equal(await conexion.schema.hasTable('tokens_correo'), true);
+  assert.equal((await conexion('knex_migrations').count({ n: '*' }).first()).n, 4);
 });
 
 test('reset exige confirmación exacta y se niega a tocar tablas ajenas', async () => {
   delete process.env.DB_RESET_CONFIRM;
   await assert.rejects(borrarTodo, /Reset bloqueado/);
   process.env.DB_RESET_CONFIRM = process.env.DB_NAME;
+  await conexion.schema.dropTableIfExists('tabla_ajena');
   await conexion.schema.createTable('tabla_ajena', (t) => t.integer('id'));
-  await assert.rejects(borrarTodo, /tablas ajenas/);
-  assert.ok(await conexion('clientes').first());
-  await conexion.schema.dropTable('tabla_ajena');
+  try {
+    await assert.rejects(borrarTodo, /tablas ajenas/);
+    assert.ok(await conexion('clientes').first());
+  } finally {
+    await conexion.schema.dropTableIfExists('tabla_ajena');
+  }
 });

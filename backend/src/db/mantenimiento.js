@@ -34,6 +34,7 @@ export async function borrarTodo() {
   }
   const esquema = await fs.readFile(new URL('./migraciones/001_inicial.sql', import.meta.url), 'utf8');
   const tablas = [...esquema.matchAll(/CREATE TABLE IF NOT EXISTS (\w+)/g)].map((m) => m[1]);
+  tablas.push('tokens_correo');
   const existentes = await conexion('information_schema.tables')
     .select('table_name')
     .where('table_schema', config.bd.nombre);
