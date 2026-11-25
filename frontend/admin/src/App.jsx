@@ -12,6 +12,9 @@ import { LudotecaModule } from './components/LudotecaModule';
 import { StaffSettingsModule } from './components/StaffSettingsModule';
 import { WalkInModal } from './components/WalkInModal';
 import { LoginScreen } from './components/LoginScreen';
+import { AlertCard, AlertToastStack, useAlertas } from './components/ui/AlertSystem';
+import { MainLoader } from './components/ui/MainLoader';
+import { SkeletonDashboard } from './components/ui/Skeletons';
 
 import { alExpirarSesion, api, sesion } from './api/cliente';
 import { aClienteClub, aEscaneo, aJuego, aPersona, aReservacion, aSucursal } from './api/adaptadores';
@@ -61,7 +64,7 @@ export function App() {
   const [selectedSucursal, setSelectedSucursal] = useState('todas');
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [walkIn, setWalkIn] = useState({ abierto: false, mesaId: null });
-  const [aviso, setAviso] = useState(null); // { tipo: 'error' | 'ok', texto }
+  const { alertas, cerrarAlerta, exito: mostrarExito, error: mostrarError, advertencia: mostrarAdvertencia } = useAlertas();
 
   // Datos del servidor
   const [sucursales, setSucursales] = useState([]);
@@ -81,14 +84,6 @@ export function App() {
   const [escaneos, setEscaneos] = useState([]);
   const [metricas, setMetricas] = useState(METRICAS_VACIAS);
 
-  const mostrarError = (texto) => setAviso({ tipo: 'error', texto });
-
-  useEffect(() => {
-    if (!aviso) return undefined;
-    const temporizador = setTimeout(() => setAviso(null), 6000);
-    return () => clearTimeout(temporizador);
-  }, [aviso]);
-
   // ------------------------------------------------------------------------
   // Sesión
   // ------------------------------------------------------------------------
@@ -105,9 +100,9 @@ export function App() {
       cargaActual.current += 1;
       setUsuario(null);
       setDatosListos(false);
-      setAviso({ tipo: 'error', texto: 'Tu sesión expiró. Inicia sesión de nuevo.' });
+      mostrarAdvertencia('Tu sesión expiró. Inicia sesión de nuevo.', 'Sesión expirada');
     });
-  }, []);
+  }, [mostrarAdvertencia]);
 
   // Al abrir el panel: si hay un token guardado, se recupera la sesión.
   useEffect(() => {
@@ -194,7 +189,7 @@ export function App() {
    * Ejecuta una acción contra la API y recarga los datos. Devuelve true/false
    * para que el componente sepa si puede mostrar su mensaje de éxito.
    */
-  const ejecutar = async (accion) => {
+  const ejecutar = async (accion, mensajeExito = '') => {
     try {
       await accion();
     } catch (error) {
@@ -204,8 +199,9 @@ export function App() {
     }
     try {
       await cargarDatos();
+      if (mensajeExito) mostrarExito(mensajeExito);
     } catch {
-      mostrarError('El cambio se guardó, pero no se pudo recargar el panel. Pulsa Actualizar para verlo.');
+      mostrarAdvertencia('El cambio se guardó, pero no se pudo recargar el panel. Pulsa Actualizar para verlo.');
     }
     return true;
   };
@@ -232,17 +228,17 @@ export function App() {
       }
       return Promise.resolve(false);
     }
-    if (nuevoEstado === 'limpieza') return ejecutar(() => post(`/mesas/${mesaId}/liberar`));
+    if (nuevoEstado === 'limpieza') return ejecutar(() => post(`/mesas/${mesaId}/liberar`), `Mesa ${mesa.numero} liberada a limpieza.`);
 
     // nuevoEstado === 'libre'
     return ejecutar(async () => {
       if (mesa.estado === 'ocupada') await post(`/mesas/${mesaId}/liberar`);
       if (mesa.estado !== 'reservada') await post(`/mesas/${mesaId}/limpia`);
-    });
+    }, `Mesa ${mesa.numero} marcada como libre.`);
   };
 
   const handleAssignWalkIn = ({ mesaId, comensal, personas, notas }) =>
-    ejecutar(() => post(`/mesas/${mesaId}/walk-in`, { comensal, personas, notas }));
+    ejecutar(() => post(`/mesas/${mesaId}/walk-in`, { comensal, personas, notas }), 'Mesa asignada a comensal walk-in.');
 
   // ------------------------------------------------------------------------
   // Reservaciones
@@ -336,17 +332,17 @@ export function App() {
       })
     );
 
-  const handleDeleteMenuItem = (id) => ejecutar(() => api(`/menu/productos/${id}`, { metodo: 'DELETE' }));
-  const handlePublishMenuItem = (id) => ejecutar(() => post(`/menu/productos/${id}/publicar`));
-  const handleUnpublishMenuItem = (id) => ejecutar(() => post(`/menu/productos/${id}/despublicar`));
-  const handleReorderMenuItems = (items) => ejecutar(() => patch('/menu/orden', { items }));
+  const handleDeleteMenuItem = (id) => ejecutar(() => api(`/menu/productos/${id}`, { metodo: 'DELETE' }), 'Platillo eliminado del menú.');
+  const handlePublishMenuItem = (id) => ejecutar(() => post(`/menu/productos/${id}/publicar`), 'Platillo publicado en la carta.');
+  const handleUnpublishMenuItem = (id) => ejecutar(() => post(`/menu/productos/${id}/despublicar`), 'Platillo pasado a borrador.');
+  const handleReorderMenuItems = (items) => ejecutar(() => patch('/menu/orden', { items }), 'Orden del menú actualizado.');
 
   // ------------------------------------------------------------------------
   // Actividades
   // ------------------------------------------------------------------------
 
-  const handleAddActividad = (nueva) => ejecutar(() => post('/actividades', nueva));
-  const handleUpdateActividad = (id, cambios) => ejecutar(() => patch(`/actividades/${id}`, cambios));
+  const handleAddActividad = (nueva) => ejecutar(() => post('/actividades', nueva), 'Actividad creada correctamente.');
+  const handleUpdateActividad = (id, cambios) => ejecutar(() => patch(`/actividades/${id}`, cambios), 'Actividad actualizada.');
 
   // ------------------------------------------------------------------------
   // Promociones y Club Marfil
@@ -384,15 +380,17 @@ export function App() {
   };
 
   const handleCanjearPromocion = (promoId, { sucursalId, codigoCliente } = {}) =>
-    ejecutar(() =>
-      post(`/promociones/${promoId}/canjear`, {
-        ...(sucursalId ? { sucursalId } : {}),
-        ...(codigoCliente ? { codigoCliente } : {})
-      })
+    ejecutar(
+      () =>
+        post(`/promociones/${promoId}/canjear`, {
+          ...(sucursalId ? { sucursalId } : {}),
+          ...(codigoCliente ? { codigoCliente } : {})
+        }),
+      'Cupón canjeado y aplicado correctamente.'
     );
 
   const handleCanjearBeneficio = (codigo) =>
-    ejecutar(() => post(`/club/beneficios/${encodeURIComponent(codigo)}/canjear`));
+    ejecutar(() => post(`/club/beneficios/${encodeURIComponent(codigo)}/canjear`), 'Beneficio Club Marfil entregado.');
 
   const handleAddPromocion = (nueva) =>
     ejecutar(() =>
@@ -499,20 +497,10 @@ export function App() {
     }
   };
 
-  const avisoFlotante = aviso && (
-    <div
-      role="alert"
-      onClick={() => setAviso(null)}
-      className={`fixed bottom-5 right-5 z-[10000] max-w-sm px-4 py-3 rounded-2xl shadow-lg text-xs font-body font-semibold cursor-pointer animate-menu-in ${
-        aviso.tipo === 'error' ? 'bg-[#1F1410] text-white border-l-4 border-[#E12927]' : 'bg-emerald-600 text-white'
-      }`}
-    >
-      {aviso.texto}
-    </div>
-  );
+  const avisoFlotante = <AlertToastStack alertas={alertas} onDismiss={cerrarAlerta} />;
 
   if (restaurandoSesion) {
-    return <PantallaDeEspera texto="Recuperando tu sesión..." />;
+    return <MainLoader texto="Recuperando tu sesión..." />;
   }
 
   if (!usuario) {
@@ -528,28 +516,30 @@ export function App() {
     return (
       <>
         {errorCarga ? (
-          <div className="h-screen w-screen bg-[#1F1410] flex flex-col items-center justify-center gap-4 px-6 text-center font-body text-white">
-            <p className="font-display font-bold text-lg">No se pudo conectar con la API</p>
-            <p className="text-sm text-white/70 max-w-md">{errorCarga}</p>
-            <div className="flex items-center gap-3 mt-2">
-              <button
-                type="button"
-                onClick={() => cargarDatos().catch(() => {})}
-                className="px-5 py-2 rounded-xl bg-[#E12927] hover:bg-[#c51e1c] text-white text-xs font-bold uppercase tracking-wider cursor-pointer"
-              >
-                Reintentar
-              </button>
-              <button
-                type="button"
-                onClick={cerrarSesion}
-                className="px-5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold uppercase tracking-wider cursor-pointer"
-              >
-                Cerrar sesión
-              </button>
+          <div className="h-screen w-screen bg-[#FAF7F5] flex flex-col items-center justify-center gap-4 px-6">
+            <div className="max-w-md w-full space-y-3">
+              <AlertCard
+                variante="error"
+                titulo="No se pudo conectar con la API"
+                mensaje={errorCarga}
+                accionTexto="Reintentar"
+                onAccion={() => cargarDatos().catch(() => {})}
+              />
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={cerrarSesion}
+                  className="px-5 py-2 rounded-full bg-[#1F1410] hover:bg-[#E12927] text-white text-xs font-mono font-bold uppercase tracking-wider cursor-pointer transition-colors"
+                >
+                  Cerrar sesión
+                </button>
+              </div>
             </div>
           </div>
         ) : (
-          <PantallaDeEspera texto="Cargando la operación del día..." />
+          <div className="h-screen w-screen bg-[#F8FAFC] p-6 overflow-hidden">
+            <SkeletonDashboard />
+          </div>
         )}
         {avisoFlotante}
       </>
@@ -735,15 +725,6 @@ export function App() {
 
       {avisoFlotante}
 
-    </div>
-  );
-}
-
-function PantallaDeEspera({ texto }) {
-  return (
-    <div className="h-screen w-screen bg-[#1F1410] flex flex-col items-center justify-center gap-4 font-body text-white/80 text-sm">
-      <span className="w-8 h-8 rounded-full border-2 border-white/20 border-t-[#E12927] animate-spin" />
-      <span>{texto}</span>
     </div>
   );
 }

@@ -599,3 +599,40 @@ select:focus-visible {
   font-weight: 700;
   font-family: var(--font-mono);
 }
+
+/* Animaciones de Skeleton shimmer y barra de alertas Café Marfil */
+@keyframes marfil-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.marfil-skeleton {
+  background: linear-gradient(90deg, #f3ebe8 25%, #fceae9 50%, #f3ebe8 75%);
+  background-size: 200% 100%;
+  animation: marfil-shimmer 1.45s ease-in-out infinite;
+}
+
+@keyframes marfil-toast-shrink {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+.marfil-toast-progress {
+  transform-origin: left;
+  animation: marfil-toast-shrink linear forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marfil-skeleton,
+  .marfil-toast-progress {
+    animation: none;
+  }
+}

@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { playSound } from '../utils/audioFeedback';
 import { reglas } from '../utils/validacion';
+import { SkeletonTable } from './ui/Skeletons';
 
 export const ReservationsTableView = ({ 
   reservaciones, 
@@ -354,6 +355,9 @@ export const ReservationsTableView = ({
 
       {/* 4. Tabla de Datos Estilo Zendenta (Filas suaves, espaciosas y redondeadas) */}
       <div className="bg-white rounded-2xl border border-[#1F1410]/8 overflow-hidden shadow-xs">
+        {cargando ? (
+          <SkeletonTable filas={6} />
+        ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             
@@ -588,6 +592,7 @@ export const ReservationsTableView = ({
 
           </table>
         </div>
+        )}
       </div>
 
       {/* Modal Pase QR (Portal a document.body para tapar toda la pantalla) */}

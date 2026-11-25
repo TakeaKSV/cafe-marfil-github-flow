@@ -3,6 +3,9 @@ import Header from './components/Header';
 import BottomNav from './components/BottomNav';
 import NotificationsDrawer from './components/NotificationsDrawer';
 import ElephantLogo from './components/ElephantLogo';
+import { AlertCard, AlertToastStack, useAlertas } from './components/ui/AlertSystem';
+import { MainLoader } from './components/ui/MainLoader';
+import { SkeletonList, SkeletonMenuGrid } from './components/ui/Skeletons';
 
 // Pantallas
 import HomeScreen from './screens/HomeScreen';
@@ -60,14 +63,14 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     const verificado = params.get('verificado');
     if (verificado === 'ok') {
-      setAviso('¡Tu correo electrónico fue verificado con éxito!');
+      mostrarExito('¡Tu correo electrónico fue verificado con éxito!', 'Correo verificado');
     } else if (verificado === 'error') {
-      setAviso('El enlace de verificación no es válido o ya expiró.');
+      mostrarError('El enlace de verificación no es válido o ya expiró.');
     }
     if (params.has('verificar') || params.has('restablecer') || params.has('verificado')) {
       window.history.replaceState({}, '', window.location.pathname || '/');
     }
-  }, []);
+  }, [mostrarExito, mostrarError]);
 
   // Escuchar cambios de URL (popstate y hashchange) para soportar /hero y /menu
   useEffect(() => {
@@ -129,13 +132,9 @@ export default function App() {
   const [isNotifDrawerOpen, setIsNotifDrawerOpen] = useState(false);
   const perfil = cliente ? aPerfil(cliente) : null;
 
-  // Aviso flotante para errores de la API
-  const [aviso, setAviso] = useState(null);
-  useEffect(() => {
-    if (!aviso) return undefined;
-    const temporizador = setTimeout(() => setAviso(null), 6000);
-    return () => clearTimeout(temporizador);
-  }, [aviso]);
+  // Sistema de alertas flotantes (éxito, error, advertencia, info)
+  const { alertas, cerrarAlerta, exito: mostrarExito, error: mostrarError, advertencia: mostrarAdvertencia, info: mostrarInfo } = useAlertas();
+  const [cargandoCuenta, setCargandoCuenta] = useState(false);
 
   const cargarCatalogo = useCallback(async () => {
     setErrorCatalogo('');
@@ -158,23 +157,28 @@ export default function App() {
    * como invitado solo hay reservaciones: las que se hicieron en este dispositivo.
    */
   const cargarCuenta = useCallback(async (conSesion) => {
-    if (conSesion) {
-      const [r, b, n] = await Promise.all([
-        api('/mi/reservaciones'),
-        api('/mi/beneficios'),
-        api('/mi/notificaciones')
-      ]);
-      setReservaciones(r.map(aReservacion));
-      setBeneficios(b.map(aBeneficio));
-      setNotificaciones(n.map(aNotificacion));
-      return;
+    setCargandoCuenta(true);
+    try {
+      if (conSesion) {
+        const [r, b, n] = await Promise.all([
+          api('/mi/reservaciones'),
+          api('/mi/beneficios'),
+          api('/mi/notificaciones')
+        ]);
+        setReservaciones(r.map(aReservacion));
+        setBeneficios(b.map(aBeneficio));
+        setNotificaciones(n.map(aNotificacion));
+        return;
+      }
+      const delDispositivo = await Promise.all(
+        reservasDeInvitado.tokens().map((token) => api(`/reservaciones/publica/${token}`).catch(() => null))
+      );
+      setReservaciones(delDispositivo.filter(Boolean).map(aReservacion));
+      setBeneficios([]);
+      setNotificaciones([]);
+    } finally {
+      setCargandoCuenta(false);
     }
-    const delDispositivo = await Promise.all(
-      reservasDeInvitado.tokens().map((token) => api(`/reservaciones/publica/${token}`).catch(() => null))
-    );
-    setReservaciones(delDispositivo.filter(Boolean).map(aReservacion));
-    setBeneficios([]);
-    setNotificaciones([]);
   }, []);
 
   // Arranque: catálogo, y la sesión guardada si la hay.
@@ -183,7 +187,7 @@ export default function App() {
 
     alExpirarSesion(() => {
       setCliente(null);
-      setAviso('Tu sesión expiró. Inicia sesión de nuevo.');
+      mostrarAdvertencia('Tu sesión expiró. Inicia sesión de nuevo.', 'Sesión expirada');
     });
 
     const restaurarSesion = async () => {
@@ -211,12 +215,14 @@ export default function App() {
     setCliente(respuesta.cliente);
     await cargarCuenta(true);
   };
-  const iniciarSesion = async (email, password) =>
-    entrar(await api('/auth/clientes/login', { metodo: 'POST', body: { email, password } }));
+  const iniciarSesion = async (email, password) => {
+    await entrar(await api('/auth/clientes/login', { metodo: 'POST', body: { email, password } }));
+    mostrarExito('¡Bienvenido de vuelta a Club Marfil!', 'Sesión iniciada');
+  };
   const crearCuenta = async (datos) => {
     const respuesta = await api('/auth/clientes/registro', { metodo: 'POST', body: datos });
     await entrar(respuesta);
-    setAviso('¡Cuenta creada! Revisa tu correo electrónico para confirmar tu dirección.');
+    mostrarExito('Revisa tu correo electrónico para confirmar tu dirección.', '¡Cuenta creada!');
   };
 
   const handleReenviarVerificacion = async () => {
@@ -224,13 +230,13 @@ export default function App() {
     setReenviandoVerif(true);
     try {
       const resp = await api('/auth/verificacion/reenviar', { metodo: 'POST' });
-      setAviso(resp?.mensaje || 'Te enviamos un nuevo correo de verificación.');
+      mostrarExito(resp?.mensaje || 'Te enviamos un nuevo correo de verificación.', 'Correo enviado');
       if (resp?.yaVerificado) {
         const me = await api('/auth/me').catch(() => null);
         if (me?.cliente) setCliente(me.cliente);
       }
     } catch (error) {
-      setAviso(error.message);
+      mostrarError(error.message);
     } finally {
       setReenviandoVerif(false);
     }
@@ -246,6 +252,7 @@ export default function App() {
     sesion.cerrar();
     setCliente(null);
     cargarCuenta(false).catch(() => {});
+    mostrarInfo('Cerraste tu sesión correctamente.', 'Hasta pronto');
     navigateTo('inicio');
   };
 
@@ -265,8 +272,9 @@ export default function App() {
         }
       });
       setCliente(actualizado);
+      mostrarExito('Tu perfil se actualizó correctamente.', 'Perfil guardado');
     } catch (error) {
-      setAviso(error.message);
+      mostrarError(error.message);
     }
   };
 
@@ -360,8 +368,9 @@ export default function App() {
         const { qrCode } = reservaciones.find((r) => r.id === reservationId);
         await api(`/reservaciones/publica/${qrCode}/cancelar`, { metodo: 'POST' });
       }
+      mostrarExito(`La reservación ${reservationId} fue cancelada.`, 'Reservación cancelada');
     } catch (error) {
-      setAviso(error.message);
+      mostrarError(error.message);
     }
     cargarCuenta(Boolean(cliente)).catch(() => {});
     cargarCatalogo().catch(() => {});
@@ -423,30 +432,23 @@ export default function App() {
       {/* Contenido Principal con Enrutador React */}
       <main className={activeScreen === 'hero' || activeScreen === 'inicio' ? 'w-full p-0 m-0 max-w-none flex-1' : 'main-content'} id="main-content">
         {!catalogoListo && activeScreen !== 'hero' && (
-          <div className="max-w-md mx-auto my-24 px-6 py-10 text-center bg-white rounded-3xl border border-stone-200 shadow-sm">
-            {errorCatalogo ? (
-              <>
-                <p className="font-display font-bold text-lg text-[#1F1410] mb-2">
-                  No se pudo conectar con Café Marfil
-                </p>
-                <p className="font-body text-sm text-stone-600 mb-6">{errorCatalogo}</p>
-                <button
-                  type="button"
-                  onClick={() => cargarCatalogo().catch((e) => setErrorCatalogo(e.message))}
-                  className="px-6 py-2.5 rounded-full bg-[#E12927] hover:bg-[#C81E1C] text-white font-mono text-xs font-bold uppercase tracking-wider cursor-pointer transition-colors"
-                >
-                  Reintentar
-                </button>
-              </>
-            ) : (
-              <div className="flex flex-col items-center gap-3">
-                <span className="w-8 h-8 rounded-full border-2 border-stone-200 border-t-[#E12927] animate-spin" />
-                <p className="font-mono text-xs font-bold text-[#8E7A74] uppercase tracking-wider">
-                  Cargando Café Marfil...
-                </p>
-              </div>
-            )}
-          </div>
+          errorCatalogo ? (
+            <div className="max-w-lg mx-auto my-24 px-4">
+              <AlertCard
+                variante="error"
+                titulo="No se pudo conectar con Café Marfil"
+                mensaje={errorCatalogo}
+                accionTexto="Reintentar"
+                onAccion={() => cargarCatalogo().catch((e) => setErrorCatalogo(e.message))}
+              />
+            </div>
+          ) : activeScreen === 'inicio' ? (
+            <MainLoader texto="Preparando Café Marfil..." />
+          ) : ['menu', 'actividades', 'promociones'].includes(activeScreen) ? (
+            <SkeletonMenuGrid cantidad={6} />
+          ) : (
+            <SkeletonList filas={4} />
+          )
         )}
 
         {/* PROTOTIPO HERO COFFEE & CO. (/hero) */}
@@ -577,14 +579,18 @@ export default function App() {
 
         {/* MIS RESERVACIONES */}
         {activeScreen === 'mis_reservaciones' && (
-          <MyReservationsScreen
-            reservaciones={reservaciones}
-            onCancelReservation={handleCancelReservation}
-            onNewReservation={() => {
-              setReservationWizardInitialData(null);
-              navigateTo('reservar');
-            }}
-          />
+          cargandoCuenta ? (
+            <SkeletonList filas={4} />
+          ) : (
+            <MyReservationsScreen
+              reservaciones={reservaciones}
+              onCancelReservation={handleCancelReservation}
+              onNewReservation={() => {
+                setReservationWizardInitialData(null);
+                navigateTo('reservar');
+              }}
+            />
+          )
         )}
 
         {/* SUCURSALES */}
@@ -729,15 +735,7 @@ export default function App() {
         }}
       />
 
-      {aviso && (
-        <div
-          role="alert"
-          onClick={() => setAviso(null)}
-          className="fixed left-1/2 -translate-x-1/2 bottom-24 z-[10000] w-[min(92vw,28rem)] p-3.5 rounded-md bg-[#1F1410] text-white border-l-4 border-[#E12927] shadow-lg font-body text-xs sm:text-sm font-medium cursor-pointer"
-        >
-          {aviso}
-        </div>
-      )}
+      <AlertToastStack alertas={alertas} onDismiss={cerrarAlerta} />
 
       {/* Drawer Lateral de Notificaciones */}
       <NotificationsDrawer
