@@ -416,6 +416,7 @@ export default function App() {
         toggleTheme={toggleTheme}
         unreadCount={unreadCount}
         openNotifications={() => setIsNotifDrawerOpen(true)}
+        isLoggedIn={Boolean(perfil)}
       />
 
       {/* Banner de verificación pendiente de correo */}
@@ -737,6 +738,7 @@ export default function App() {
       {/* Navegación Móvil Inferior con botón Reservar Elevado */}
       <BottomNav
         activeScreen={activeScreen}
+        isLoggedIn={Boolean(perfil)}
         setActiveScreen={(s) => {
           setReservationWizardInitialData(null);
           navigateTo(s);

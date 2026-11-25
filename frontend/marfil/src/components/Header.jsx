@@ -1,15 +1,14 @@
 import React from 'react';
-import { Bell, Moon, Sun, CalendarDays, User, Sparkles } from 'lucide-react';
+import { Bell, CalendarDays, User, LogIn } from 'lucide-react';
 import ElephantLogo from './ElephantLogo';
 import { sounds } from '../utils/audio';
 
 export default function Header({
   activeScreen,
   setActiveScreen,
-  theme,
-  toggleTheme,
   unreadCount,
-  openNotifications
+  openNotifications,
+  isLoggedIn = false
 }) {
   const navItems = [
     { id: 'inicio', label: 'Inicio' },
@@ -124,21 +123,38 @@ export default function Header({
               )}
             </button>
 
-            {/* Perfil */}
-            <button
-              className={`w-10 h-10 rounded-full border flex items-center justify-center active:scale-95 transition-all cursor-pointer shadow-xs ${
-                activeScreen === 'perfil' || activeScreen === 'mis_reservaciones'
-                  ? 'bg-[#1F1410] text-white border-[#1F1410]'
-                  : isHeroOverlay
-                  ? 'border-white/25 bg-black/20 hover:bg-black/35 text-white backdrop-blur-md'
-                  : 'border-stone-200/80 bg-white/60 backdrop-blur-md text-[#1F1410] hover:bg-[#FCEAE9] hover:border-[#E12927]'
-              }`}
-              onClick={() => handleNav('perfil')}
-              aria-label="Mi Perfil y Reservaciones"
-              title="Mi Perfil"
-            >
-              <User size={18} />
-            </button>
+            {/* Perfil o Iniciar sesión */}
+            {isLoggedIn ? (
+              <button
+                className={`w-10 h-10 rounded-full border flex items-center justify-center active:scale-95 transition-all cursor-pointer shadow-xs ${
+                  activeScreen === 'perfil' || activeScreen === 'mis_reservaciones'
+                    ? 'bg-[#1F1410] text-white border-[#1F1410]'
+                    : isHeroOverlay
+                    ? 'border-white/25 bg-black/20 hover:bg-black/35 text-white backdrop-blur-md'
+                    : 'border-stone-200/80 bg-white/60 backdrop-blur-md text-[#1F1410] hover:bg-[#FCEAE9] hover:border-[#E12927]'
+                }`}
+                onClick={() => handleNav('perfil')}
+                aria-label="Mi Perfil y Reservaciones"
+                title="Mi Perfil"
+              >
+                <User size={18} />
+              </button>
+            ) : (
+              <button
+                className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full border font-mono text-xs font-bold uppercase tracking-wider active:scale-95 transition-all cursor-pointer shadow-xs ${
+                  activeScreen === 'perfil'
+                    ? 'bg-[#1F1410] text-white border-[#1F1410]'
+                    : isHeroOverlay
+                    ? 'border-white/30 bg-black/25 hover:bg-white hover:text-[#1F1410] text-white backdrop-blur-md'
+                    : 'border-[#1F1410]/20 bg-white text-[#1F1410] hover:bg-[#FCEAE9] hover:border-[#E12927] hover:text-[#E12927]'
+                }`}
+                onClick={() => handleNav('perfil')}
+                aria-label="Iniciar sesión en Café Marfil"
+              >
+                <LogIn size={14} />
+                <span>Iniciar sesión</span>
+              </button>
+            )}
           </div>
         </div>
       </header>

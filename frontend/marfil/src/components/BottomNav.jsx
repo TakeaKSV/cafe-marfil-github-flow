@@ -1,8 +1,8 @@
 import React from 'react';
-import { Home, UtensilsCrossed, CalendarPlus, Compass, User } from 'lucide-react';
+import { Home, UtensilsCrossed, CalendarPlus, Compass, User, LogIn } from 'lucide-react';
 import { sounds } from '../utils/audio';
 
-export default function BottomNav({ activeScreen, setActiveScreen }) {
+export default function BottomNav({ activeScreen, setActiveScreen, isLoggedIn = false }) {
   const handleNav = (screenId) => {
     sounds.playClick();
     setActiveScreen(screenId);
@@ -74,7 +74,7 @@ export default function BottomNav({ activeScreen, setActiveScreen }) {
           <span className="font-body text-[10px] tracking-tight mt-0.5 font-bold">Ludoteca</span>
         </button>
 
-        {/* Perfil */}
+        {/* Perfil / Iniciar sesión */}
         <button
           className={`flex-1 flex flex-col items-center justify-center py-1.5 rounded-lg transition-all duration-200 cursor-pointer ${
             activeScreen === 'perfil' || activeScreen === 'mis_reservaciones'
@@ -83,8 +83,10 @@ export default function BottomNav({ activeScreen, setActiveScreen }) {
           }`}
           onClick={() => handleNav('perfil')}
         >
-          <User size={18} />
-          <span className="font-body text-[10px] tracking-tight mt-0.5 font-bold">Perfil</span>
+          {isLoggedIn ? <User size={18} /> : <LogIn size={18} />}
+          <span className="font-body text-[10px] tracking-tight mt-0.5 font-bold">
+            {isLoggedIn ? 'Perfil' : 'Iniciar sesión'}
+          </span>
         </button>
       </div>
     </nav>
