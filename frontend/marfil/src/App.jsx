@@ -229,8 +229,32 @@ export default function App() {
   };
   const crearCuenta = async (datos) => {
     const respuesta = await api('/auth/clientes/registro', { metodo: 'POST', body: datos });
+    if (respuesta?.token) {
+      await entrar(respuesta);
+    } else {
+      mostrarInfo(
+        'Te enviamos un código de 6 dígitos a tu correo para confirmar tu identidad.',
+        'Confirma tu correo'
+      );
+    }
+    return respuesta;
+  };
+
+  const verificarCodigoCuenta = async (email, codigo) => {
+    const respuesta = await api('/auth/verificar-codigo', {
+      metodo: 'POST',
+      body: { email, codigo }
+    });
     await entrar(respuesta);
-    mostrarExito('Revisa tu correo electrónico para confirmar tu dirección.', '¡Cuenta creada!');
+    mostrarExito('¡Correo verificado! Ya iniciaste sesión en Club Marfil.', 'Cuenta activada');
+  };
+
+  const reenviarCodigoCuenta = async (email) => {
+    const resp = await api('/auth/verificacion/reenviar', {
+      metodo: 'POST',
+      body: { email }
+    });
+    mostrarExito(resp?.mensaje || 'Te enviamos un nuevo código de 6 dígitos.', 'Código reenviado');
   };
 
   const handleReenviarVerificacion = async () => {
@@ -559,6 +583,8 @@ export default function App() {
             <AuthScreen
               onLogin={iniciarSesion}
               onRegister={crearCuenta}
+              onVerifyCode={verificarCodigoCuenta}
+              onResendCode={reenviarCodigoCuenta}
               onForgotPassword={() => navigateTo('olvide_password')}
               motivo="Inicia sesión para ver tu pasaporte de sellos y tus beneficios."
             />
@@ -616,6 +642,8 @@ export default function App() {
           <AuthScreen
             onLogin={iniciarSesion}
             onRegister={crearCuenta}
+            onVerifyCode={verificarCodigoCuenta}
+            onResendCode={reenviarCodigoCuenta}
             onForgotPassword={() => navigateTo('olvide_password')}
           />
         )}

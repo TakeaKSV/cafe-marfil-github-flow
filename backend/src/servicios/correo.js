@@ -202,24 +202,27 @@ async function enviarCorreoSeguro({ para, asunto, texto, html }) {
   }
 }
 
-export async function enviarVerificacionCorreo({ nombre, email, enlace }) {
+export async function enviarVerificacionCorreo({ nombre, email, codigo }) {
   const saludo = escaparHtml(nombre || 'cliente');
+  const codigoSeguro = escaparHtml(codigo || '');
   const html = construirPlantillaHtml({
-    preheader: 'Confirma tu correo electrónico para activar tu cuenta Club Marfil.',
-    titulo: 'Verifica tu correo electrónico',
+    preheader: `Tu código de verificación Café Marfil es ${codigoSeguro}.`,
+    titulo: 'Confirma tu identidad',
     cuerpoHtml: `
       <p style="margin:0 0 14px 0;">Hola <strong>${saludo}</strong>,</p>
-      <p style="margin:0 0 14px 0;">¡Gracias por unirte a <strong>Club Marfil</strong>! Confirma que esta dirección es tuya para activar tus beneficios, sellos digitales y alertas de reservación.</p>
-      <p style="margin:0;color:#6E5A52;font-size:13px;">Este enlace es válido por <strong>24 horas</strong> y solo puede usarse una vez.</p>
+      <p style="margin:0 0 18px 0;">Para activar tu cuenta de <strong>Club Marfil</strong> y poder iniciar sesión, ingresa el siguiente código de 6 dígitos en la aplicación:</p>
+      <div style="background-color:#FCEAE9;border:2px solid #E12927;border-radius:14px;padding:22px 16px;text-align:center;margin:20px 0;">
+        <div style="font-size:11px;font-family:'Space Mono',monospace;color:#8E7A74;letter-spacing:0.16em;text-transform:uppercase;margin-bottom:8px;">CÓDIGO DE VERIFICACIÓN</div>
+        <div style="font-size:34px;line-height:1;font-family:'Space Mono',monospace;font-weight:700;color:#E12927;letter-spacing:0.35em;padding-left:0.35em;">${codigoSeguro}</div>
+      </div>
+      <p style="margin:0;color:#6E5A52;font-size:13px;">Este código es válido por <strong>15 minutos</strong> y solo puede usarse una vez.</p>
     `,
-    botonTexto: 'Confirmar mi correo',
-    botonUrl: enlace,
-    pieNota: 'Si no creaste esta cuenta en Café Marfil, puedes ignorar este mensaje.'
+    pieNota: 'Si no intentaste crear una cuenta en Café Marfil, puedes ignorar este correo.'
   });
   return enviarCorreoSeguro({
     para: email,
-    asunto: 'Verifica tu correo en Café Marfil',
-    texto: `Hola ${nombre || ''},\n\nConfirma tu correo en Café Marfil entrando a este enlace (válido 24 horas):\n${enlace}\n\nSi no creaste esta cuenta, ignora este mensaje.`,
+    asunto: `Tu código de verificación: ${codigo} · Café Marfil`,
+    texto: `Hola ${nombre || ''},\n\nTu código de verificación de 6 dígitos para Café Marfil es: ${codigo}\n\nEste código es válido por 15 minutos y solo puede usarse una vez.\nSi no creaste esta cuenta, ignora este mensaje.`,
     html
   });
 }

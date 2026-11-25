@@ -159,12 +159,17 @@ test('registro de clientes en la PWA', async () => {
   };
   const alta = await api('POST', '/auth/clientes/registro', { body: nuevo });
   assert.equal(alta.status, 201);
+  assert.equal(alta.datos.requiereVerificacion, true);
+  assert.equal(alta.datos.token, undefined, 'no entrega sesión hasta confirmar código de 6 dígitos');
   assert.equal(alta.datos.cliente.email, 'renata@example.com', 'el correo se guarda en minúsculas');
   assert.match(alta.datos.cliente.codigoCliente, /^MF-CLUB-\d{5}$/);
   assert.equal(alta.datos.cliente.nivel, 'Explorador');
 
-  const perfil = await api('GET', '/mi/perfil', { token: alta.datos.token });
-  assert.equal(perfil.datos.nombre, 'Renata Ibarra');
+  // No puede iniciar sesión antes de confirmar el código de 6 dígitos.
+  const loginBloqueado = await api('POST', '/auth/clientes/login', {
+    body: { email: 'renata@example.com', password: 'cafeconleche' }
+  });
+  assert.equal(loginBloqueado.status, 403);
 
   assert.equal((await api('POST', '/auth/clientes/registro', { body: nuevo })).status, 409, 'correo repetido');
 
@@ -991,16 +996,34 @@ test('inyección SQL: búsquedas y slugs se tratan como datos', async () => {
 });
 
 test('dos clientes no acceden a reservaciones ni notificaciones ajenas', async () => {
-  const alta = await api('POST', '/auth/clientes/registro', {
-    body: { nombre: 'Otro Cliente', email: 'otro-seguridad@example.com', password: 'segura-de-prueba' }
+  let codigoCapturado = null;
+  establecerTransporteCorreo({
+    async sendMail(msg) {
+      const m = /\b(\d{6})\b/.exec(msg.text || '');
+      if (m) codigoCapturado = m[1];
+      return { messageId: '<test-aislamiento@marfil.local>' };
+    }
   });
-  assert.equal(alta.status, 201);
+  let token;
+  try {
+    const alta = await api('POST', '/auth/clientes/registro', {
+      body: { nombre: 'Otro Cliente', email: 'otro-seguridad@example.com', password: 'segura-de-prueba' }
+    });
+    assert.equal(alta.status, 201);
+    assert.ok(codigoCapturado);
+    const verif = await api('POST', '/auth/verificar-codigo', {
+      body: { email: 'otro-seguridad@example.com', codigo: codigoCapturado }
+    });
+    assert.equal(verif.status, 200);
+    token = verif.datos.token;
+  } finally {
+    restaurarTransporteCorreo();
+  }
   const propia = await api('POST', '/reservaciones', {
     token: sesion.cliente,
     body: { sucursalId: 'calvario', fecha: MANANA, hora: '10:00', personas: 2 }
   });
   assert.equal(propia.status, 201);
-  const token = alta.datos.token;
   assert.equal((await api('POST', `/mi/reservaciones/${propia.datos.folio}/cancelar`, { token })).status, 404);
   const avisos = (await api('GET', '/mi/notificaciones', { token: sesion.cliente })).datos;
   assert.equal((await api('POST', `/mi/notificaciones/${avisos[0].id}/leer`, { token })).status, 404);
@@ -1157,7 +1180,7 @@ test('correos: verificación de registro, bloqueo de canje sin verificar, recupe
     });
     assert.equal(temporal.status, 400);
 
-    // 2. Registro válido envía correo de verificación y crea cliente no verificado.
+    // 2. Registro válido envía código de 6 dígitos y NO entrega sesión hasta confirmar.
     const registro = await api('POST', '/auth/clientes/registro', {
       body: {
         nombre: 'Camila Verificada',
@@ -1167,12 +1190,20 @@ test('correos: verificación de registro, bloqueo de canje sin verificar, recupe
       }
     });
     assert.equal(registro.status, 201);
+    assert.equal(registro.datos.requiereVerificacion, true);
+    assert.equal(registro.datos.token, undefined);
     assert.equal(registro.datos.cliente.emailVerificado, false);
     assert.equal(registro.datos.verificacionEnviada, true);
     assert.equal(bandeja.length, 1);
-    assert.match(bandeja[0].subject, /Verifica tu correo/);
-    const tokenVerif = /\?verificar=([a-f0-9]{64})/.exec(bandeja[0].text)?.[1];
-    assert.ok(tokenVerif, 'el correo debe incluir el token de verificación');
+    assert.match(bandeja[0].subject, /código de verificación/i);
+    const codigo6 = /\b(\d{6})\b/.exec(bandeja[0].text)?.[1];
+    assert.ok(codigo6, 'el correo debe incluir el código de 6 dígitos');
+
+    // Login bloqueado antes de confirmar el código.
+    const loginAntes = await api('POST', '/auth/clientes/login', {
+      body: { email: 'camila.verif@example.com', password: 'password123' }
+    });
+    assert.equal(loginAntes.status, 403);
 
     // 3. Cuenta no verificada no puede canjear beneficios en caja.
     const beneficio = await otorgarBeneficio(registro.datos.cliente.id, {
@@ -1184,17 +1215,26 @@ test('correos: verificación de registro, bloqueo de canje sin verificar, recupe
     });
     assert.equal(canjeBloqueado.status, 403);
 
-    // 4. Token inválido falla con 400; token válido verifica, envía bienvenida y no puede reusarse.
-    assert.equal((await api('GET', '/auth/verificar?token=invalido&formato=json')).status, 400);
+    // 4. Código incorrecto falla con 400; código válido verifica, entrega JWT, envía bienvenida y no puede reusarse.
+    assert.equal(
+      (await api('POST', '/auth/verificar-codigo', { body: { email: 'camila.verif@example.com', codigo: '000000' } })).status,
+      400
+    );
 
-    const verificado = await api('GET', `/auth/verificar?token=${tokenVerif}&formato=json`);
+    const verificado = await api('POST', '/auth/verificar-codigo', {
+      body: { email: 'camila.verif@example.com', codigo: codigo6 }
+    });
     assert.equal(verificado.status, 200);
+    assert.ok(verificado.datos.token);
     assert.equal(verificado.datos.cliente.emailVerificado, true);
     assert.equal(bandeja.length, 2);
     assert.match(bandeja[1].subject, /activa/);
 
-    // Reutilizar el mismo token falla.
-    assert.equal((await api('GET', `/auth/verificar?token=${tokenVerif}&formato=json`)).status, 400);
+    // Reutilizar el mismo código falla.
+    assert.equal(
+      (await api('POST', '/auth/verificar-codigo', { body: { email: 'camila.verif@example.com', codigo: codigo6 } })).status,
+      400
+    );
 
     // Ya verificada, sí puede canjear su beneficio.
     const canjeOk = await api('POST', `/club/beneficios/${beneficio.codigo}/canjear`, {
@@ -1203,7 +1243,7 @@ test('correos: verificación de registro, bloqueo de canje sin verificar, recupe
     assert.equal(canjeOk.status, 200);
 
     // Reenviar en cuenta ya verificada responde yaVerificado: true sin enviar nuevo correo.
-    const reenvioYa = await api('POST', '/auth/verificacion/reenviar', { token: registro.datos.token });
+    const reenvioYa = await api('POST', '/auth/verificacion/reenviar', { token: verificado.datos.token });
     assert.equal(reenvioYa.status, 200);
     assert.equal(reenvioYa.datos.yaVerificado, true);
 
@@ -1228,7 +1268,7 @@ test('correos: verificación de registro, bloqueo de canje sin verificar, recupe
     assert.equal(reset.status, 200);
 
     // El token JWT anterior quedó revocado por session_version++.
-    assert.equal((await api('GET', '/auth/me', { token: registro.datos.token })).status, 401);
+    assert.equal((await api('GET', '/auth/me', { token: verificado.datos.token })).status, 401);
     // El enlace de recuperación no se puede reutilizar.
     assert.equal(
       (await api('POST', '/auth/password/restablecer', { body: { token: tokenReset, password: 'otraPassword88' } })).status,

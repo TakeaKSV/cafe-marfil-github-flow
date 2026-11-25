@@ -7,7 +7,7 @@ import { bloquearFila, enTransaccion } from '../db/conexion.js';
 import * as repo from '../repositorios/clientes.js';
 import * as repoTokens from '../repositorios/tokensCorreo.js';
 import { codigoUnico, generarCodigoBeneficio, generarCodigoClub, leerJSON } from '../utils/codigos.js';
-import { conflicto, noAutenticado, noEncontrado, sinPermiso, solicitudInvalida } from '../utils/errores.js';
+import { HttpError, conflicto, noAutenticado, noEncontrado, sinPermiso, solicitudInvalida } from '../utils/errores.js';
 import { ahoraISO, fechaEnFrase, hoyLocal } from '../utils/fechas.js';
 
 import { crearNotificacion, registrarEscaneo } from './bitacora.js';
@@ -106,26 +106,74 @@ const hashToken = (tokenPlano) => crypto.createHash('sha256').update(String(toke
 export async function emitirVerificacionCorreo(clienteId) {
   const cliente = await obtenerCliente(clienteId);
   if (!cliente.email) throw solicitudInvalida('Esta cuenta no tiene un correo registrado.');
-  const tokenPlano = crypto.randomBytes(32).toString('hex');
+  const codigo = String(crypto.randomInt(100000, 1000000));
   const ahora = ahoraISO();
-  const expiraEn = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  const expiraEn = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 
   await repoTokens.invalidarPendientes(cliente.id, 'verificacion', ahora);
   await repoTokens.crear({
     clienteId: cliente.id,
-    tokenHash: hashToken(tokenPlano),
+    tokenHash: hashToken(`${cliente.id}:${codigo}`),
     tipo: 'verificacion',
     expiraEn,
     creadoEn: ahora
   });
 
-  const enlace = `${config.correo.appUrl}/?verificar=${tokenPlano}`;
   const resultado = await enviarVerificacionCorreo({
     nombre: cliente.nombre,
     email: cliente.email,
-    enlace
+    codigo
   });
   return { enviado: resultado.enviado, cliente };
+}
+
+export async function verificarCodigoCorreo(email, codigo) {
+  const codigoLimpio = String(codigo || '').trim();
+  if (!/^\d{6}$/.test(codigoLimpio)) {
+    throw solicitudInvalida('Ingresa el código de 6 dígitos que enviamos a tu correo.');
+  }
+  const filaCliente = await repo.porEmail(String(email || '').trim().toLowerCase());
+  if (!filaCliente) {
+    throw solicitudInvalida('El código de verificación no es válido o ya expiró.');
+  }
+  const hash = hashToken(`${filaCliente.id}:${codigoLimpio}`);
+  const registro = await repoTokens.porHash(hash);
+  if (!registro || registro.tipo !== 'verificacion' || registro.cliente_id !== filaCliente.id) {
+    throw solicitudInvalida('El código de verificación es incorrecto.');
+  }
+  if (registro.usado_en) {
+    throw solicitudInvalida('Este código de verificación ya fue utilizado.');
+  }
+  if (new Date(registro.expira_en).getTime() < Date.now()) {
+    throw solicitudInvalida('El código expiró. Solicita un nuevo código de 6 dígitos.');
+  }
+
+  const cliente = await enTransaccion(async () => {
+    await bloquearFila('tokens_correo', registro.id);
+    const actual = await repoTokens.porHash(hash);
+    if (!actual || actual.usado_en) {
+      throw solicitudInvalida('Este código de verificación ya fue utilizado.');
+    }
+    const ahora = ahoraISO();
+    await repoTokens.marcarUsado(actual.id, ahora);
+    await repo.marcarEmailVerificado(actual.cliente_id, ahora);
+    return obtenerCliente(actual.cliente_id);
+  });
+
+  await enviarBienvenida({
+    nombre: cliente.nombre,
+    email: cliente.email,
+    codigoCliente: cliente.codigoCliente
+  });
+  return { cliente, version: filaCliente.session_version };
+}
+
+export async function reenviarCodigoPorEmail(email) {
+  const fila = await repo.porEmail(String(email || '').trim().toLowerCase());
+  if (!fila || !fila.password_hash) return { yaVerificado: false, enviado: false };
+  if (fila.email_verificado_en) return { yaVerificado: true, enviado: false };
+  const { enviado } = await emitirVerificacionCorreo(fila.id);
+  return { yaVerificado: false, enviado };
 }
 
 export async function verificarCorreoPorToken(tokenPlano) {
@@ -231,6 +279,13 @@ export async function autenticarCliente(email, password) {
   const fila = await repo.porEmail(email);
   const valido = await verificarPassword(password, fila?.password_hash);
   if (!valido) throw noAutenticado('Correo o contraseña incorrectos.');
+  if (!fila.email_verificado_en) {
+    throw new HttpError(
+      403,
+      'Debes confirmar tu correo con el código de 6 dígitos antes de iniciar sesión.',
+      [{ campo: 'verificacion', mensaje: 'requiere_verificacion' }]
+    );
+  }
   return { cliente: aCliente(fila), version: fila.session_version };
 }
 

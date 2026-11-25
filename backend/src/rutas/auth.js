@@ -1,19 +1,21 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { config } from '../config.js';
-import { firmarToken, requiereCliente } from '../middleware/auth.js';
+import { firmarToken } from '../middleware/auth.js';
 import {
   autenticarCliente,
   emitirVerificacionCorreo,
   obtenerCliente,
+  reenviarCodigoPorEmail,
   reenviarVerificacionCorreo,
   registrarCliente,
   restablecerPasswordPorToken,
   solicitarRecuperacionPassword,
+  verificarCodigoCorreo,
   verificarCorreoPorToken
 } from '../servicios/clientes.js';
 import { autenticarStaff, obtenerPersona } from '../servicios/personal.js';
-import { noAutenticado } from '../utils/errores.js';
+import { noAutenticado, solicitudInvalida } from '../utils/errores.js';
 import { leer, zEmail, zPassword, zPasswordLogin, zTexto } from '../utils/validar.js';
 
 const router = Router();
@@ -26,6 +28,18 @@ const esquemaRegistro = z.object({
   password: zPassword,
   telefono: zTexto(30).optional(),
   ciudad: zTexto(80).optional()
+});
+
+const esquemaVerificarCodigo = z.object({
+  email: zEmail,
+  codigo: z
+    .string()
+    .trim()
+    .regex(/^\d{6}$/, 'Ingresa el código de 6 dígitos.')
+});
+
+const esquemaReenviar = z.object({
+  email: zEmail.optional()
 });
 
 const esquemaOlvidePassword = z.object({ email: zEmail });
@@ -41,14 +55,16 @@ router.post('/staff/login', async (req, res) => {
   res.json({ token: firmarToken({ id: usuario.id, tipo: 'staff', version }), usuario });
 });
 
-// PWA de clientes
+// PWA de clientes: el registro NO entrega sesión hasta confirmar el código de 6 dígitos.
 router.post('/clientes/registro', async (req, res) => {
   const cliente = await registrarCliente(leer(esquemaRegistro, req.body));
   const { enviado } = await emitirVerificacionCorreo(cliente.id).catch(() => ({ enviado: false }));
   res.status(201).json({
-    token: firmarToken({ id: cliente.id, tipo: 'cliente' }),
+    requiereVerificacion: true,
+    email: cliente.email,
     cliente,
-    verificacionEnviada: enviado
+    verificacionEnviada: enviado,
+    mensaje: 'Te enviamos un código de 6 dígitos a tu correo para confirmar tu cuenta.'
   });
 });
 
@@ -58,7 +74,19 @@ router.post('/clientes/login', async (req, res) => {
   res.json({ token: firmarToken({ id: cliente.id, tipo: 'cliente', version }), cliente });
 });
 
-// Verificación de correo electrónico
+// Verificación por código de 6 dígitos (activa la cuenta e inicia sesión)
+router.post('/verificar-codigo', async (req, res) => {
+  const { email, codigo } = leer(esquemaVerificarCodigo, req.body);
+  const { cliente, version } = await verificarCodigoCorreo(email, codigo);
+  res.json({
+    ok: true,
+    token: firmarToken({ id: cliente.id, tipo: 'cliente', version }),
+    cliente,
+    mensaje: '¡Tu correo electrónico fue verificado correctamente!'
+  });
+});
+
+// Compatibilidad con enlaces de verificación
 router.get('/verificar', async (req, res) => {
   const token = typeof req.query.token === 'string' ? req.query.token.trim() : '';
   const quiereJson =
@@ -82,14 +110,26 @@ router.get('/verificar', async (req, res) => {
   }
 });
 
-router.post('/verificacion/reenviar', requiereCliente, async (req, res) => {
-  const resultado = await reenviarVerificacionCorreo(req.usuario.id);
-  res.json({
+router.post('/verificacion/reenviar', async (req, res) => {
+  if (req.usuario?.tipo === 'cliente') {
+    const resultado = await reenviarVerificacionCorreo(req.usuario.id);
+    return res.json({
+      ok: true,
+      ...resultado,
+      mensaje: resultado.yaVerificado
+        ? 'Tu correo ya estaba verificado.'
+        : 'Te enviamos un nuevo código de 6 dígitos. Revisa tu bandeja.'
+    });
+  }
+  const { email } = leer(esquemaReenviar, req.body || {});
+  if (!email) throw solicitudInvalida('Indica el correo para reenviar el código de verificación.');
+  const resultado = await reenviarCodigoPorEmail(email);
+  return res.json({
     ok: true,
     ...resultado,
     mensaje: resultado.yaVerificado
-      ? 'Tu correo ya estaba verificado.'
-      : 'Te enviamos un nuevo correo de verificación. Revisa tu bandeja.'
+      ? 'Tu correo ya está verificado. Ya puedes iniciar sesión.'
+      : 'Si tu cuenta está pendiente de verificación, te enviamos un nuevo código de 6 dígitos.'
   });
 });
 
