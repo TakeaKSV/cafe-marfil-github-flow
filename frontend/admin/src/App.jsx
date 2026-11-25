@@ -352,17 +352,47 @@ export function App() {
   // Promociones y Club Marfil
   // ------------------------------------------------------------------------
 
+  const CAMPOS_PROMOCION = [
+    'codigo',
+    'titulo',
+    'categoria',
+    'categoriaSlug',
+    'descuentoBadge',
+    'beneficio',
+    'descripcion',
+    'vigencia',
+    'imagen',
+    'limiteDiario',
+    'estado',
+    'sucursales'
+  ];
+
   const handleUpdatePromocion = (actualizada) => {
     const anterior = promociones.find((p) => p.id === actualizada.id);
     if (!anterior) return Promise.resolve(false);
-    if (actualizada.canjesHoy > anterior.canjesHoy) {
+    if (actualizada.canjesHoy !== undefined && actualizada.canjesHoy > anterior.canjesHoy) {
       return ejecutar(() => post(`/promociones/${actualizada.id}/canjear`));
     }
-    if (actualizada.estado !== anterior.estado) {
-      return ejecutar(() => patch(`/promociones/${actualizada.id}`, { estado: actualizada.estado }));
+    const cambios = {};
+    for (const campo of CAMPOS_PROMOCION) {
+      if (actualizada[campo] === undefined) continue;
+      const valor = campo === 'limiteDiario' ? Number(actualizada[campo]) : actualizada[campo];
+      if (JSON.stringify(valor) !== JSON.stringify(anterior[campo])) cambios[campo] = valor;
     }
-    return Promise.resolve(true);
+    if (Object.keys(cambios).length === 0) return Promise.resolve(true);
+    return ejecutar(() => patch(`/promociones/${actualizada.id}`, cambios));
   };
+
+  const handleCanjearPromocion = (promoId, { sucursalId, codigoCliente } = {}) =>
+    ejecutar(() =>
+      post(`/promociones/${promoId}/canjear`, {
+        ...(sucursalId ? { sucursalId } : {}),
+        ...(codigoCliente ? { codigoCliente } : {})
+      })
+    );
+
+  const handleCanjearBeneficio = (codigo) =>
+    ejecutar(() => post(`/club/beneficios/${encodeURIComponent(codigo)}/canjear`));
 
   const handleAddPromocion = (nueva) =>
     ejecutar(() =>
@@ -370,10 +400,13 @@ export function App() {
         codigo: nueva.codigo,
         titulo: nueva.titulo,
         categoria: nueva.categoria,
+        categoriaSlug: nueva.categoriaSlug || undefined,
         descuentoBadge: nueva.descuentoBadge,
         beneficio: nueva.beneficio,
+        descripcion: nueva.descripcion || undefined,
         vigencia: nueva.vigencia,
-        limiteDiario: nueva.limiteDiario,
+        imagen: nueva.imagen || undefined,
+        limiteDiario: Number(nueva.limiteDiario),
         sucursales: nueva.sucursales
       })
     );
@@ -611,11 +644,13 @@ export function App() {
                 <ScannerModule
                   reservaciones={reservacionesHoy}
                   promociones={promociones}
-                  clientesClub={clientesClub}
                   historial={escaneos}
+                  selectedSucursal={selectedSucursal}
                   onUpdateReservacion={handleUpdateReservacion}
-                  onUpdatePromocion={handleUpdatePromocion}
+                  onCanjearPromocion={handleCanjearPromocion}
+                  onCanjearBeneficio={handleCanjearBeneficio}
                   onUpdateClienteClub={handleUpdateClienteClub}
+                  onRecargar={() => cargarDatos().catch(() => {})}
                   soundEnabled={soundEnabled}
                 />
               )}
@@ -652,8 +687,12 @@ export function App() {
               {activeTab === 'promotions' && (
                 <PromotionsModule
                   promociones={promociones}
+                  sucursales={sucursales}
+                  selectedSucursal={selectedSucursal}
+                  usuario={usuario}
                   onUpdatePromocion={handleUpdatePromocion}
                   onAddPromocion={handleAddPromocion}
+                  onCanjearPromocion={handleCanjearPromocion}
                   soundEnabled={soundEnabled}
                 />
               )}

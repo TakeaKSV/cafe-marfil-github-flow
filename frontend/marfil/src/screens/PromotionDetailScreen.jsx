@@ -66,11 +66,12 @@ export default function PromotionDetailScreen({ promo, onBack }) {
             </div>
 
             <button
-              className="w-full inline-flex items-center justify-center gap-2 py-3.5 rounded-md font-mono text-xs font-bold uppercase tracking-wider bg-[#E12927] hover:bg-[#C81E1C] active:scale-95 text-white border-2 border-[#E12927] shadow-md shadow-[#E12927]/30 hover:shadow-lg transition-all duration-200 cursor-pointer"
+              disabled={promo.agotadaHoy}
+              className="w-full inline-flex items-center justify-center gap-2 py-3.5 rounded-md font-mono text-xs font-bold uppercase tracking-wider bg-[#E12927] hover:bg-[#C81E1C] disabled:bg-stone-400 disabled:border-stone-400 disabled:cursor-not-allowed active:scale-95 text-white border-2 border-[#E12927] shadow-md shadow-[#E12927]/30 hover:shadow-lg transition-all duration-200 cursor-pointer"
               onClick={handleShowQR}
             >
               <QrCode size={16} />
-              <span>Mostrar cupón al barista</span>
+              <span>{promo.agotadaHoy ? 'Cupo de hoy agotado' : 'Mostrar cupón al barista'}</span>
             </button>
 
             <p className="font-body text-xs text-[#5A4840] text-center m-0 font-medium">

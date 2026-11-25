@@ -1,5 +1,31 @@
 # Historial de versiones
 
+## 1.4.0 — 2026-11-25
+
+### Imágenes en Cloudinary (`feature/cloud-uploads`)
+
+- Integración firmada con Cloudinary (`backend/src/servicios/cloudinary.js`) organizada por carpeta (`menu`, `actividades`, `promociones`), con respaldo automático a almacenamiento local cuando `CLOUDINARY_CLOUD_NAME` no está configurado.
+- Variables `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` y `CLOUDINARY_FOLDER` en `backend/src/config.js` y `backend/.env.example`.
+
+### Panel Admin sin datos simulados (`feature/admin-sin-simulados`)
+
+- Eliminados módulos heredados sin uso con datos simulados (`DashboardModule.jsx`, `ReservationsModule.jsx`, `OrderListView.jsx`).
+- `ScannerModule.jsx` conectado directamente a `GET /api/escaner/:codigo` en tiempo real (sin tokens demo hardcodeados ni `setTimeout` simulados), soportando reservaciones, cupones, Club Marfil y beneficios personales.
+
+### Editor de Actividades (`feature/admin-actividades`)
+
+- Nuevo módulo `ActivitiesModule.jsx` y pestaña **Actividades** en el panel admin con creación, edición, archivo/reactivación, subida de foto a Cloudinary y vista previa en vivo estilo PWA.
+- Soporte `?incluirInactivas=1` en `GET /api/actividades` para personal autorizado.
+
+### Formularios simplificados y editor en pantalla completa (`feature/formularios-simples`)
+
+- `MenuCatalogModule.jsx` rediseñado como editor a pantalla completa con 5 campos esenciales visibles y sección colapsable de opciones avanzadas, junto a la vista previa PWA en vivo.
+
+### Cupones funcionales (`feature/cupones-reales`)
+
+- `PromotionsModule.jsx` y `App.jsx` con edición completa (`PATCH /api/promociones/:id`), selección de sucursales, foto en nube y canje directo en caja (`POST /api/promociones/:id/canjear` con sucursal y código Club Marfil opcional).
+- `PromotionDetailScreen.jsx` en la PWA deshabilita el botón de cupón cuando se alcanza el límite diario.
+
 ## 1.3.0 — 2026-11-25
 
 ### Sin datos ficticios ni simulados (`feature/sin-mocks`)
