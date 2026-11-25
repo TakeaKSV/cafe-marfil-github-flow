@@ -35,6 +35,7 @@ export function crearApp({ bitacora = !config.esProduccion } = {}) {
           styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
           fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
           imgSrc: ["'self'", 'data:', 'blob:', 'https://res.cloudinary.com', 'https:'],
+          mediaSrc: ["'self'", 'blob:'],
           connectSrc: ["'self'", 'https://res.cloudinary.com'],
           objectSrc: ["'none'"],
           upgradeInsecureRequests: null

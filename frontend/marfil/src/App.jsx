@@ -594,16 +594,28 @@ export default function App() {
           )
         )}
 
-        {/* SISTEMA DE RESERVACIONES (WIZARD EN 6 PASOS) */}
+        {/* SISTEMA DE RESERVACIONES (WIZARD EN 6 PASOS - REQUIERE CUENTA) */}
         {catalogoListo && activeScreen === 'reservar' && (
-          <ReservationWizard
-            sucursales={sucursales}
-            actividades={actividades}
-            initialData={reservationWizardInitialData}
-            contacto={perfil}
-            onCancel={() => navigateTo('inicio')}
-            onCompleteReservation={handleCompleteReservation}
-          />
+          perfil ? (
+            <ReservationWizard
+              sucursales={sucursales}
+              actividades={actividades}
+              initialData={reservationWizardInitialData}
+              contacto={perfil}
+              onCancel={() => navigateTo('inicio')}
+              onCompleteReservation={handleCompleteReservation}
+            />
+          ) : (
+            <AuthScreen
+              modoInicial="registrar"
+              onLogin={iniciarSesion}
+              onRegister={crearCuenta}
+              onVerifyCode={verificarCodigoCuenta}
+              onResendCode={reenviarCodigoCuenta}
+              onForgotPassword={() => navigateTo('olvide_password')}
+              motivo="Para apartar tu mesa o lugar en una actividad necesitas una cuenta Club Marfil. Crea tu cuenta (o inicia sesión) y continuaremos automáticamente con tu reservación."
+            />
+          )
         )}
 
         {/* CONFIRMACIÓN DE RESERVACIÓN */}
@@ -617,7 +629,17 @@ export default function App() {
 
         {/* MIS RESERVACIONES */}
         {activeScreen === 'mis_reservaciones' && (
-          cargandoCuenta ? (
+          !perfil ? (
+            <AuthScreen
+              modoInicial="entrar"
+              onLogin={iniciarSesion}
+              onRegister={crearCuenta}
+              onVerifyCode={verificarCodigoCuenta}
+              onResendCode={reenviarCodigoCuenta}
+              onForgotPassword={() => navigateTo('olvide_password')}
+              motivo="Inicia sesión o crea tu cuenta para ver y administrar tus reservaciones."
+            />
+          ) : cargandoCuenta ? (
             <SkeletonList filas={4} />
           ) : (
             <MyReservationsScreen

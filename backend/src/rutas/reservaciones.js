@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { esStaff, requiereStaff } from '../middleware/auth.js';
+import { noAutenticado } from '../utils/errores.js';
 import {
   actualizarReservacion,
   cancelarReservacion,
@@ -63,12 +64,15 @@ const esquemaCompletar = z.object({ ticketTotal: zPrecio.optional() });
 // Público (PWA): reservar, y consultar o cancelar con el token secreto del QR
 // --------------------------------------------------------------------------
 
-// La misma ruta sirve a invitados, a clientes con sesión y al host del panel.
+// Exige sesión autenticada (cliente de la PWA o personal del panel).
 router.post('/', async (req, res) => {
+  if (!esStaff(req) && req.usuario?.tipo !== 'cliente') {
+    throw noAutenticado('Inicia sesión o crea tu cuenta para realizar una reservación.');
+  }
   const datos = leer(esquemaCrear, req.body);
   const contexto = esStaff(req)
     ? { personalId: req.usuario.id }
-    : { clienteId: req.usuario?.tipo === 'cliente' ? req.usuario.id : null };
+    : { clienteId: req.usuario.id };
   res.status(201).json(await crearReservacion(datos, contexto));
 });
 

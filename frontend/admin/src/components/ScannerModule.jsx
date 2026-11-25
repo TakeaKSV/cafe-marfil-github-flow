@@ -1,7 +1,11 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Html5Qrcode } from 'html5-qrcode';
 import {
   QrCode,
   Scan,
+  Camera,
+  CameraOff,
+  ImageUp,
   CheckCircle2,
   AlertCircle,
   Gift,
@@ -36,6 +40,12 @@ export const ScannerModule = ({
   const [isScanning, setIsScanning] = useState(false);
   const [procesandoAccion, setProcesandoAccion] = useState(false);
   const [scanResult, setScanResult] = useState(null);
+  const [camaraActiva, setCamaraActiva] = useState(false);
+  const [errorCamara, setErrorCamara] = useState('');
+  const [leyendoImagen, setLeyendoImagen] = useState(false);
+  const qrScannerRef = useRef(null);
+  const ultimoLeidoRef = useRef({ codigo: '', ts: 0 });
+  const fileInputRef = useRef(null);
 
   // Accesos rápidos generados únicamente desde registros reales activos en la base de datos.
   const accesosActivos = useMemo(() => {
@@ -49,7 +59,7 @@ export const ScannerModule = ({
     return lista;
   }, [reservaciones, promociones]);
 
-  const handleProcessCode = async (codeToProcess) => {
+  const handleProcessCode = useCallback(async (codeToProcess) => {
     const raw = (codeToProcess ?? tokenInput).trim().toUpperCase();
     if (!raw || isScanning) return;
 
@@ -127,6 +137,105 @@ export const ScannerModule = ({
       if (onRecargar) onRecargar();
     } finally {
       setIsScanning(false);
+    }
+  }, [tokenInput, isScanning, soundEnabled, onRecargar]);
+
+  const detenerCamara = useCallback(async () => {
+    const instancia = qrScannerRef.current;
+    qrScannerRef.current = null;
+    if (instancia) {
+      try {
+        if (instancia.isScanning) await instancia.stop();
+      } catch {
+        // ignorar si ya estaba detenida
+      }
+      try {
+        instancia.clear();
+      } catch {
+        // ignorar limpieza
+      }
+    }
+    setCamaraActiva(false);
+  }, []);
+
+  useEffect(() => {
+    if (!camaraActiva) return undefined;
+    let cancelado = false;
+    setErrorCamara('');
+
+    const iniciar = async () => {
+      try {
+        const instancia = new Html5Qrcode('marfil-qr-reader');
+        qrScannerRef.current = instancia;
+        const onScanSuccess = (decodedText) => {
+          const limpio = String(decodedText || '').trim();
+          if (!limpio) return;
+          const ahora = Date.now();
+          if (ultimoLeidoRef.current.codigo === limpio && ahora - ultimoLeidoRef.current.ts < 2500) {
+            return;
+          }
+          ultimoLeidoRef.current = { codigo: limpio, ts: ahora };
+          setTokenInput(limpio.toUpperCase());
+          handleProcessCode(limpio);
+          detenerCamara();
+        };
+
+        try {
+          await instancia.start(
+            { facingMode: 'environment' },
+            { fps: 10, qrbox: { width: 220, height: 220 } },
+            onScanSuccess,
+            () => {}
+          );
+        } catch {
+          const camaras = await Html5Qrcode.getCameras();
+          if (!camaras?.length) throw new Error('No se encontró ninguna cámara disponible en este dispositivo.');
+          await instancia.start(
+            camaras[0].id,
+            { fps: 10, qrbox: { width: 220, height: 220 } },
+            onScanSuccess,
+            () => {}
+          );
+        }
+        if (cancelado) await detenerCamara();
+      } catch (err) {
+        if (!cancelado) {
+          setErrorCamara(
+            err?.message ||
+              'No se pudo acceder a la cámara. Verifica los permisos del navegador o usa "Escanear imagen".'
+          );
+          setCamaraActiva(false);
+        }
+      }
+    };
+
+    iniciar();
+    return () => {
+      cancelado = true;
+      detenerCamara();
+    };
+  }, [camaraActiva, detenerCamara, handleProcessCode]);
+
+  const handleScanImageFile = async (e) => {
+    const archivo = e.target.files?.[0];
+    e.target.value = '';
+    if (!archivo || leyendoImagen) return;
+    setErrorCamara('');
+    setLeyendoImagen(true);
+    try {
+      const lector = new Html5Qrcode('marfil-qr-file-reader');
+      const texto = await lector.scanFile(archivo, false);
+      lector.clear();
+      const limpio = String(texto || '').trim().toUpperCase();
+      if (limpio) {
+        setTokenInput(limpio);
+        await handleProcessCode(limpio);
+      }
+    } catch {
+      setErrorCamara('No se detectó ningún código QR válido en la imagen seleccionada.');
+      if (soundEnabled) playSound('alert');
+    } finally {
+      setLeyendoImagen(false);
     }
   };
 
@@ -274,9 +383,67 @@ export const ScannerModule = ({
         {/* Columna Izquierda: Entrada de Código */}
         <div className="lg:col-span-6 space-y-4">
           <div className="bg-white p-6 rounded-2xl border border-[#1F1410]/8 shadow-xs space-y-4">
-            <h2 className="font-display font-bold text-base text-[#1F1410]">
-              Validar Folio, Cupón o Código QR
-            </h2>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="font-display font-bold text-base text-[#1F1410]">
+                Validar Folio, Cupón o Código QR
+              </h2>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (soundEnabled) playSound('toggle');
+                    if (camaraActiva) detenerCamara();
+                    else {
+                      setErrorCamara('');
+                      setCamaraActiva(true);
+                    }
+                  }}
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-mono font-bold transition-colors cursor-pointer ${
+                    camaraActiva
+                      ? 'bg-[#1F1410] text-white hover:bg-[#3a2820]'
+                      : 'bg-[#E12927] text-white hover:bg-[#b51c1a]'
+                  }`}
+                >
+                  {camaraActiva ? <CameraOff className="w-3.5 h-3.5" /> : <Camera className="w-3.5 h-3.5" />}
+                  <span>{camaraActiva ? 'Cerrar cámara' : 'Abrir cámara'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={leyendoImagen}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-mono font-bold bg-[#FAF7F5] hover:bg-[#FCEAE9] text-[#1F1410] hover:text-[#E12927] border border-[#1F1410]/15 transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  <ImageUp className="w-3.5 h-3.5" />
+                  <span>{leyendoImagen ? 'Leyendo...' : 'Subir QR'}</span>
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleScanImageFile}
+                  className="hidden"
+                />
+              </div>
+            </div>
+
+            <div id="marfil-qr-file-reader" className="hidden" />
+
+            {camaraActiva && (
+              <div className="rounded-2xl overflow-hidden border-2 border-[#E12927]/40 bg-[#1F1410] p-2">
+                <div id="marfil-qr-reader" className="w-full rounded-xl overflow-hidden" />
+                <p className="text-[11px] font-mono text-white/75 text-center pt-2 pb-1">
+                  Apunta la cámara al código QR del cliente (reservación, cupón o Club Marfil)
+                </p>
+              </div>
+            )}
+
+            {errorCamara && (
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-800 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                <span>{errorCamara}</span>
+              </div>
+            )}
 
             <div>
               <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1.5">

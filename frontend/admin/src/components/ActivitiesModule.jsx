@@ -107,7 +107,14 @@ export const ActivitiesModule = ({
   };
 
   const actualizarCampo = (campo, valor) => {
-    setForm((prev) => ({ ...prev, [campo]: valor }));
+    setForm((prev) => {
+      const siguiente = { ...prev, [campo]: valor };
+      // Si se cambia horaInicio u horaFin, limpia horarioTexto para regenerarlo automáticamente.
+      if (campo === 'horaInicio' || campo === 'horaFin') {
+        siguiente.horarioTexto = '';
+      }
+      return siguiente;
+    });
     setErrores((prev) => ({ ...prev, [campo]: null }));
   };
 
@@ -354,6 +361,82 @@ export const ActivitiesModule = ({
               {errores.imagen && <p className="text-xs text-[#E12927] font-semibold">{errores.imagen}</p>}
             </div>
 
+            {/* Fecha y Horario (siempre visible) */}
+            <div className="p-4 rounded-xl bg-[#FAF7F5] border border-[#1F1410]/10 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-mono font-bold text-[#1F1410] flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-[#E12927]" />
+                  Fecha y Horario de la Actividad
+                </span>
+                <span className="text-[11px] font-mono text-[#1F1410]/55">
+                  Modifica hora de inicio/fin o etiqueta
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[11px] font-mono font-bold text-[#1F1410]/70 mb-1">Fecha fija</label>
+                  <input
+                    type="date"
+                    value={form.fecha}
+                    onChange={(e) => actualizarCampo('fecha', e.target.value)}
+                    className="w-full px-3 py-2 text-xs font-mono bg-white border border-[#1F1410]/15 rounded-lg focus:outline-hidden focus:border-[#E12927]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-mono font-bold text-[#1F1410]/70 mb-1">Hora inicio</label>
+                  <input
+                    type="time"
+                    value={form.horaInicio}
+                    onChange={(e) => actualizarCampo('horaInicio', e.target.value)}
+                    className="w-full px-3 py-2 text-xs font-mono bg-white border border-[#1F1410]/15 rounded-lg focus:outline-hidden focus:border-[#E12927]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-mono font-bold text-[#1F1410]/70 mb-1">Hora fin</label>
+                  <input
+                    type="time"
+                    value={form.horaFin}
+                    onChange={(e) => actualizarCampo('horaFin', e.target.value)}
+                    className="w-full px-3 py-2 text-xs font-mono bg-white border border-[#1F1410]/15 rounded-lg focus:outline-hidden focus:border-[#E12927]"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[11px] font-mono font-bold text-[#1F1410]/70 mb-1">Texto de fecha (recurrente)</label>
+                  <input
+                    type="text"
+                    value={form.fechaTexto}
+                    onChange={(e) => actualizarCampo('fechaTexto', e.target.value)}
+                    placeholder="Ej. Todos los viernes"
+                    className="w-full px-3 py-2 text-xs bg-white border border-[#1F1410]/15 rounded-lg focus:outline-hidden focus:border-[#E12927]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-mono font-bold text-[#1F1410]/70 mb-1">Horario visible (opcional)</label>
+                  <input
+                    type="text"
+                    value={form.horarioTexto}
+                    onChange={(e) => actualizarCampo('horarioTexto', e.target.value)}
+                    placeholder="Auto según inicio y fin"
+                    className="w-full px-3 py-2 text-xs bg-white border border-[#1F1410]/15 rounded-lg focus:outline-hidden focus:border-[#E12927]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-mono font-bold text-[#1F1410]/70 mb-1">Duración</label>
+                  <input
+                    type="text"
+                    value={form.duracion}
+                    onChange={(e) => actualizarCampo('duracion', e.target.value)}
+                    placeholder="Ej. 2 horas"
+                    className="w-full px-3 py-2 text-xs bg-white border border-[#1F1410]/15 rounded-lg focus:outline-hidden focus:border-[#E12927]"
+                  />
+                </div>
+              </div>
+            </div>
+
             {/* Opciones Avanzadas Colapsables */}
             <div className="border border-[#1F1410]/10 rounded-xl overflow-hidden">
               <button
@@ -361,65 +444,12 @@ export const ActivitiesModule = ({
                 onClick={() => setMostrarAvanzado((v) => !v)}
                 className="w-full px-4 py-3 bg-[#FAF7F5] hover:bg-[#FCEAE9]/50 flex items-center justify-between text-xs font-mono font-bold text-[#1F1410] cursor-pointer"
               >
-                <span>Horario, fecha fija y detalles opcionales</span>
+                <span>Detalles opcionales (qué incluye y requisitos)</span>
                 {mostrarAvanzado ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
               </button>
 
               {mostrarAvanzado && (
                 <div className="p-4 space-y-4 border-t border-[#1F1410]/10">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div>
-                      <label className="block text-[11px] font-mono font-bold text-[#1F1410]/70 mb-1">Fecha fija</label>
-                      <input
-                        type="date"
-                        value={form.fecha}
-                        onChange={(e) => actualizarCampo('fecha', e.target.value)}
-                        className="w-full px-3 py-2 text-xs font-mono border border-[#1F1410]/15 rounded-lg"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-mono font-bold text-[#1F1410]/70 mb-1">Hora inicio</label>
-                      <input
-                        type="time"
-                        value={form.horaInicio}
-                        onChange={(e) => actualizarCampo('horaInicio', e.target.value)}
-                        className="w-full px-3 py-2 text-xs font-mono border border-[#1F1410]/15 rounded-lg"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-mono font-bold text-[#1F1410]/70 mb-1">Hora fin</label>
-                      <input
-                        type="time"
-                        value={form.horaFin}
-                        onChange={(e) => actualizarCampo('horaFin', e.target.value)}
-                        className="w-full px-3 py-2 text-xs font-mono border border-[#1F1410]/15 rounded-lg"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[11px] font-mono font-bold text-[#1F1410]/70 mb-1">Texto de fecha (si es recurrente)</label>
-                      <input
-                        type="text"
-                        value={form.fechaTexto}
-                        onChange={(e) => actualizarCampo('fechaTexto', e.target.value)}
-                        placeholder="Ej. Todos los viernes"
-                        className="w-full px-3 py-2 text-xs border border-[#1F1410]/15 rounded-lg"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-mono font-bold text-[#1F1410]/70 mb-1">Duración</label>
-                      <input
-                        type="text"
-                        value={form.duracion}
-                        onChange={(e) => actualizarCampo('duracion', e.target.value)}
-                        placeholder="Ej. 2 horas"
-                        className="w-full px-3 py-2 text-xs border border-[#1F1410]/15 rounded-lg"
-                      />
-                    </div>
-                  </div>
-
                   <div>
                     <label className="block text-[11px] font-mono font-bold text-[#1F1410]/70 mb-1">¿Qué incluye? (una línea por punto)</label>
                     <textarea

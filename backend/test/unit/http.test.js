@@ -61,8 +61,8 @@ test('el login limita intentos antes de acceder a datos y devuelve Retry-After',
 test('las escrituras públicas tienen límite propio', () =>
   conServidor(async (url) => {
     const enviar = () => fetch(url + '/reservaciones', { method: 'POST' });
-    assert.equal((await enviar()).status, 400);
-    assert.equal((await enviar()).status, 400);
+    assert.equal((await enviar()).status, 401);
+    assert.equal((await enviar()).status, 401);
     assert.equal((await enviar()).status, 429);
     assert.equal((await fetch(url + '/health')).status, 200);
   }));

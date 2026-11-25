@@ -18,9 +18,10 @@ export default function AuthScreen({
   onVerifyCode,
   onResendCode,
   onForgotPassword,
-  motivo
+  motivo,
+  modoInicial = 'entrar'
 }) {
-  const [modo, setModo] = useState('entrar'); // entrar | registrar | verificar
+  const [modo, setModo] = useState(modoInicial); // entrar | registrar | verificar
   const [emailPendiente, setEmailPendiente] = useState('');
   const [codigo, setCodigo] = useState('');
   const [errorCodigo, setErrorCodigo] = useState('');

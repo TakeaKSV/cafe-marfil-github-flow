@@ -101,15 +101,25 @@ export async function actualizarActividad(id, cambios) {
       reservas.length &&
       [
         ['fecha', 'fecha'],
-        ['sucursalId', 'sucursal_id'],
-        ['horaInicio', 'hora_inicio']
+        ['sucursalId', 'sucursal_id']
       ].some(([campo, columna]) => cambios[campo] !== undefined && cambios[campo] !== actual[columna])
     ) {
-      throw conflicto('No se puede mover una actividad con reservaciones vigentes.');
+      throw conflicto('No se puede mover la fecha o sucursal de una actividad con reservaciones vigentes.');
     }
     if (cambios.sucursalId) await exigirSucursal(cambios.sucursalId);
 
-    await repo.actualizarActividades(id, cambios);
+    const cambiosFinales = { ...cambios };
+    const cambioHora =
+      (cambios.horaInicio !== undefined && cambios.horaInicio !== actual.hora_inicio) ||
+      (cambios.horaFin !== undefined && cambios.horaFin !== actual.hora_fin);
+    if (
+      cambioHora &&
+      (cambios.horarioTexto === undefined || cambios.horarioTexto === actual.horario_texto)
+    ) {
+      cambiosFinales.horarioTexto = null;
+    }
+
+    await repo.actualizarActividades(id, cambiosFinales);
 
     // Si se desactivó ya no es visible: se responde solo la confirmación.
     return cambios.activa === false ? { id, activa: false } : obtenerActividad(id);

@@ -12,6 +12,7 @@ import {
   ListOrdered
 } from 'lucide-react';
 import { sounds } from '../utils/audio';
+import QRCodeImage from '../components/QRCodeImage';
 
 export default function ReservationSuccessScreen({
   reservation,
@@ -75,9 +76,9 @@ export default function ReservationSuccessScreen({
             <span className="font-body text-xs text-[#1F1410] font-medium">Presenta este folio al llegar a la sucursal.</span>
           </div>
 
-          <div className="bg-white p-3.5 rounded-md border-2 border-stone-300 flex flex-col items-center shadow-sm">
-            <QrCode size={80} className="text-[#1F1410]" />
-            <span className="font-mono text-[9px] font-bold text-[#8E7A74] tracking-wider mt-1 uppercase">ESCÁNER EN PUERTA</span>
+          <div className="bg-white p-3 rounded-md border-2 border-stone-300 flex flex-col items-center shadow-sm">
+            <QRCodeImage value={reservation.id} size={116} alt={`QR Reservación ${reservation.id}`} />
+            <span className="font-mono text-[9px] font-bold text-[#8E7A74] tracking-wider mt-1.5 uppercase">ESCÁNER EN PUERTA</span>
           </div>
         </div>
 

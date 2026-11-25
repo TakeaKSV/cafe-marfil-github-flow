@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { playSound } from '../utils/audioFeedback';
 import { reglas } from '../utils/validacion';
+import { QRCodeImage } from './QRCodeImage';
 import { SkeletonTable } from './ui/Skeletons';
 
 export const ReservationsTableView = ({ 
@@ -637,21 +638,9 @@ export const ReservationsTableView = ({
               Folio: <strong className="font-mono text-[#E12927] text-sm">{qrModalItem.folio}</strong>
             </p>
 
-            {/* Simulación visual QR */}
-            <div className="p-4 bg-[#FAF7F5] rounded-2xl border border-dashed border-[#1F1410]/20 inline-block mb-4 shadow-inner">
-              <div className="w-36 h-36 bg-[#1F1410] p-2 flex flex-col justify-between rounded-xl mx-auto shadow-md">
-                <div className="flex justify-between">
-                  <div className="w-8 h-8 border-4 border-white bg-[#1F1410]" />
-                  <div className="w-8 h-8 border-4 border-white bg-[#1F1410]" />
-                </div>
-                <div className="text-center text-white font-mono text-[9px] font-bold tracking-wider">
-                  CAFÉ MARFIL
-                </div>
-                <div className="flex justify-between">
-                  <div className="w-8 h-8 border-4 border-white bg-[#1F1410]" />
-                  <div className="w-5 h-5 bg-[#E12927] rounded-xs self-end" />
-                </div>
-              </div>
+            {/* Código QR real escaneable */}
+            <div className="p-3 bg-white rounded-2xl border border-[#1F1410]/15 inline-block mb-4 shadow-sm">
+              <QRCodeImage value={qrModalItem.folio} size={160} alt={`QR ${qrModalItem.folio}`} />
             </div>
 
             <div className="text-xs text-left bg-[#FAF7F5] p-4 rounded-2xl border border-[#1F1410]/8 font-mono space-y-1.5 mb-5">

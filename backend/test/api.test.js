@@ -279,14 +279,26 @@ test('walk-in: sentar, cobrar y liberar una mesa', async () => {
   assert.equal((await api('POST', `/mesas/${m07}/liberar`, { token: sesion.host, body: {} })).status, 409);
 });
 
-test('reservación de invitado desde la PWA y gestión con el token del QR', async () => {
+test('reservación desde la PWA exige sesión y permite gestión con el token del QR', async () => {
+  const sinSesion = await api('POST', '/reservaciones', {
+    body: {
+      sucursalId: 'calvario',
+      fecha: MANANA,
+      hora: '18:00',
+      personas: 2
+    }
+  });
+  assert.equal(sinSesion.status, 401);
+
   const invalida = await api('POST', '/reservaciones', {
+    token: sesion.cliente,
     body: { sucursalId: 'porras-matriz', fecha: '02/10/2026', hora: '25:00', personas: 0 }
   });
   assert.equal(invalida.status, 400);
   assert.deepEqual(invalida.datos.detalles.map((d) => d.campo).sort(), ['fecha', 'hora', 'personas']);
 
   const pasada = await api('POST', '/reservaciones', {
+    token: sesion.cliente,
     body: {
       comensal: 'Ana',
       telefono: '618',
@@ -299,6 +311,7 @@ test('reservación de invitado desde la PWA y gestión con el token del QR', asy
   assert.equal(pasada.status, 400);
 
   const creada = await api('POST', '/reservaciones', {
+    token: sesion.cliente,
     body: {
       tipo: 'juegos',
       comensal: 'Ana Invitada',
@@ -311,7 +324,7 @@ test('reservación de invitado desde la PWA y gestión con el token del QR', asy
     }
   });
   assert.equal(creada.status, 201);
-  assert.equal(creada.datos.mesaId, null, 'un invitado no puede asignarse mesa');
+  assert.equal(creada.datos.mesaId, null, 'un cliente no puede asignarse mesa');
   assert.equal(creada.datos.origen, 'app');
   assert.equal(creada.datos.tipoNombre, 'Mesa con Juegos de Mesa');
   const { tokenQR, folio } = creada.datos;
@@ -329,6 +342,7 @@ test('reservación de invitado desde la PWA y gestión con el token del QR', asy
 
 test('el registro del admin muestra la reserva futura de la landing y mantiene separados los datos de hoy', async () => {
   const creada = await api('POST', '/reservaciones', {
+    token: sesion.cliente,
     body: {
       comensal: 'Prueba registro admin',
       telefono: '618-555-0100',
@@ -388,6 +402,7 @@ test('reservar una actividad respeta su fecha, su sucursal y su cupo', async () 
   assert.equal(antes.lugaresDisponibles, 4);
 
   const creada = await api('POST', '/reservaciones', {
+    token: sesion.cliente,
     body: {
       tipo: 'actividad',
       actividadId: 'glow-paint',
@@ -405,12 +420,23 @@ test('reservar una actividad respeta su fecha, su sucursal y su cupo', async () 
   assert.equal(creada.datos.totalEstimado, 3 * 250);
 
   const sinCupo = await api('POST', '/reservaciones', {
+    token: sesion.cliente,
     body: { tipo: 'actividad', actividadId: antes.id, comensal: 'Otro Grupo', telefono: '618-321-0001', personas: 2 }
   });
   assert.equal(sinCupo.status, 409);
   assert.match(sinCupo.datos.error, /Solo quedan 1 lugares/);
 
   assert.equal((await api('GET', '/actividades/glow-paint')).datos.lugaresDisponibles, 1);
+
+  // Editar horario de la actividad regenera horarioTexto automáticamente.
+  const editada = await api('PATCH', `/actividades/${antes.id}`, {
+    token: sesion.admin,
+    body: { horaInicio: '20:00', horaFin: '22:00' }
+  });
+  assert.equal(editada.status, 200);
+  assert.equal(editada.datos.horaInicio, '20:00');
+  assert.equal(editada.datos.horaFin, '22:00');
+  assert.match(editada.datos.horarioTexto || '', /8:00 PM/);
 
   // No se puede hacer check-in hoy de algo que es para otro día.
   const anticipado = await api('POST', `/reservaciones/${creada.datos.folio}/check-in`, {
@@ -420,6 +446,7 @@ test('reservar una actividad respeta su fecha, su sucursal y su cupo', async () 
   assert.equal(anticipado.status, 409);
 
   const faltaActividad = await api('POST', '/reservaciones', {
+    token: sesion.cliente,
     body: { tipo: 'actividad', comensal: 'X', telefono: '1', personas: 1 }
   });
   assert.equal(faltaActividad.status, 400);
@@ -461,7 +488,8 @@ test('mi cuenta: perfil, reservaciones, beneficios y notificaciones', async () =
   assert.equal(beneficios.find((b) => b.estado === 'bloqueado').progreso, '6 de 8 sellos completados');
 
   const notificacionesAntes = (await api('GET', '/mi/notificaciones', { token })).datos;
-  assert.equal(notificacionesAntes.filter((n) => !n.leida).length, 2);
+  assert.ok(notificacionesAntes.filter((n) => !n.leida).length >= 2);
+  const miasAntes = (await api('GET', '/mi/reservaciones', { token })).datos;
 
   // Reservar con sesión: toma nombre y teléfono del perfil y queda ligada a la cuenta.
   const creada = await api('POST', '/reservaciones', {
@@ -474,7 +502,7 @@ test('mi cuenta: perfil, reservaciones, beneficios y notificaciones', async () =
   const { folio } = creada.datos;
 
   const mias = (await api('GET', '/mi/reservaciones', { token })).datos;
-  assert.equal(mias.length, 3);
+  assert.equal(mias.length, miasAntes.length + 1);
   assert.equal(mias.find((r) => r.folio === 'MF-RES-73190').esHistorica, true);
   assert.equal(mias.find((r) => r.folio === folio).esHistorica, false);
 
@@ -1053,6 +1081,7 @@ test('último cupo: solo una de dos reservaciones simultáneas se confirma', asy
   assert.equal(actividad.status, 201);
   const reservar = (nombre) =>
     api('POST', '/reservaciones', {
+      token: sesion.cliente,
       body: {
         tipo: 'actividad',
         actividadId: actividad.datos.id,
