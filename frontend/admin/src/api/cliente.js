@@ -2,12 +2,12 @@
 //
 // La URL de la API se puede cambiar con VITE_API_URL (archivo .env de Vite).
 
-const URL_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const URL_BASE = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:3000/api' : '/api');
 const CLAVE_TOKEN = 'marfil_admin_token';
 
 export const ORIGEN_API = (() => {
   try {
-    return new URL(URL_BASE).origin;
+    return new URL(URL_BASE, window.location.origin).origin;
   } catch {
     return '';
   }
@@ -73,7 +73,7 @@ export function alExpirarSesion(fn) {
  * Si algo sale mal lanza ErrorApi con un mensaje listo para mostrar.
  */
 export async function api(ruta, { metodo = 'GET', body, query } = {}) {
-  const url = new URL(URL_BASE + ruta);
+  const url = new URL(URL_BASE + ruta, window.location.origin);
   for (const [clave, valor] of Object.entries(query ?? {})) {
     if (valor !== undefined && valor !== null && valor !== '') url.searchParams.set(clave, valor);
   }

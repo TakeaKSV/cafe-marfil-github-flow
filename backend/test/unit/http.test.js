@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { once } from 'node:events';
+import path from 'node:path';
 import { after, test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 process.env.NODE_ENV = 'test';
 process.env.AUTH_RATE_LIMIT_MAX = '2';
@@ -68,4 +71,30 @@ test('el límite general también protege lecturas', () =>
   conServidor(async (url) => {
     for (let n = 0; n < 6; n += 1) assert.equal((await fetch(url + '/health')).status, 200);
     assert.equal((await fetch(url + '/health')).status, 429);
+  }));
+
+test('sirve landing en / y admin en /admin sin afectar el 404 JSON de /api', () =>
+  conServidor(async (url) => {
+    const origen = new URL(url).origin;
+    const raizMonorepo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+    const tieneLanding = fs.existsSync(path.join(raizMonorepo, 'frontend', 'marfil', 'dist', 'index.html'));
+    const tieneAdmin = fs.existsSync(path.join(raizMonorepo, 'frontend', 'admin', 'dist', 'index.html'));
+
+    if (tieneLanding) {
+      const landing = await fetch(origen + '/');
+      assert.equal(landing.status, 200);
+      assert.match(landing.headers.get('content-type') || '', /text\/html/);
+      assert.match(await landing.text(), /Café Marfil/);
+    }
+
+    if (tieneAdmin) {
+      const admin = await fetch(origen + '/admin');
+      assert.equal(admin.status, 200);
+      assert.match(admin.headers.get('content-type') || '', /text\/html/);
+      assert.match(await admin.text(), /Panel de Administración/);
+    }
+
+    const api404 = await fetch(url + '/ruta-inexistente');
+    assert.equal(api404.status, 404);
+    assert.match(api404.headers.get('content-type') || '', /application\/json/);
   }));

@@ -2,7 +2,7 @@
 //
 // La URL de la API se puede cambiar con VITE_API_URL (archivo .env de Vite).
 
-const URL_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const URL_BASE = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:3000/api' : '/api');
 const CLAVE_TOKEN = 'marfil_cliente_token';
 const CLAVE_RESERVAS_INVITADO = 'marfil_reservas_invitado';
 

@@ -14,7 +14,11 @@ try {
 }
 
 const servidor = crearApp().listen(config.puerto, () => {
-  console.log('API Café Marfil escuchando en el puerto ' + config.puerto);
+  const base = `http://localhost:${config.puerto}`;
+  console.log(`Café Marfil servidor unificado en ${base}`);
+  console.log(`  Landing: ${base}/`);
+  console.log(`  Admin:   ${base}/admin`);
+  console.log(`  API:     ${base}/api`);
 });
 servidor.requestTimeout = 30000;
 servidor.headersTimeout = 15000;

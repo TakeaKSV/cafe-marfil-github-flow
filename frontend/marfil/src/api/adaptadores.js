@@ -2,7 +2,8 @@
 
 const ORIGEN_API = (() => {
   try {
-    return new URL(import.meta.env.VITE_API_URL || 'http://localhost:3000/api').origin;
+    const base = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:3000/api' : '/api');
+    return new URL(base, window.location.origin).origin;
   } catch {
     return '';
   }

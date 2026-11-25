@@ -24,7 +24,7 @@ const esquema = z.object({
     .string()
     .regex(/^\d+[smhd]$/)
     .default('8h'),
-  CORS_ORIGIN: z.string().default('http://localhost:5173,http://localhost:5174'),
+  CORS_ORIGIN: z.string().default('http://localhost:3000,http://localhost:5173,http://localhost:5174'),
   ZONA_HORARIA: z.string().default('America/Monterrey'),
   TRUST_PROXY: z.string().default(''),
   RATE_LIMIT_MAX: entero(600, 100000),
@@ -37,8 +37,8 @@ const esquema = z.object({
   SMTP_USER: z.string().default(''),
   SMTP_PASS: z.string().default(''),
   MAIL_FROM: z.string().default('Café Marfil <no-reply@cafemarfil.mx>'),
-  APP_URL: z.string().default('http://localhost:5173'),
-  ADMIN_URL: z.string().default('http://localhost:5174'),
+  APP_URL: z.string().default('http://localhost:3000'),
+  ADMIN_URL: z.string().default('http://localhost:3000/admin'),
   MAIL_ENABLED: z.string().optional(),
   MAIL_CHECK_MX: z.string().optional(),
   CLOUDINARY_CLOUD_NAME: z.string().default(''),
