@@ -11,7 +11,9 @@ export function StaffOnboardingScreen({ token, onCompleted, onGoLogin }) {
   const [errorCarga, setErrorCarga] = useState('');
 
   const [form, setForm] = useState({
-    nombre: '',
+    nombres: '',
+    apellidoPaterno: '',
+    apellidoMaterno: '',
     password: '',
     confirmarPassword: ''
   });
@@ -48,7 +50,9 @@ export function StaffOnboardingScreen({ token, onCompleted, onGoLogin }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const errs = {
-      nombre: reglas.nombrePersona(form.nombre),
+      nombres: reglas.nombrePersona(form.nombres, { min: 2, max: 80 }),
+      apellidoPaterno: reglas.nombrePersona(form.apellidoPaterno, { min: 2, max: 60 }),
+      apellidoMaterno: reglas.nombrePersona(form.apellidoMaterno, { min: 2, max: 60, opcional: true }),
       password:
         !form.password || form.password.length < 8
           ? 'La contraseña debe tener al menos 8 caracteres.'
@@ -68,7 +72,9 @@ export function StaffOnboardingScreen({ token, onCompleted, onGoLogin }) {
         metodo: 'POST',
         body: {
           token,
-          nombre: form.nombre.trim(),
+          nombres: form.nombres.trim(),
+          apellidoPaterno: form.apellidoPaterno.trim(),
+          apellidoMaterno: form.apellidoMaterno.trim() || undefined,
           password: form.password
         }
       });
@@ -162,19 +168,59 @@ export function StaffOnboardingScreen({ token, onCompleted, onGoLogin }) {
         <form onSubmit={handleSubmit} noValidate className="p-6 sm:p-7 space-y-4">
           <div>
             <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1">
-              Nombre completo *
+              Nombre(s) *
             </label>
             <input
               type="text"
-              value={form.nombre}
-              onChange={(e) => actualizar('nombre', e.target.value)}
-              placeholder="Ej. Andrea Morales"
-              autoComplete="name"
+              value={form.nombres}
+              onChange={(e) => actualizar('nombres', e.target.value)}
+              placeholder="Ej. Andrea"
+              autoComplete="given-name"
               className={`w-full px-4 py-2.5 text-sm border rounded-xl focus:outline-hidden ${
-                errores.nombre ? 'border-[#E12927]' : 'border-[#1F1410]/15 focus:border-[#E12927]'
+                errores.nombres ? 'border-[#E12927]' : 'border-[#1F1410]/15 focus:border-[#E12927]'
               }`}
             />
-            {errores.nombre && <p className="text-xs font-semibold text-[#E12927] mt-1">{errores.nombre}</p>}
+            {errores.nombres && <p className="text-xs font-semibold text-[#E12927] mt-1">{errores.nombres}</p>}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1">
+                Apellido Paterno *
+              </label>
+              <input
+                type="text"
+                value={form.apellidoPaterno}
+                onChange={(e) => actualizar('apellidoPaterno', e.target.value)}
+                placeholder="Ej. Morales"
+                autoComplete="family-name"
+                className={`w-full px-4 py-2.5 text-sm border rounded-xl focus:outline-hidden ${
+                  errores.apellidoPaterno ? 'border-[#E12927]' : 'border-[#1F1410]/15 focus:border-[#E12927]'
+                }`}
+              />
+              {errores.apellidoPaterno && (
+                <p className="text-xs font-semibold text-[#E12927] mt-1">{errores.apellidoPaterno}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1">
+                Apellido Materno
+              </label>
+              <input
+                type="text"
+                value={form.apellidoMaterno}
+                onChange={(e) => actualizar('apellidoMaterno', e.target.value)}
+                placeholder="Opcional"
+                autoComplete="additional-name"
+                className={`w-full px-4 py-2.5 text-sm border rounded-xl focus:outline-hidden ${
+                  errores.apellidoMaterno ? 'border-[#E12927]' : 'border-[#1F1410]/15 focus:border-[#E12927]'
+                }`}
+              />
+              {errores.apellidoMaterno && (
+                <p className="text-xs font-semibold text-[#E12927] mt-1">{errores.apellidoMaterno}</p>
+              )}
+            </div>
           </div>
 
           <div>

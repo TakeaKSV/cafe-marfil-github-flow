@@ -22,9 +22,12 @@ test('migra una base 1.1.0 con datos sin perderlos y es idempotente', async () =
   await prepararBase();
   const despues = await conexion('clientes').orderBy('id');
   assert.deepEqual(
-    despues.map(({ session_version, email_verificado_en, ...cliente }) => {
+    despues.map(({ session_version, email_verificado_en, nombres, apellido_paterno, apellido_materno, ...cliente }) => {
       assert.equal(session_version, 0);
       assert.equal(email_verificado_en, null);
+      assert.ok(nombres);
+      assert.equal(typeof apellido_paterno, 'string');
+      assert.ok(apellido_materno === null || typeof apellido_materno === 'string');
       return cliente;
     }),
     antes
@@ -34,7 +37,9 @@ test('migra una base 1.1.0 con datos sin perderlos y es idempotente', async () =
   assert.equal(await conexion.schema.hasTable('tokens_correo'), true);
   assert.equal(await conexion.schema.hasTable('invitaciones_personal'), true);
   assert.equal(await conexion.schema.hasColumn('invitaciones_personal', 'turno_inicio'), true);
-  assert.equal((await conexion('knex_migrations').count({ n: '*' }).first()).n, 6);
+  assert.equal(await conexion.schema.hasColumn('personal', 'nombres'), true);
+  assert.equal(await conexion.schema.hasColumn('clientes', 'apellido_paterno'), true);
+  assert.equal((await conexion('knex_migrations').count({ n: '*' }).first()).n, 7);
 });
 
 test('reset exige confirmación exacta y se niega a tocar tablas ajenas', async () => {

@@ -32,7 +32,11 @@ export default function AuthScreen({
 
   const esquema = useMemo(
     () => ({
-      nombre: (v) => (esRegistro ? reglas.nombre(v, { min: 2, max: 120, etiqueta: 'Tu nombre' }) : null),
+      nombres: (v) => (esRegistro ? reglas.nombre(v, { min: 2, max: 80, etiqueta: 'Tu(s) nombre(s)' }) : null),
+      apellidoPaterno: (v) =>
+        esRegistro ? reglas.nombre(v, { min: 2, max: 60, etiqueta: 'Tu apellido paterno' }) : null,
+      apellidoMaterno: (v) =>
+        esRegistro ? reglas.nombre(v, { min: 2, max: 60, opcional: true, etiqueta: 'Tu apellido materno' }) : null,
       correo: (v) => reglas.email(v),
       telefono: (v) => (esRegistro ? reglas.telefonoMX(v, { opcional: true }) : null),
       password: (v) =>
@@ -44,7 +48,15 @@ export default function AuthScreen({
   );
 
   const form = useFormulario(
-    { nombre: '', correo: '', telefono: '', password: '', confirmarPassword: '' },
+    {
+      nombres: '',
+      apellidoPaterno: '',
+      apellidoMaterno: '',
+      correo: '',
+      telefono: '',
+      password: '',
+      confirmarPassword: ''
+    },
     esquema
   );
 
@@ -70,7 +82,7 @@ export default function AuthScreen({
     setErrorGeneral('');
 
     const camposActivos = esRegistro
-      ? ['nombre', 'correo', 'telefono', 'password', 'confirmarPassword']
+      ? ['nombres', 'apellidoPaterno', 'apellidoMaterno', 'correo', 'telefono', 'password', 'confirmarPassword']
       : ['correo', 'password'];
     const { valido } = form.validarTodo(camposActivos);
     if (!valido) return;
@@ -80,7 +92,9 @@ export default function AuthScreen({
       const correoLimpio = form.valores.correo.trim().toLowerCase();
       if (esRegistro) {
         const resp = await onRegister({
-          nombre: form.valores.nombre.trim(),
+          nombres: form.valores.nombres.trim(),
+          apellidoPaterno: form.valores.apellidoPaterno.trim(),
+          apellidoMaterno: form.valores.apellidoMaterno.trim() || undefined,
           email: correoLimpio,
           password: form.valores.password,
           telefono: form.valores.telefono.trim() || undefined
@@ -283,20 +297,54 @@ export default function AuthScreen({
         className="p-6 sm:p-7 rounded-lg bg-white border-2 border-stone-300 flex flex-col gap-4 shadow-md"
       >
         {esRegistro && (
-          <div className="flex flex-col gap-1">
-            <label htmlFor="auth-nombre" className={CLASE_LABEL}>NOMBRE COMPLETO *</label>
-            <input
-              id="auth-nombre"
-              type="text"
-              value={form.valores.nombre}
-              onChange={(e) => form.setCampo('nombre', e.target.value)}
-              placeholder="Ej. Sofía Navarro"
-              autoComplete="name"
-              className={claseInput(form.errores.nombre)}
-              {...form.propsCampo('nombre')}
-            />
-            {renderError('nombre')}
-          </div>
+          <>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="auth-nombres" className={CLASE_LABEL}>NOMBRE(S) *</label>
+              <input
+                id="auth-nombres"
+                type="text"
+                value={form.valores.nombres}
+                onChange={(e) => form.setCampo('nombres', e.target.value)}
+                placeholder="Ej. Sofía"
+                autoComplete="given-name"
+                className={claseInput(form.errores.nombres)}
+                {...form.propsCampo('nombres')}
+              />
+              {renderError('nombres')}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
+                <label htmlFor="auth-ap-paterno" className={CLASE_LABEL}>APELLIDO PATERNO *</label>
+                <input
+                  id="auth-ap-paterno"
+                  type="text"
+                  value={form.valores.apellidoPaterno}
+                  onChange={(e) => form.setCampo('apellidoPaterno', e.target.value)}
+                  placeholder="Ej. Navarro"
+                  autoComplete="family-name"
+                  className={claseInput(form.errores.apellidoPaterno)}
+                  {...form.propsCampo('apellidoPaterno')}
+                />
+                {renderError('apellidoPaterno')}
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label htmlFor="auth-ap-materno" className={CLASE_LABEL}>APELLIDO MATERNO</label>
+                <input
+                  id="auth-ap-materno"
+                  type="text"
+                  value={form.valores.apellidoMaterno}
+                  onChange={(e) => form.setCampo('apellidoMaterno', e.target.value)}
+                  placeholder="Opcional"
+                  autoComplete="additional-name"
+                  className={claseInput(form.errores.apellidoMaterno)}
+                  {...form.propsCampo('apellidoMaterno')}
+                />
+                {renderError('apellidoMaterno')}
+              </div>
+            </div>
+          </>
         )}
 
         <div className="flex flex-col gap-1">

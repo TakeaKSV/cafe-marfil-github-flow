@@ -294,6 +294,9 @@ export default function App() {
         metodo: 'PATCH',
         body: {
           nombre: nuevo.nombre,
+          nombres: nuevo.nombres,
+          apellidoPaterno: nuevo.apellidoPaterno,
+          apellidoMaterno: nuevo.apellidoMaterno || '',
           telefono: nuevo.telefono || null,
           email: nuevo.correo,
           preferencias: {

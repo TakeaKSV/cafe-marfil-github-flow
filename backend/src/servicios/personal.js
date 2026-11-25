@@ -6,6 +6,7 @@ import * as repo from '../repositorios/personal.js';
 import * as repoInv from '../repositorios/invitacionesPersonal.js';
 import { conflicto, noAutenticado, noEncontrado, solicitudInvalida } from '../utils/errores.js';
 import { ahoraISO } from '../utils/fechas.js';
+import { dividirNombreCompleto, resolverNombrePartes } from '../utils/nombres.js';
 import { aBit } from '../repositorios/base.js';
 import { enviarInvitacionPersonal, verificarDominioCorreo } from './correo.js';
 import { exigirSucursal } from './sucursales.js';
@@ -32,9 +33,19 @@ function aInvitacion(fila) {
 }
 
 function aPersona(fila) {
+  const partes = fila.nombres
+    ? {
+        nombres: fila.nombres,
+        apellidoPaterno: fila.apellido_paterno ?? '',
+        apellidoMaterno: fila.apellido_materno ?? ''
+      }
+    : dividirNombreCompleto(fila.nombre);
   return {
     id: fila.id,
     nombre: fila.nombre,
+    nombres: partes.nombres,
+    apellidoPaterno: partes.apellidoPaterno,
+    apellidoMaterno: partes.apellidoMaterno,
     email: fila.email,
     rol: fila.rol,
     puesto: fila.puesto,
@@ -72,8 +83,12 @@ export async function crearPersona(datos) {
   }
   await exigirEmailLibre(datos.email);
 
+  const nombrePartes = resolverNombrePartes(datos);
   const { id } = await repo.insertarPersona({
-    nombre: datos.nombre,
+    nombre: nombrePartes.nombre,
+    nombres: nombrePartes.nombres,
+    apellidoPaterno: nombrePartes.apellidoPaterno,
+    apellidoMaterno: nombrePartes.apellidoMaterno,
     email: datos.email ?? null,
     passwordHash: datos.password ? await cifrarPassword(datos.password) : null,
     rol: datos.rol,
@@ -104,8 +119,10 @@ export async function actualizarPersona(id, cambios) {
     if (cambios.sucursalId) await exigirSucursal(cambios.sucursalId);
     await exigirEmailLibre(cambios.email, id);
 
+    const nombrePartes = resolverNombrePartes(cambios, actual);
     await repo.actualizarPersonal(id, {
       ...cambios,
+      ...nombrePartes,
       passwordHash: cambios.password ? await cifrarPassword(cambios.password) : undefined
     });
 
@@ -200,9 +217,10 @@ export async function consultarInvitacion(tokenPlano) {
   return aInvitacion(fila);
 }
 
-export async function completarInvitacion({ token, nombre, password }) {
+export async function completarInvitacion({ token, nombre, nombres, apellidoPaterno, apellidoMaterno, password }) {
   const invitacion = await exigirInvitacionValida(token);
   const passwordHash = await cifrarPassword(password);
+  const nombrePartes = resolverNombrePartes({ nombre, nombres, apellidoPaterno, apellidoMaterno });
 
   const persona = await enTransaccion(async () => {
     await bloquearFila('invitaciones_personal', invitacion.id);
@@ -214,7 +232,10 @@ export async function completarInvitacion({ token, nombre, password }) {
 
     const ahora = ahoraISO();
     const { id } = await repo.insertarPersona({
-      nombre: nombre.trim(),
+      nombre: nombrePartes.nombre,
+      nombres: nombrePartes.nombres,
+      apellidoPaterno: nombrePartes.apellidoPaterno,
+      apellidoMaterno: nombrePartes.apellidoMaterno,
       email: actual.email,
       passwordHash,
       rol: actual.rol,

@@ -32,7 +32,10 @@ export default function ReservationWizard({
   const [selectedDate, setSelectedDate] = useState(() => fechaEnDias(1)); // por defecto, mañana
   const [selectedTime, setSelectedTime] = useState('11:00 AM');
   const [personas, setPersonas] = useState(initialData?.personas || 2);
-  const [nombre, setNombre] = useState(contacto?.nombre ?? '');
+  const [nombres, setNombres] = useState(contacto?.nombres || contacto?.nombre?.split(' ')[0] || '');
+  const [apellidoPaterno, setApellidoPaterno] = useState(contacto?.apellidoPaterno || '');
+  const [apellidoMaterno, setApellidoMaterno] = useState(contacto?.apellidoMaterno || '');
+  const nombreCompleto = [nombres, apellidoPaterno, apellidoMaterno].map((s) => s.trim()).filter(Boolean).join(' ');
   const [telefono, setTelefono] = useState(contacto?.telefono ?? '');
   const [correo, setCorreo] = useState(contacto?.correo ?? '');
   const [notas, setNotas] = useState(initialData?.notas ?? initialData?.nota ?? '');
@@ -144,7 +147,9 @@ export default function ReservationWizard({
       setCurrentStep(5);
     } else if (currentStep === 5) {
       const errs = {
-        nombre: reglas.nombre(nombre, { min: 2, max: 120, etiqueta: 'Tu nombre' }),
+        nombres: reglas.nombre(nombres, { min: 2, max: 80, etiqueta: 'Tu(s) nombre(s)' }),
+        apellidoPaterno: reglas.nombre(apellidoPaterno, { min: 2, max: 60, etiqueta: 'Tu apellido paterno' }),
+        apellidoMaterno: reglas.nombre(apellidoMaterno, { min: 2, max: 60, opcional: true, etiqueta: 'Tu apellido materno' }),
         telefono: reglas.telefonoMX(telefono),
         correo: reglas.email(correo, { opcional: true }),
         notas: reglas.texto(notas, { max: 300, opcional: true, etiqueta: 'Las notas' })
@@ -172,7 +177,7 @@ export default function ReservationWizard({
         fechaISO: selectedDate,
         hora: selectedTime,
         personas: Number(personas),
-        nombreCliente: nombre.trim(),
+        nombreCliente: nombreCompleto,
         telefonoCliente: telefono.trim(),
         correoCliente: correo.trim(),
         notas: notas.trim()
@@ -505,26 +510,93 @@ export default function ReservationWizard({
 
           <div className="p-6 sm:p-7 rounded-lg bg-white border-2 border-stone-300 flex flex-col gap-4 shadow-md">
             <div className="flex flex-col gap-1">
-              <label htmlFor="wizard-nombre" className="font-mono text-xs font-bold text-[#8E7A74] uppercase tracking-wider">
-                NOMBRE COMPLETO *
+              <label htmlFor="wizard-nombres" className="font-mono text-xs font-bold text-[#8E7A74] uppercase tracking-wider">
+                NOMBRE(S) *
               </label>
               <input
-                id="wizard-nombre"
-                data-campo="wizard-nombre"
+                id="wizard-nombres"
+                data-campo="wizard-nombres"
                 type="text"
-                value={nombre}
+                value={nombres}
                 onChange={(e) => {
-                  setNombre(e.target.value);
-                  limpiarErrorCampo('nombre');
+                  setNombres(e.target.value);
+                  limpiarErrorCampo('nombres');
                 }}
-                onBlur={() => setFieldErrors((p) => ({ ...p, nombre: reglas.nombre(nombre, { min: 2, max: 120, etiqueta: 'Tu nombre' }) }))}
-                aria-invalid={Boolean(fieldErrors.nombre)}
-                placeholder="Ingresa tu nombre..."
+                onBlur={() => setFieldErrors((p) => ({ ...p, nombres: reglas.nombre(nombres, { min: 2, max: 80, etiqueta: 'Tu(s) nombre(s)' }) }))}
+                aria-invalid={Boolean(fieldErrors.nombres)}
+                placeholder="Ej. Sofía"
                 className={`p-3.5 rounded-md border-2 bg-white font-body text-sm text-[#1F1410] focus:outline-none ${
-                  fieldErrors.nombre ? 'border-[#E12927] bg-[#FCEAE9]/20' : 'border-stone-300 focus:border-[#E12927]'
+                  fieldErrors.nombres ? 'border-[#E12927] bg-[#FCEAE9]/20' : 'border-stone-300 focus:border-[#E12927]'
                 }`}
               />
-              {fieldErrors.nombre && <p role="alert" className="text-xs font-semibold text-[#E12927]">{fieldErrors.nombre}</p>}
+              {fieldErrors.nombres && <p role="alert" className="text-xs font-semibold text-[#E12927]">{fieldErrors.nombres}</p>}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
+                <label htmlFor="wizard-ap-paterno" className="font-mono text-xs font-bold text-[#8E7A74] uppercase tracking-wider">
+                  APELLIDO PATERNO *
+                </label>
+                <input
+                  id="wizard-ap-paterno"
+                  data-campo="wizard-apellidoPaterno"
+                  type="text"
+                  value={apellidoPaterno}
+                  onChange={(e) => {
+                    setApellidoPaterno(e.target.value);
+                    limpiarErrorCampo('apellidoPaterno');
+                  }}
+                  onBlur={() =>
+                    setFieldErrors((p) => ({
+                      ...p,
+                      apellidoPaterno: reglas.nombre(apellidoPaterno, { min: 2, max: 60, etiqueta: 'Tu apellido paterno' })
+                    }))
+                  }
+                  aria-invalid={Boolean(fieldErrors.apellidoPaterno)}
+                  placeholder="Ej. Navarro"
+                  className={`p-3.5 rounded-md border-2 bg-white font-body text-sm text-[#1F1410] focus:outline-none ${
+                    fieldErrors.apellidoPaterno ? 'border-[#E12927] bg-[#FCEAE9]/20' : 'border-stone-300 focus:border-[#E12927]'
+                  }`}
+                />
+                {fieldErrors.apellidoPaterno && (
+                  <p role="alert" className="text-xs font-semibold text-[#E12927]">{fieldErrors.apellidoPaterno}</p>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label htmlFor="wizard-ap-materno" className="font-mono text-xs font-bold text-[#8E7A74] uppercase tracking-wider">
+                  APELLIDO MATERNO
+                </label>
+                <input
+                  id="wizard-ap-materno"
+                  data-campo="wizard-apellidoMaterno"
+                  type="text"
+                  value={apellidoMaterno}
+                  onChange={(e) => {
+                    setApellidoMaterno(e.target.value);
+                    limpiarErrorCampo('apellidoMaterno');
+                  }}
+                  onBlur={() =>
+                    setFieldErrors((p) => ({
+                      ...p,
+                      apellidoMaterno: reglas.nombre(apellidoMaterno, {
+                        min: 2,
+                        max: 60,
+                        opcional: true,
+                        etiqueta: 'Tu apellido materno'
+                      })
+                    }))
+                  }
+                  aria-invalid={Boolean(fieldErrors.apellidoMaterno)}
+                  placeholder="Opcional"
+                  className={`p-3.5 rounded-md border-2 bg-white font-body text-sm text-[#1F1410] focus:outline-none ${
+                    fieldErrors.apellidoMaterno ? 'border-[#E12927] bg-[#FCEAE9]/20' : 'border-stone-300 focus:border-[#E12927]'
+                  }`}
+                />
+                {fieldErrors.apellidoMaterno && (
+                  <p role="alert" className="text-xs font-semibold text-[#E12927]">{fieldErrors.apellidoMaterno}</p>
+                )}
+              </div>
             </div>
 
             <div className="flex flex-col gap-1">
@@ -646,7 +718,7 @@ export default function ReservationWizard({
 
               <div>
                 <span className="block font-mono text-[10px] font-bold text-[#8E7A74] uppercase tracking-wider">A NOMBRE DE</span>
-                <strong className="text-[#1F1410]">{nombre}</strong>
+                <strong className="text-[#1F1410]">{nombreCompleto}</strong>
                 <span className="block font-mono text-xs text-[#5A4840]">{telefono} {correo && `· ${correo}`}</span>
               </div>
 

@@ -212,6 +212,9 @@ router.post('/juegos/:id/devolver', async (req, res) => res.json(await devolverJ
 
 const camposPersona = {
   nombre: zTexto(120),
+  nombres: zTexto(80),
+  apellidoPaterno: zTexto(60),
+  apellidoMaterno: zTextoOpcional(60),
   email: zEmail.nullable(),
   password: zPassword,
   rol: z.enum(['admin', 'gerente', 'host', 'staff']),
@@ -223,17 +226,26 @@ const camposPersona = {
   esEncargado: z.boolean()
 };
 
-const esquemaCrearPersona = z.object({
-  ...camposPersona,
-  email: camposPersona.email.optional(),
-  password: zPassword.optional(),
-  rol: camposPersona.rol.default('staff'),
-  sucursalId: camposPersona.sucursalId.optional(),
-  turnoInicio: camposPersona.turnoInicio.optional(),
-  turnoFin: camposPersona.turnoFin.optional(),
-  estado: camposPersona.estado.default('activo'),
-  esEncargado: z.boolean().default(false)
-});
+const esquemaCrearPersona = z
+  .object({
+    ...camposPersona,
+    nombre: camposPersona.nombre.optional(),
+    nombres: camposPersona.nombres.optional(),
+    apellidoPaterno: camposPersona.apellidoPaterno.optional(),
+    apellidoMaterno: camposPersona.apellidoMaterno.optional(),
+    email: camposPersona.email.optional(),
+    password: zPassword.optional(),
+    rol: camposPersona.rol.default('staff'),
+    sucursalId: camposPersona.sucursalId.optional(),
+    turnoInicio: camposPersona.turnoInicio.optional(),
+    turnoFin: camposPersona.turnoFin.optional(),
+    estado: camposPersona.estado.default('activo'),
+    esEncargado: z.boolean().default(false)
+  })
+  .refine((d) => Boolean(d.nombre || (d.nombres && d.apellidoPaterno)), {
+    message: 'Ingresa el nombre y apellido paterno.',
+    path: ['nombres']
+  });
 
 const esquemaEditarPersona = z.object(camposPersona).partial();
 
@@ -251,7 +263,7 @@ const esquemaInvitarPersona = z.object({
   turnoFin: zHora.nullable().optional()
 });
 
-router.get('/personal', async (req, res) => res.json(await listarPersonal(leer(filtrosPersonal, req.query))));
+router.get('/personal', soloAdmin, async (req, res) => res.json(await listarPersonal(leer(filtrosPersonal, req.query))));
 
 router.get('/personal/invitaciones', soloAdmin, async (_req, res) => {
   res.json(await listarInvitacionesPendientes());

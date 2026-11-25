@@ -861,8 +861,9 @@ test('ludoteca: préstamos, devoluciones y devolución automática al liberar la
   assert.equal(azul.datos.vecesJugadoMes, 0);
 });
 
-test('equipo: solo el admin da de alta, y una baja corta la sesión al instante', async () => {
-  const personal = (await api('GET', '/personal', { token: sesion.host })).datos;
+test('equipo: solo el admin consulta y da de alta, y una baja corta la sesión al instante', async () => {
+  assert.equal((await api('GET', '/personal', { token: sesion.host })).status, 403);
+  const personal = (await api('GET', '/personal', { token: sesion.admin })).datos;
   assert.equal(personal.length, 6);
   assert.equal(personal.find((p) => p.nombre === 'Erick Rentería').tieneAcceso, false);
 
@@ -1327,13 +1328,18 @@ test('correos: verificación de registro, bloqueo de canje sin verificar, recupe
     const completado = await api('POST', '/auth/invitacion/completar', {
       body: {
         token: tokenInv,
-        nombre: 'Diego Barista',
+        nombres: 'Diego',
+        apellidoPaterno: 'Barista',
+        apellidoMaterno: 'López',
         password: 'claveEmpleado2026'
       }
     });
     assert.equal(completado.status, 201);
     assert.ok(completado.datos.token);
-    assert.equal(completado.datos.usuario.nombre, 'Diego Barista');
+    assert.equal(completado.datos.usuario.nombre, 'Diego Barista López');
+    assert.equal(completado.datos.usuario.nombres, 'Diego');
+    assert.equal(completado.datos.usuario.apellidoPaterno, 'Barista');
+    assert.equal(completado.datos.usuario.apellidoMaterno, 'López');
     assert.equal(completado.datos.usuario.turno, '14:00 - 22:00');
 
     // Reutilizar el enlace falla con 400.

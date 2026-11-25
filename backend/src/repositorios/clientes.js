@@ -32,6 +32,9 @@ export const insertarCliente = (datos) =>
   insertar('clientes', {
     codigo_club: datos.codigo,
     nombre: datos.nombre,
+    nombres: datos.nombres ?? null,
+    apellido_paterno: datos.apellidoPaterno ?? null,
+    apellido_materno: datos.apellidoMaterno ?? null,
     email: datos.email,
     telefono: datos.telefono,
     password_hash: datos.passwordHash,
@@ -75,6 +78,9 @@ export const registrarCanjeRecompensa = ({ clienteId, descripcion, personalId, c
 
 const CAMPOS_CLIENTES = {
   nombre: 'nombre',
+  nombres: 'nombres',
+  apellidoPaterno: 'apellido_paterno',
+  apellidoMaterno: 'apellido_materno',
   email: 'email',
   telefono: 'telefono',
   ciudad: 'ciudad',

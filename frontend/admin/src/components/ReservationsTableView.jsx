@@ -55,7 +55,9 @@ export const ReservationsTableView = ({
   // Formulario nueva reserva
   const sucursalPorDefecto = selectedSucursal === 'todas' ? (sucursales[0]?.id || '') : selectedSucursal;
   const [newRes, setNewRes] = useState({
-    comensal: '',
+    nombres: '',
+    apellidoPaterno: '',
+    apellidoMaterno: '',
     telefono: '',
     fechaISO: hoy,
     sucursalId: sucursalPorDefecto,
@@ -125,7 +127,9 @@ export const ReservationsTableView = ({
     e.preventDefault();
     if (guardando) return;
     const errs = {
-      comensal: reglas.nombrePersona(newRes.comensal),
+      nombres: reglas.nombrePersona(newRes.nombres, { min: 2, max: 80 }),
+      apellidoPaterno: reglas.nombrePersona(newRes.apellidoPaterno, { min: 2, max: 60 }),
+      apellidoMaterno: reglas.nombrePersona(newRes.apellidoMaterno, { min: 2, max: 60, opcional: true }),
       fechaISO: reglas.fechaNoPasada(newRes.fechaISO),
       telefono: reglas.telefonoMX(newRes.telefono),
       personas: reglas.entero(newRes.personas, { min: 1, max: 12, etiqueta: 'El número de personas' }),
@@ -137,12 +141,17 @@ export const ReservationsTableView = ({
       return;
     }
 
+    const comensalCompleto = [newRes.nombres, newRes.apellidoPaterno, newRes.apellidoMaterno]
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .join(' ');
+
     setGuardando(true);
     let creada;
     try {
       creada = await onAddReservacion({
         ...newRes,
-        comensal: newRes.comensal.trim(),
+        comensal: comensalCompleto,
         telefono: newRes.telefono.trim(),
         personas: Number(newRes.personas)
       });
@@ -154,7 +163,9 @@ export const ReservationsTableView = ({
     setShowAddModal(false);
     setResErrors({});
     setNewRes({
-      comensal: '',
+      nombres: '',
+      apellidoPaterno: '',
+      apellidoMaterno: '',
       telefono: '',
       fechaISO: hoy,
       sucursalId: sucursalPorDefecto,
@@ -711,22 +722,64 @@ export const ReservationsTableView = ({
             <form onSubmit={handleCreateReservation} noValidate className="space-y-4 font-body">
               <div>
                 <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1.5">
-                  Nombre Completo del Comensal *
+                  Nombre(s) del Comensal *
                 </label>
                 <input
                   type="text"
-                  placeholder="Ej. Sofía Herrera"
-                  value={newRes.comensal}
+                  placeholder="Ej. Sofía"
+                  value={newRes.nombres}
                   onChange={(e) => {
-                    setNewRes({ ...newRes, comensal: e.target.value });
-                    setResErrors((p) => ({ ...p, comensal: null }));
+                    setNewRes({ ...newRes, nombres: e.target.value });
+                    setResErrors((p) => ({ ...p, nombres: null }));
                   }}
-                  aria-invalid={Boolean(resErrors.comensal)}
+                  aria-invalid={Boolean(resErrors.nombres)}
                   className={`w-full px-4 py-2.5 text-xs border rounded-xl focus:ring-1 focus:outline-hidden transition-all ${
-                    resErrors.comensal ? 'border-[#E12927] focus:border-[#E12927] focus:ring-[#E12927]' : 'border-[#1F1410]/15 focus:border-[#E12927] focus:ring-[#E12927]'
+                    resErrors.nombres ? 'border-[#E12927] focus:border-[#E12927] focus:ring-[#E12927]' : 'border-[#1F1410]/15 focus:border-[#E12927] focus:ring-[#E12927]'
                   }`}
                 />
-                {resErrors.comensal && <p role="alert" className="text-[11px] font-semibold text-[#E12927] mt-1">{resErrors.comensal}</p>}
+                {resErrors.nombres && <p role="alert" className="text-[11px] font-semibold text-[#E12927] mt-1">{resErrors.nombres}</p>}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1.5">
+                    Apellido Paterno *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej. Herrera"
+                    value={newRes.apellidoPaterno}
+                    onChange={(e) => {
+                      setNewRes({ ...newRes, apellidoPaterno: e.target.value });
+                      setResErrors((p) => ({ ...p, apellidoPaterno: null }));
+                    }}
+                    aria-invalid={Boolean(resErrors.apellidoPaterno)}
+                    className={`w-full px-4 py-2.5 text-xs border rounded-xl focus:ring-1 focus:outline-hidden transition-all ${
+                      resErrors.apellidoPaterno ? 'border-[#E12927] focus:border-[#E12927] focus:ring-[#E12927]' : 'border-[#1F1410]/15 focus:border-[#E12927] focus:ring-[#E12927]'
+                    }`}
+                  />
+                  {resErrors.apellidoPaterno && <p role="alert" className="text-[11px] font-semibold text-[#E12927] mt-1">{resErrors.apellidoPaterno}</p>}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1.5">
+                    Apellido Materno
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Opcional"
+                    value={newRes.apellidoMaterno}
+                    onChange={(e) => {
+                      setNewRes({ ...newRes, apellidoMaterno: e.target.value });
+                      setResErrors((p) => ({ ...p, apellidoMaterno: null }));
+                    }}
+                    aria-invalid={Boolean(resErrors.apellidoMaterno)}
+                    className={`w-full px-4 py-2.5 text-xs border rounded-xl focus:ring-1 focus:outline-hidden transition-all ${
+                      resErrors.apellidoMaterno ? 'border-[#E12927] focus:border-[#E12927] focus:ring-[#E12927]' : 'border-[#1F1410]/15 focus:border-[#E12927] focus:ring-[#E12927]'
+                    }`}
+                  />
+                  {resErrors.apellidoMaterno && <p role="alert" className="text-[11px] font-semibold text-[#E12927] mt-1">{resErrors.apellidoMaterno}</p>}
+                </div>
               </div>
 
               <div>

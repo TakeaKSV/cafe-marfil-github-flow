@@ -20,6 +20,7 @@ import { SkeletonDashboard } from './components/ui/Skeletons';
 import { alExpirarSesion, api, sesion } from './api/cliente';
 import { aClienteClub, aEscaneo, aJuego, aPersona, aReservacion, aSucursal } from './api/adaptadores';
 import { cargarReservacionesPanel } from './api/reservaciones';
+import { esAdmin, esGerencia, puedeVerTab } from './utils/permisos';
 
 const SEGUNDOS_ENTRE_RECARGAS = 30;
 
@@ -142,18 +143,20 @@ export function App() {
     try {
       // La fecha del servidor solo delimita los indicadores y la operación de hoy.
       const nuevasMetricas = await api('/metricas/hoy', { query: { sucursalId } });
+      const esAdminActual = esAdmin(usuario);
+      const esGerenciaActual = esGerencia(usuario);
       const [s, m, r, productos, catsMenu, acts, promos, clientes, j, personal, invs, historial] = await Promise.all([
         api('/sucursales'),
         api('/mesas'),
         cargarReservacionesPanel(api, { hoy: nuevasMetricas.fecha, fecha: fechaReservaciones, sucursalId }),
-        api('/menu/productos', { query: { incluirBorradores: '1' } }),
+        api('/menu/productos', { query: esGerenciaActual ? { incluirBorradores: '1' } : undefined }),
         api('/menu/categorias'),
-        api('/actividades', { query: { incluirPasadas: '1', incluirInactivas: '1' } }),
+        api('/actividades', { query: esGerenciaActual ? { incluirPasadas: '1', incluirInactivas: '1' } : undefined }),
         api('/promociones'),
         api('/club/clientes'),
         api('/juegos'),
-        api('/personal'),
-        api('/personal/invitaciones').catch(() => []),
+        esAdminActual ? api('/personal') : Promise.resolve([]),
+        esAdminActual ? api('/personal/invitaciones').catch(() => []) : Promise.resolve([]),
         api('/escaner/historial', { query: { limite: 30 } })
       ]);
       if (carga !== cargaActual.current) return;
@@ -179,7 +182,14 @@ export function App() {
     } finally {
       if (carga === cargaActual.current) setCargandoReservaciones(false);
     }
-  }, [selectedSucursal, fechaReservaciones]);
+  }, [selectedSucursal, fechaReservaciones, usuario]);
+
+  // Si cambia el usuario o intenta acceder a una pestaña sin permiso, regresa a dashboard.
+  useEffect(() => {
+    if (usuario && !puedeVerTab(usuario.rol, activeTab)) {
+      setActiveTab('dashboard');
+    }
+  }, [usuario, activeTab]);
 
   // Carga inicial y recarga periódica para que mesas y tiempos se mantengan al día.
   useEffect(() => {
@@ -593,12 +603,14 @@ export function App() {
       {/* Sidebar Lateral Fijo: Siempre visible al 100%, nunca cambia de posición con el scroll */}
       <Sidebar
           activeTab={activeTab}
-          onSelectTab={setActiveTab}
+          onSelectTab={(tab) => {
+            if (puedeVerTab(usuario?.rol, tab)) setActiveTab(tab);
+          }}
           selectedSucursal={selectedSucursal}
           onSelectSucursal={setSelectedSucursal}
           sucursales={sucursales}
           soundEnabled={soundEnabled}
-          badges={badges}
+          usuario={usuario}
           onLogout={cerrarSesion}
         />
 
@@ -703,7 +715,7 @@ export function App() {
               )}
 
               {/* 5b. Editor de Actividades & Eventos */}
-              {activeTab === 'activities' && (
+              {activeTab === 'activities' && puedeVerTab(usuario?.rol, 'activities') && (
                 <ActivitiesModule
                   actividades={actividades}
                   sucursales={sucursales}
@@ -715,7 +727,7 @@ export function App() {
               )}
 
               {/* 6. Promociones & Cupones */}
-              {activeTab === 'promotions' && (
+              {activeTab === 'promotions' && puedeVerTab(usuario?.rol, 'promotions') && (
                 <PromotionsModule
                   promociones={promociones}
                   sucursales={sucursales}
@@ -735,12 +747,13 @@ export function App() {
                   onUpdateJuego={handleUpdateJuego}
                   onAddJuego={handleAddJuego}
                   mesas={mesasLudoteca}
+                  usuario={usuario}
                   soundEnabled={soundEnabled}
                 />
               )}
 
               {/* 8. Personal & Configuración */}
-              {activeTab === 'staff' && (
+              {activeTab === 'staff' && puedeVerTab(usuario?.rol, 'staff') && (
                 <StaffSettingsModule
                   staff={staff}
                   sucursales={sucursales}

@@ -11,7 +11,7 @@ import {
   obtenerCliente
 } from '../servicios/clientes.js';
 import { cancelarReservacion, listarReservaciones } from '../servicios/reservaciones.js';
-import { leer, zEmail, zId, zTexto } from '../utils/validar.js';
+import { leer, zEmail, zId, zTexto, zTextoOpcional } from '../utils/validar.js';
 
 const router = Router();
 router.use(requiereCliente);
@@ -19,6 +19,9 @@ router.use(requiereCliente);
 const esquemaPerfil = z
   .object({
     nombre: zTexto(120),
+    nombres: zTexto(80),
+    apellidoPaterno: zTexto(60),
+    apellidoMaterno: zTextoOpcional(60),
     email: zEmail,
     telefono: zTexto(30).nullable(),
     ciudad: zTexto(80).nullable(),

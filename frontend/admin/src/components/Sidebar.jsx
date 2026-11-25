@@ -17,6 +17,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { playSound } from '../utils/audioFeedback';
+import { ETIQUETA_ROL, puedeVerTab } from '../utils/permisos';
 
 export const Sidebar = ({
   activeTab,
@@ -25,7 +26,7 @@ export const Sidebar = ({
   onSelectSucursal,
   sucursales,
   soundEnabled,
-  badges = {},
+  usuario,
   onLogout
 }) => {
   const currentSucursalObj = sucursales.find(s => s.id === selectedSucursal);
@@ -50,7 +51,7 @@ export const Sidebar = ({
     };
   }, [isBranchOpen]);
 
-  const menuItems = [
+  const todosLosItems = [
     { id: 'dashboard', label: 'Panel Principal', icon: LayoutDashboard },
     { id: 'reservations', label: 'Reservaciones', icon: CalendarDays },
     { id: 'floorplan', label: 'Mesas en Vivo', icon: LayoutGrid },
@@ -61,6 +62,7 @@ export const Sidebar = ({
     { id: 'ludoteca', label: 'Ludoteca', icon: Dice5 },
     { id: 'staff', label: 'Personal & Turnos', icon: Users }
   ];
+  const menuItems = todosLosItems.filter((item) => puedeVerTab(usuario?.rol, item.id));
 
   const activeIndex = Math.max(0, menuItems.findIndex(item => item.id === activeTab));
 
@@ -231,11 +233,13 @@ export const Sidebar = ({
       <div className="px-5 pt-3 space-y-3">
 
 
-        {/* Estado en Línea de Terminal Durango */}
+        {/* Estado en Línea y Rol Activo */}
         <div className="bg-white/10 rounded-2xl px-3 py-2 flex items-center justify-between text-[11px] text-white/80 font-mono">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-[10px] font-semibold text-white">Terminal Durango · En Línea</span>
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+            <span className="text-[10px] font-semibold text-white truncate">
+              {ETIQUETA_ROL[usuario?.rol] || 'Terminal Durango'}
+            </span>
           </div>
           <button
             onClick={() => {

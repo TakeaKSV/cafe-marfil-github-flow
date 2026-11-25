@@ -9,6 +9,7 @@ import * as repoTokens from '../repositorios/tokensCorreo.js';
 import { codigoUnico, generarCodigoBeneficio, generarCodigoClub, leerJSON } from '../utils/codigos.js';
 import { HttpError, conflicto, noAutenticado, noEncontrado, sinPermiso, solicitudInvalida } from '../utils/errores.js';
 import { ahoraISO, fechaEnFrase, hoyLocal } from '../utils/fechas.js';
+import { dividirNombreCompleto, resolverNombrePartes } from '../utils/nombres.js';
 
 import { crearNotificacion, registrarEscaneo } from './bitacora.js';
 import {
@@ -28,11 +29,21 @@ function nivelPorVisitas(visitas) {
 }
 
 function aCliente(fila) {
+  const partes = fila.nombres
+    ? {
+        nombres: fila.nombres,
+        apellidoPaterno: fila.apellido_paterno ?? '',
+        apellidoMaterno: fila.apellido_materno ?? ''
+      }
+    : dividirNombreCompleto(fila.nombre);
   return {
     id: fila.id,
     codigoCliente: fila.codigo_club,
     nombre: fila.nombre,
-    primerNombre: fila.nombre.split(' ')[0],
+    nombres: partes.nombres,
+    apellidoPaterno: partes.apellidoPaterno,
+    apellidoMaterno: partes.apellidoMaterno,
+    primerNombre: (partes.nombres || fila.nombre).split(' ')[0],
     email: fila.email,
     telefono: fila.telefono,
     ciudad: fila.ciudad,
@@ -87,10 +98,14 @@ export async function registrarCliente(datos) {
     }
   }
 
+  const nombrePartes = resolverNombrePartes(datos);
   const codigo = await codigoUnico(generarCodigoClub, (c) => repo.codigoExiste(c));
   const { id } = await repo.insertarCliente({
     codigo,
-    nombre: datos.nombre,
+    nombre: nombrePartes.nombre,
+    nombres: nombrePartes.nombres,
+    apellidoPaterno: nombrePartes.apellidoPaterno,
+    apellidoMaterno: nombrePartes.apellidoMaterno,
     email: datos.email ?? null,
     telefono: datos.telefono ?? null,
     passwordHash: datos.password ? await cifrarPassword(datos.password) : null,
@@ -311,8 +326,10 @@ export async function actualizarPerfil(id, cambios) {
       ? JSON.stringify({ ...actual.preferencias, ...cambios.preferencias })
       : undefined;
 
+    const nombrePartes = resolverNombrePartes(cambios, actual);
     await repo.actualizarClientes(id, {
       ...cambios,
+      ...nombrePartes,
       preferencias,
       ...(cambioEmail ? { emailVerificadoEn: null } : {})
     });

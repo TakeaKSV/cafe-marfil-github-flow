@@ -37,12 +37,16 @@ export default function ProfileScreen({
 
   const form = useFormulario(
     {
-      nombre: perfil.nombre || '',
+      nombres: perfil.nombres || perfil.nombre?.split(' ')[0] || '',
+      apellidoPaterno: perfil.apellidoPaterno || '',
+      apellidoMaterno: perfil.apellidoMaterno || '',
       telefono: perfil.telefono || '',
       correo: perfil.correo || ''
     },
     {
-      nombre: (v) => reglas.nombre(v, { min: 2, max: 120, etiqueta: 'Tu nombre' }),
+      nombres: (v) => reglas.nombre(v, { min: 2, max: 80, etiqueta: 'Tu(s) nombre(s)' }),
+      apellidoPaterno: (v) => reglas.nombre(v, { min: 2, max: 60, etiqueta: 'Tu apellido paterno' }),
+      apellidoMaterno: (v) => reglas.nombre(v, { min: 2, max: 60, opcional: true, etiqueta: 'Tu apellido materno' }),
       telefono: (v) => reglas.telefonoMX(v, { opcional: true }),
       correo: (v) => reglas.email(v)
     }
@@ -56,9 +60,15 @@ export default function ProfileScreen({
     if (!valido) return;
     setGuardando(true);
     try {
+      const nombres = form.valores.nombres.trim();
+      const apellidoPaterno = form.valores.apellidoPaterno.trim();
+      const apellidoMaterno = form.valores.apellidoMaterno.trim();
       await onUpdatePerfil({
         ...perfil,
-        nombre: form.valores.nombre.trim(),
+        nombres,
+        apellidoPaterno,
+        apellidoMaterno,
+        nombre: [nombres, apellidoPaterno, apellidoMaterno].filter(Boolean).join(' '),
         telefono: form.valores.telefono.trim(),
         correo: form.valores.correo.trim(),
         preferencias: {
@@ -132,24 +142,69 @@ export default function ProfileScreen({
             {isEditing ? (
               <form onSubmit={handleSave} noValidate className="flex flex-col gap-4 pt-2 border-t-2 border-stone-200">
                 <div className="flex flex-col gap-1">
-                  <label htmlFor="perfil-nombre" className="font-mono text-[11px] font-bold text-[#8E7A74] tracking-wider uppercase">
-                    NOMBRE COMPLETO *
+                  <label htmlFor="perfil-nombres" className="font-mono text-[11px] font-bold text-[#8E7A74] tracking-wider uppercase">
+                    NOMBRE(S) *
                   </label>
                   <input
-                    id="perfil-nombre"
+                    id="perfil-nombres"
                     type="text"
-                    value={form.valores.nombre}
-                    onChange={(e) => form.setCampo('nombre', e.target.value)}
+                    value={form.valores.nombres}
+                    onChange={(e) => form.setCampo('nombres', e.target.value)}
                     className={`px-4 py-3 rounded-md border-2 bg-white text-sm font-body text-[#1F1410] focus:outline-none ${
-                      form.errores.nombre ? 'border-[#E12927] bg-[#FCEAE9]/20' : 'border-stone-300 focus:border-[#E12927]'
+                      form.errores.nombres ? 'border-[#E12927] bg-[#FCEAE9]/20' : 'border-stone-300 focus:border-[#E12927]'
                     }`}
-                    {...form.propsCampo('nombre')}
+                    {...form.propsCampo('nombres')}
                   />
-                  {form.errores.nombre && (
-                    <p id="error-nombre" role="alert" className="text-xs font-semibold text-[#E12927]">
-                      {form.errores.nombre}
+                  {form.errores.nombres && (
+                    <p id="error-nombres" role="alert" className="text-xs font-semibold text-[#E12927]">
+                      {form.errores.nombres}
                     </p>
                   )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1">
+                    <label htmlFor="perfil-ap-paterno" className="font-mono text-[11px] font-bold text-[#8E7A74] tracking-wider uppercase">
+                      APELLIDO PATERNO *
+                    </label>
+                    <input
+                      id="perfil-ap-paterno"
+                      type="text"
+                      value={form.valores.apellidoPaterno}
+                      onChange={(e) => form.setCampo('apellidoPaterno', e.target.value)}
+                      className={`px-4 py-3 rounded-md border-2 bg-white text-sm font-body text-[#1F1410] focus:outline-none ${
+                        form.errores.apellidoPaterno ? 'border-[#E12927] bg-[#FCEAE9]/20' : 'border-stone-300 focus:border-[#E12927]'
+                      }`}
+                      {...form.propsCampo('apellidoPaterno')}
+                    />
+                    {form.errores.apellidoPaterno && (
+                      <p id="error-apellidoPaterno" role="alert" className="text-xs font-semibold text-[#E12927]">
+                        {form.errores.apellidoPaterno}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label htmlFor="perfil-ap-materno" className="font-mono text-[11px] font-bold text-[#8E7A74] tracking-wider uppercase">
+                      APELLIDO MATERNO
+                    </label>
+                    <input
+                      id="perfil-ap-materno"
+                      type="text"
+                      value={form.valores.apellidoMaterno}
+                      onChange={(e) => form.setCampo('apellidoMaterno', e.target.value)}
+                      placeholder="Opcional"
+                      className={`px-4 py-3 rounded-md border-2 bg-white text-sm font-body text-[#1F1410] focus:outline-none ${
+                        form.errores.apellidoMaterno ? 'border-[#E12927] bg-[#FCEAE9]/20' : 'border-stone-300 focus:border-[#E12927]'
+                      }`}
+                      {...form.propsCampo('apellidoMaterno')}
+                    />
+                    {form.errores.apellidoMaterno && (
+                      <p id="error-apellidoMaterno" role="alert" className="text-xs font-semibold text-[#E12927]">
+                        {form.errores.apellidoMaterno}
+                      </p>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex flex-col gap-1">

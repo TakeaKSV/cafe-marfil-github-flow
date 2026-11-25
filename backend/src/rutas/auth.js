@@ -21,19 +21,27 @@ import {
   obtenerPersona
 } from '../servicios/personal.js';
 import { noAutenticado, solicitudInvalida } from '../utils/errores.js';
-import { leer, zEmail, zPassword, zPasswordLogin, zTexto } from '../utils/validar.js';
+import { leer, zEmail, zPassword, zPasswordLogin, zTexto, zTextoOpcional } from '../utils/validar.js';
 
 const router = Router();
 
 const esquemaLogin = z.object({ email: zEmail, password: zPasswordLogin });
 
-const esquemaRegistro = z.object({
-  nombre: zTexto(120),
-  email: zEmail,
-  password: zPassword,
-  telefono: zTexto(30).optional(),
-  ciudad: zTexto(80).optional()
-});
+const esquemaRegistro = z
+  .object({
+    nombre: zTexto(120).optional(),
+    nombres: zTexto(80).optional(),
+    apellidoPaterno: zTexto(60).optional(),
+    apellidoMaterno: zTextoOpcional(60).optional(),
+    email: zEmail,
+    password: zPassword,
+    telefono: zTexto(30).optional(),
+    ciudad: zTexto(80).optional()
+  })
+  .refine((d) => Boolean(d.nombre || (d.nombres && d.apellidoPaterno)), {
+    message: 'Ingresa tus nombres y apellido paterno.',
+    path: ['nombres']
+  });
 
 const esquemaVerificarCodigo = z.object({
   email: zEmail,
@@ -53,11 +61,19 @@ const esquemaRestablecerPassword = z.object({
   password: zPassword
 });
 
-const esquemaCompletarInvitacion = z.object({
-  token: zTexto(128),
-  nombre: zTexto(120),
-  password: zPassword
-});
+const esquemaCompletarInvitacion = z
+  .object({
+    token: zTexto(128),
+    nombre: zTexto(120).optional(),
+    nombres: zTexto(80).optional(),
+    apellidoPaterno: zTexto(60).optional(),
+    apellidoMaterno: zTextoOpcional(60).optional(),
+    password: zPassword
+  })
+  .refine((d) => Boolean(d.nombre || (d.nombres && d.apellidoPaterno)), {
+    message: 'Ingresa tus nombres y apellido paterno.',
+    path: ['nombres']
+  });
 
 // Panel de administración
 router.post('/staff/login', async (req, res) => {

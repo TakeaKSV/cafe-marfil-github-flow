@@ -15,6 +15,7 @@ import {
   HelpCircle
 } from 'lucide-react';
 import { playSound } from '../utils/audioFeedback';
+import { esGerencia } from '../utils/permisos';
 import { reglas } from '../utils/validacion';
 
 export const LudotecaModule = ({
@@ -22,8 +23,10 @@ export const LudotecaModule = ({
   onUpdateJuego,
   onAddJuego,
   mesas,
+  usuario,
   soundEnabled
 }) => {
+  const puedeGestionarCatalogo = esGerencia(usuario);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterEstado, setFilterEstado] = useState('todas');
   const [showLoanModal, setShowLoanModal] = useState(null);
@@ -164,16 +167,18 @@ export const LudotecaModule = ({
           </p>
         </div>
 
-        <button
-          onClick={() => {
-            if (soundEnabled) playSound('toggle');
-            setShowNewGameModal(true);
-          }}
-          className="flex items-center gap-2 px-4 py-2 bg-[#E12927] hover:bg-[#c9201f] text-white text-xs sm:text-sm font-semibold rounded-md shadow-xs transition-colors cursor-pointer"
-        >
-          <Plus className="w-4 h-4 stroke-[2.5]" />
-          Registrar Nuevo Juego
-        </button>
+        {puedeGestionarCatalogo && (
+          <button
+            onClick={() => {
+              if (soundEnabled) playSound('toggle');
+              setShowNewGameModal(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-[#E12927] hover:bg-[#c9201f] text-white text-xs sm:text-sm font-semibold rounded-md shadow-xs transition-colors cursor-pointer"
+          >
+            <Plus className="w-4 h-4 stroke-[2.5]" />
+            Registrar Nuevo Juego
+          </button>
+        )}
       </div>
 
       {/* Filtros de Estado y Buscador */}

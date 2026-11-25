@@ -25,6 +25,9 @@ export const paraSesion = (id) =>
 export const insertarPersona = (datos) =>
   insertar('personal', {
     nombre: datos.nombre,
+    nombres: datos.nombres ?? null,
+    apellido_paterno: datos.apellidoPaterno ?? null,
+    apellido_materno: datos.apellidoMaterno ?? null,
     email: datos.email,
     password_hash: datos.passwordHash,
     rol: datos.rol,
@@ -39,6 +42,9 @@ export const insertarPersona = (datos) =>
 
 const CAMPOS_PERSONAL = {
   nombre: 'nombre',
+  nombres: 'nombres',
+  apellidoPaterno: 'apellido_paterno',
+  apellidoMaterno: 'apellido_materno',
   email: 'email',
   passwordHash: 'password_hash',
   rol: 'rol',

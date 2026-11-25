@@ -165,6 +165,9 @@ export function aSeccionesDeMenu(productos = []) {
 
 export const aPerfil = (c) => ({
   nombre: c.nombre,
+  nombres: c.nombres ?? '',
+  apellidoPaterno: c.apellidoPaterno ?? '',
+  apellidoMaterno: c.apellidoMaterno ?? '',
   primerNombre: c.primerNombre,
   correo: c.email ?? '',
   telefono: c.telefono ?? '',
