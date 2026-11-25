@@ -1,7 +1,17 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { cargarConfig } from '../../src/config.js';
-import { leer, zEntero, zId, zPassword, zPasswordLogin, zPrecio } from '../../src/utils/validar.js';
+import {
+  leer,
+  zEntero,
+  zId,
+  zNombrePersona,
+  zPassword,
+  zPasswordLogin,
+  zPrecio,
+  zRutaImagen,
+  zTelefonoMX
+} from '../../src/utils/validar.js';
 import { generarTokenQR } from '../../src/utils/codigos.js';
 
 test('contraseñas UTF-8: rechaza truncamiento de bcrypt, conserva espacios', () => {
@@ -57,4 +67,19 @@ test('los pases de invitado contienen 128 bits aleatorios', () => {
   const tokens = new Set(Array.from({ length: 100 }, generarTokenQR));
   assert.equal(tokens.size, 100);
   for (const token of tokens) assert.match(token, /^QR-[A-F0-9]{32}$/);
+});
+
+test('teléfonos MX, nombres y rutas de imagen validan formato seguro', () => {
+  assert.equal(leer(zTelefonoMX, '(618) 123-4567'), '(618) 123-4567');
+  assert.equal(leer(zTelefonoMX, '+52 618 123 4567'), '+52 618 123 4567');
+  assert.throws(() => leer(zTelefonoMX, '12345'), { status: 400 });
+  assert.throws(() => leer(zTelefonoMX, 'abcde'), { status: 400 });
+
+  assert.equal(leer(zNombrePersona, 'Sofía Navarro'), 'Sofía Navarro');
+  assert.throws(() => leer(zNombrePersona, 'A'), { status: 400 });
+  assert.throws(() => leer(zNombrePersona, '<script>alert(1)</script>'), { status: 400 });
+
+  assert.equal(leer(zRutaImagen, '/uploads/cafe.png'), '/uploads/cafe.png');
+  assert.equal(leer(zRutaImagen, 'https://cafemarfil.mx/img/latte.jpg'), 'https://cafemarfil.mx/img/latte.jpg');
+  assert.throws(() => leer(zRutaImagen, 'javascript:alert(1)'), { status: 400 });
 });

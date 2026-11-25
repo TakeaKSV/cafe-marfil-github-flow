@@ -13,6 +13,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { playSound } from '../utils/audioFeedback';
+import { reglas } from '../utils/validacion';
 
 export const StaffSettingsModule = ({ 
   staff, 
@@ -21,12 +22,18 @@ export const StaffSettingsModule = ({
   soundEnabled 
 }) => {
   const [broadcastMessage, setBroadcastMessage] = useState('');
+  const [broadcastError, setBroadcastError] = useState('');
   const [broadcastSent, setBroadcastSent] = useState(false);
 
   const handleSendBroadcast = (e) => {
     e.preventDefault();
-    if (!broadcastMessage.trim()) return;
-
+    const err = reglas.texto(broadcastMessage, { min: 5, max: 240, etiqueta: 'El mensaje' });
+    if (err) {
+      setBroadcastError(err);
+      if (soundEnabled) playSound('alert');
+      return;
+    }
+    setBroadcastError('');
     setBroadcastSent(true);
     if (soundEnabled) playSound('alert');
     setTimeout(() => {
@@ -143,14 +150,22 @@ export const StaffSettingsModule = ({
               Envía un anuncio inmediato a las pantallas de comandera, recepción y cocina en piso.
             </p>
 
-            <form onSubmit={handleSendBroadcast} className="space-y-2">
+            <form onSubmit={handleSendBroadcast} noValidate className="space-y-2">
               <input
                 type="text"
+                maxLength={240}
                 placeholder="Ej. Cambio de turno de barra a las 15:30. Preparar insumos..."
                 value={broadcastMessage}
-                onChange={(e) => setBroadcastMessage(e.target.value)}
-                className="w-full px-3 py-2 text-xs border border-[#1F1410]/20 rounded-xs focus:border-[#E12927] focus:outline-hidden"
+                onChange={(e) => {
+                  setBroadcastMessage(e.target.value);
+                  setBroadcastError('');
+                }}
+                aria-invalid={Boolean(broadcastError)}
+                className={`w-full px-3 py-2 text-xs border rounded-xs focus:outline-hidden ${
+                  broadcastError ? 'border-[#E12927]' : 'border-[#1F1410]/20 focus:border-[#E12927]'
+                }`}
               />
+              {broadcastError && <p role="alert" className="text-[11px] font-semibold text-[#E12927]">{broadcastError}</p>}
 
               <button
                 type="submit"

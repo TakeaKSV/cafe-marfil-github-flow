@@ -12,20 +12,27 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { playSound } from '../utils/audioFeedback';
+import { reglas, useFormulario } from '../utils/validacion';
 
 export const LoginScreen = ({ onLogin, soundEnabled = true }) => {
-  const [username, setUsername] = useState('admin@cafemarfil.mx');
-  const [password, setPassword] = useState('marfil2026');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+
+  const form = useFormulario(
+    { username: '', password: '' },
+    {
+      username: (v) => reglas.email(v),
+      password: (v) => reglas.requerido(v, 'Ingresa tu contraseña.')
+    }
+  );
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMessage('');
 
-    if (!username.trim() || !password.trim()) {
-      setErrorMessage('Por favor ingresa usuario y contraseña.');
+    const { valido } = form.validarTodo();
+    if (!valido) {
       if (soundEnabled) playSound('alert');
       return;
     }
@@ -35,20 +42,14 @@ export const LoginScreen = ({ onLogin, soundEnabled = true }) => {
 
     // onLogin valida las credenciales contra la API; si falla lanza el mensaje a mostrar.
     try {
-      await onLogin(username.trim(), password);
+      await onLogin(form.valores.username.trim(), form.valores.password);
       if (soundEnabled) playSound('success');
     } catch (error) {
-      setErrorMessage(error.message);
+      const mapeado = form.aplicarErroresApi(error, { email: 'username' });
+      if (!mapeado) setErrorMessage(error.message);
       if (soundEnabled) playSound('alert');
       setIsLoading(false);
     }
-  };
-
-  const handleQuickDemo = () => {
-    setUsername('admin@cafemarfil.mx');
-    setPassword('marfil2026');
-    setErrorMessage('');
-    if (soundEnabled) playSound('coin');
   };
 
   return (
@@ -155,40 +156,57 @@ export const LoginScreen = ({ onLogin, soundEnabled = true }) => {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} noValidate className="space-y-4">
 
               {/* Campo: Usuario / Correo */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-semibold text-white/85 font-body">
-                  Usuario o Correo
+                <label htmlFor="admin-email" className="block text-xs font-semibold text-white/85 font-body">
+                  Correo Institucional *
                 </label>
                 <div className="relative">
                   <User className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
                   <input
-                    type="text"
-                    required
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
+                    id="admin-email"
+                    type="email"
+                    autoComplete="username"
+                    value={form.valores.username}
+                    onChange={(e) => form.setCampo('username', e.target.value)}
                     placeholder="admin@cafemarfil.mx"
-                    className="w-full pl-11 pr-4 py-3 bg-black/40 border border-white/15 rounded-full text-xs sm:text-sm text-white placeholder:text-white/30 focus:outline-hidden focus:border-[#E12927] focus:ring-2 focus:ring-[#E12927]/30 transition-all font-body shadow-inner"
+                    className={`w-full pl-11 pr-4 py-3 bg-black/40 border rounded-full text-xs sm:text-sm text-white placeholder:text-white/30 focus:outline-hidden focus:ring-2 transition-all font-body shadow-inner ${
+                      form.errores.username
+                        ? 'border-rose-400 focus:border-rose-400 focus:ring-rose-400/30'
+                        : 'border-white/15 focus:border-[#E12927] focus:ring-[#E12927]/30'
+                    }`}
+                    {...form.propsCampo('username')}
                   />
                 </div>
+                {form.errores.username && (
+                  <p id="error-username" role="alert" className="text-[11px] text-rose-300 font-medium pl-3">
+                    {form.errores.username}
+                  </p>
+                )}
               </div>
 
               {/* Campo: Contraseña */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-semibold text-white/85 font-body">
-                  Contraseña
+                <label htmlFor="admin-password" className="block text-xs font-semibold text-white/85 font-body">
+                  Contraseña *
                 </label>
                 <div className="relative">
                   <Lock className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
                   <input
+                    id="admin-password"
                     type={showPassword ? 'text' : 'password'}
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    autoComplete="current-password"
+                    value={form.valores.password}
+                    onChange={(e) => form.setCampo('password', e.target.value)}
                     placeholder="••••••••••••"
-                    className="w-full pl-11 pr-11 py-3 bg-black/40 border border-white/15 rounded-full text-xs sm:text-sm text-white placeholder:text-white/30 focus:outline-hidden focus:border-[#E12927] focus:ring-2 focus:ring-[#E12927]/30 transition-all font-body shadow-inner"
+                    className={`w-full pl-11 pr-11 py-3 bg-black/40 border rounded-full text-xs sm:text-sm text-white placeholder:text-white/30 focus:outline-hidden focus:ring-2 transition-all font-body shadow-inner ${
+                      form.errores.password
+                        ? 'border-rose-400 focus:border-rose-400 focus:ring-rose-400/30'
+                        : 'border-white/15 focus:border-[#E12927] focus:ring-[#E12927]/30'
+                    }`}
+                    {...form.propsCampo('password')}
                   />
                   <button
                     type="button"
@@ -199,6 +217,11 @@ export const LoginScreen = ({ onLogin, soundEnabled = true }) => {
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
+                {form.errores.password && (
+                  <p id="error-password" role="alert" className="text-[11px] text-rose-300 font-medium pl-3">
+                    {form.errores.password}
+                  </p>
+                )}
 
                 {/* Enlace "¿Olvidaste tu contraseña?" */}
                 <div className="text-right pt-1">

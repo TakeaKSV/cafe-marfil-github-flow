@@ -15,6 +15,7 @@ import {
   HelpCircle
 } from 'lucide-react';
 import { playSound } from '../utils/audioFeedback';
+import { reglas } from '../utils/validacion';
 
 export const LudotecaModule = ({
   juegos,
@@ -49,6 +50,8 @@ export const LudotecaModule = ({
     dificultad: 'Media',
     piezasEstado: '100% Completo (Verificado)'
   });
+  const [gameErrors, setGameErrors] = useState({});
+  const [loanError, setLoanError] = useState('');
 
   const filtered = juegos.filter(j => {
     const matchesEstado = filterEstado === 'todas' ||
@@ -75,7 +78,12 @@ export const LudotecaModule = ({
   const handleLoanGame = (e) => {
     e.preventDefault();
     if (!showLoanModal) return;
-
+    if (!selectedMesaForLoan || mesas.length === 0) {
+      setLoanError('No hay mesas ocupadas disponibles para prestar este juego.');
+      if (soundEnabled) playSound('alert');
+      return;
+    }
+    setLoanError('');
     onUpdateJuego({
       ...showLoanModal,
       estado: 'en_mesa',
@@ -99,25 +107,36 @@ export const LudotecaModule = ({
 
   const handleCreateGame = (e) => {
     e.preventDefault();
-    if (!newGame.nombre.trim()) return;
+    const errs = {
+      nombre: reglas.nombreItem(newGame.nombre, { min: 2, max: 120, etiqueta: 'El título del juego' }),
+      categoria: reglas.texto(newGame.categoria, { min: 2, max: 80, etiqueta: 'La categoría' }),
+      jugadores: reglas.texto(newGame.jugadores, { min: 2, max: 60, etiqueta: 'El rango de jugadores' }),
+      duracionMin: reglas.texto(newGame.duracionMin, { min: 2, max: 40, etiqueta: 'La duración estimada' })
+    };
+    setGameErrors(errs);
+    if (Object.values(errs).some(Boolean)) {
+      if (soundEnabled) playSound('alert');
+      return;
+    }
 
     const creado = {
       id: `game-${Date.now()}`,
-      nombre: newGame.nombre,
-      categoria: newGame.categoria,
-      jugadores: newGame.jugadores,
-      duracionMin: newGame.duracionMin,
+      nombre: newGame.nombre.trim(),
+      categoria: newGame.categoria.trim(),
+      jugadores: newGame.jugadores.trim(),
+      duracionMin: newGame.duracionMin.trim(),
       dificultad: newGame.dificultad,
       piezasEstado: newGame.piezasEstado,
       estado: 'disponible',
       mesaActual: null,
-      vecesJugadoMes: 1,
+      vecesJugadoMes: 0,
       reposicionRequerida: false
     };
 
     onAddJuego(creado);
     if (soundEnabled) playSound('success');
     setShowNewGameModal(false);
+    setGameErrors({});
     setNewGame({
       nombre: '',
       categoria: 'Estrategia & Tablero',
@@ -334,14 +353,17 @@ export const LudotecaModule = ({
               </button>
             </div>
 
-            <form onSubmit={handleLoanGame} className="space-y-4 font-body">
+            <form onSubmit={handleLoanGame} noValidate className="space-y-4 font-body">
               <div>
                 <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1.5">
                   Seleccionar Mesa Activa de Sala:
                 </label>
                 <select
                   value={selectedMesaForLoan}
-                  onChange={(e) => setSelectedMesaForLoan(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedMesaForLoan(e.target.value);
+                    setLoanError('');
+                  }}
                   className="w-full px-4 py-2.5 text-xs border border-[#1F1410]/15 rounded-xl focus:border-[#E12927] focus:ring-1 focus:ring-[#E12927] focus:outline-hidden bg-white font-mono cursor-pointer transition-all"
                 >
                   {mesas.map(m => (
@@ -350,6 +372,7 @@ export const LudotecaModule = ({
                     </option>
                   ))}
                 </select>
+                {loanError && <p role="alert" className="text-[11px] font-semibold text-[#E12927] mt-1">{loanError}</p>}
               </div>
 
               <div className="p-4 bg-[#FAF7F5] rounded-2xl text-xs text-[#1F1410]/70 font-mono border border-[#1F1410]/8">
@@ -405,60 +428,87 @@ export const LudotecaModule = ({
               </button>
             </div>
 
-            <form onSubmit={handleCreateGame} className="space-y-4 font-body">
+            <form onSubmit={handleCreateGame} noValidate className="space-y-4 font-body">
               <div>
                 <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1.5">
                   Nombre del Título *
                 </label>
                 <input
                   type="text"
-                  required
                   placeholder="Ej. Azul (Master Chocolatier)"
                   value={newGame.nombre}
-                  onChange={(e) => setNewGame({ ...newGame, nombre: e.target.value })}
-                  className="w-full px-4 py-2.5 text-xs border border-[#1F1410]/15 rounded-xl focus:border-[#E12927] focus:ring-1 focus:ring-[#E12927] focus:outline-hidden transition-all"
+                  onChange={(e) => {
+                    setNewGame({ ...newGame, nombre: e.target.value });
+                    setGameErrors((p) => ({ ...p, nombre: null }));
+                  }}
+                  aria-invalid={Boolean(gameErrors.nombre)}
+                  className={`w-full px-4 py-2.5 text-xs border rounded-xl focus:ring-1 focus:outline-hidden transition-all ${
+                    gameErrors.nombre ? 'border-[#E12927] focus:border-[#E12927] focus:ring-[#E12927]' : 'border-[#1F1410]/15 focus:border-[#E12927] focus:ring-[#E12927]'
+                  }`}
                 />
+                {gameErrors.nombre && <p role="alert" className="text-[11px] font-semibold text-[#E12927] mt-1">{gameErrors.nombre}</p>}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1.5">
-                    Categoría
+                    Categoría *
                   </label>
                   <input
                     type="text"
                     value={newGame.categoria}
-                    onChange={(e) => setNewGame({ ...newGame, categoria: e.target.value })}
-                    className="w-full px-4 py-2.5 text-xs border border-[#1F1410]/15 rounded-xl focus:border-[#E12927] focus:ring-1 focus:ring-[#E12927] focus:outline-hidden transition-all"
+                    onChange={(e) => {
+                      setNewGame({ ...newGame, categoria: e.target.value });
+                      setGameErrors((p) => ({ ...p, categoria: null }));
+                    }}
+                    aria-invalid={Boolean(gameErrors.categoria)}
+                    className={`w-full px-4 py-2.5 text-xs border rounded-xl focus:ring-1 focus:outline-hidden transition-all ${
+                      gameErrors.categoria ? 'border-[#E12927]' : 'border-[#1F1410]/15 focus:border-[#E12927] focus:ring-[#E12927]'
+                    }`}
                   />
+                  {gameErrors.categoria && <p role="alert" className="text-[11px] font-semibold text-[#E12927] mt-1">{gameErrors.categoria}</p>}
                 </div>
 
                 <div>
                   <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1.5">
-                    Número de Jugadores
+                    Número de Jugadores *
                   </label>
                   <input
                     type="text"
                     placeholder="2 - 4 jugadores"
                     value={newGame.jugadores}
-                    onChange={(e) => setNewGame({ ...newGame, jugadores: e.target.value })}
-                    className="w-full px-4 py-2.5 text-xs border border-[#1F1410]/15 rounded-xl focus:border-[#E12927] focus:ring-1 focus:ring-[#E12927] focus:outline-hidden font-mono transition-all"
+                    onChange={(e) => {
+                      setNewGame({ ...newGame, jugadores: e.target.value });
+                      setGameErrors((p) => ({ ...p, jugadores: null }));
+                    }}
+                    aria-invalid={Boolean(gameErrors.jugadores)}
+                    className={`w-full px-4 py-2.5 text-xs border rounded-xl focus:ring-1 focus:outline-hidden font-mono transition-all ${
+                      gameErrors.jugadores ? 'border-[#E12927]' : 'border-[#1F1410]/15 focus:border-[#E12927] focus:ring-[#E12927]'
+                    }`}
                   />
+                  {gameErrors.jugadores && <p role="alert" className="text-[11px] font-semibold text-[#E12927] mt-1">{gameErrors.jugadores}</p>}
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1.5">
-                    Duración Estimada
+                    Duración Estimada *
                   </label>
                   <input
                     type="text"
                     placeholder="30 - 45 min"
                     value={newGame.duracionMin}
-                    onChange={(e) => setNewGame({ ...newGame, duracionMin: e.target.value })}
-                    className="w-full px-4 py-2.5 text-xs border border-[#1F1410]/15 rounded-xl focus:border-[#E12927] focus:ring-1 focus:ring-[#E12927] focus:outline-hidden font-mono transition-all"
+                    onChange={(e) => {
+                      setNewGame({ ...newGame, duracionMin: e.target.value });
+                      setGameErrors((p) => ({ ...p, duracionMin: null }));
+                    }}
+                    aria-invalid={Boolean(gameErrors.duracionMin)}
+                    className={`w-full px-4 py-2.5 text-xs border rounded-xl focus:ring-1 focus:outline-hidden font-mono transition-all ${
+                      gameErrors.duracionMin ? 'border-[#E12927]' : 'border-[#1F1410]/15 focus:border-[#E12927] focus:ring-[#E12927]'
+                    }`}
                   />
+                  {gameErrors.duracionMin && <p role="alert" className="text-[11px] font-semibold text-[#E12927] mt-1">{gameErrors.duracionMin}</p>}
                 </div>
 
                 <div>

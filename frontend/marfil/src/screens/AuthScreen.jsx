@@ -1,50 +1,85 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { AlertCircle, ArrowRight, LogIn, UserPlus } from 'lucide-react';
 import { sounds } from '../utils/audio';
+import { reglas, useFormulario } from '../utils/validacion';
 
-const CLASE_INPUT =
-  'p-3.5 rounded-md border-2 border-stone-300 bg-white font-body text-sm text-[#1F1410] focus:outline-none focus:border-[#E12927]';
+const claseInput = (tieneError) =>
+  `p-3.5 rounded-md border-2 bg-white font-body text-sm text-[#1F1410] focus:outline-none transition-colors ${
+    tieneError ? 'border-[#E12927] bg-[#FCEAE9]/20' : 'border-stone-300 focus:border-[#E12927]'
+  }`;
 const CLASE_LABEL = 'font-mono text-xs font-bold text-[#8E7A74] uppercase tracking-wider';
 
 /**
  * Acceso a la cuenta Club Marfil: iniciar sesión o crear cuenta.
- * Se muestra en lugar de las pantallas que necesitan saber quién es el cliente
- * (perfil y beneficios). `onLogin` y `onRegister` lanzan un error con el
- * mensaje a mostrar si la API rechaza los datos.
  */
-export default function AuthScreen({ onLogin, onRegister, motivo }) {
+export default function AuthScreen({ onLogin, onRegister, onForgotPassword, motivo }) {
   const [modo, setModo] = useState('entrar'); // entrar | registrar
-  const [nombre, setNombre] = useState('');
-  const [correo, setCorreo] = useState('');
-  const [telefono, setTelefono] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [errorGeneral, setErrorGeneral] = useState('');
   const [enviando, setEnviando] = useState(false);
 
   const esRegistro = modo === 'registrar';
 
+  const esquema = useMemo(
+    () => ({
+      nombre: (v) => (esRegistro ? reglas.nombre(v, { min: 2, max: 120, etiqueta: 'Tu nombre' }) : null),
+      correo: (v) => reglas.email(v),
+      telefono: (v) => (esRegistro ? reglas.telefonoMX(v, { opcional: true }) : null),
+      password: (v) =>
+        esRegistro ? reglas.passwordSegura(v) : reglas.requerido(v, 'Ingresa tu contraseña.'),
+      confirmarPassword: (v, all) =>
+        esRegistro ? reglas.confirmarPassword(v, all.password) : null
+    }),
+    [esRegistro]
+  );
+
+  const form = useFormulario(
+    { nombre: '', correo: '', telefono: '', password: '', confirmarPassword: '' },
+    esquema
+  );
+
   const cambiarModo = (nuevo) => {
     sounds.playClick();
     setModo(nuevo);
-    setError('');
+    setErrorGeneral('');
+    form.setErrores({});
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     sounds.playClick();
-    setError('');
+    setErrorGeneral('');
+
+    const camposActivos = esRegistro
+      ? ['nombre', 'correo', 'telefono', 'password', 'confirmarPassword']
+      : ['correo', 'password'];
+    const { valido } = form.validarTodo(camposActivos);
+    if (!valido) return;
+
     setEnviando(true);
     try {
       if (esRegistro) {
-        await onRegister({ nombre: nombre.trim(), email: correo.trim(), password, telefono: telefono.trim() || undefined });
+        await onRegister({
+          nombre: form.valores.nombre.trim(),
+          email: form.valores.correo.trim(),
+          password: form.valores.password,
+          telefono: form.valores.telefono.trim() || undefined
+        });
       } else {
-        await onLogin(correo.trim(), password);
+        await onLogin(form.valores.correo.trim(), form.valores.password);
       }
     } catch (err) {
-      setError(err.message);
+      const mapeado = form.aplicarErroresApi(err, { email: 'correo' });
+      if (!mapeado) setErrorGeneral(err.message);
       setEnviando(false);
     }
   };
+
+  const renderError = (campo) =>
+    form.errores[campo] ? (
+      <p id={`error-${campo}`} role="alert" className="font-body text-xs text-[#E12927] font-semibold mt-0.5">
+        {form.errores[campo]}
+      </p>
+    ) : null;
 
   return (
     <div className="flex flex-col gap-8 fade-in pb-16 max-w-xl mx-auto w-full">
@@ -78,72 +113,108 @@ export default function AuthScreen({ onLogin, onRegister, motivo }) {
         ))}
       </div>
 
-      <form onSubmit={handleSubmit} className="p-6 sm:p-7 rounded-lg bg-white border-2 border-stone-300 flex flex-col gap-4 shadow-md">
+      <form
+        onSubmit={handleSubmit}
+        noValidate
+        className="p-6 sm:p-7 rounded-lg bg-white border-2 border-stone-300 flex flex-col gap-4 shadow-md"
+      >
         {esRegistro && (
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-1">
             <label htmlFor="auth-nombre" className={CLASE_LABEL}>NOMBRE COMPLETO *</label>
             <input
               id="auth-nombre"
               type="text"
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-              placeholder="Ingresa tu nombre..."
+              value={form.valores.nombre}
+              onChange={(e) => form.setCampo('nombre', e.target.value)}
+              placeholder="Ej. Sofía Navarro"
               autoComplete="name"
-              className={CLASE_INPUT}
-              required
+              className={claseInput(form.errores.nombre)}
+              {...form.propsCampo('nombre')}
             />
+            {renderError('nombre')}
           </div>
         )}
 
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-1">
           <label htmlFor="auth-correo" className={CLASE_LABEL}>CORREO ELECTRÓNICO *</label>
           <input
             id="auth-correo"
             type="email"
-            value={correo}
-            onChange={(e) => setCorreo(e.target.value)}
+            value={form.valores.correo}
+            onChange={(e) => form.setCampo('correo', e.target.value)}
             placeholder="tu.correo@ejemplo.com"
             autoComplete="email"
-            className={CLASE_INPUT}
-            required
+            className={claseInput(form.errores.correo)}
+            {...form.propsCampo('correo')}
           />
+          {renderError('correo')}
         </div>
 
         {esRegistro && (
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-1">
             <label htmlFor="auth-telefono" className={CLASE_LABEL}>TELÉFONO / WHATSAPP (OPCIONAL)</label>
             <input
               id="auth-telefono"
               type="tel"
-              value={telefono}
-              onChange={(e) => setTelefono(e.target.value)}
+              value={form.valores.telefono}
+              onChange={(e) => form.setCampo('telefono', e.target.value)}
               placeholder="(618) 123-4567"
               autoComplete="tel"
-              className={CLASE_INPUT}
+              className={claseInput(form.errores.telefono)}
+              {...form.propsCampo('telefono')}
             />
+            {renderError('telefono')}
           </div>
         )}
 
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-1">
           <label htmlFor="auth-password" className={CLASE_LABEL}>
-            CONTRASEÑA *{esRegistro && ' (MÍNIMO 8 CARACTERES)'}
+            CONTRASEÑA *{esRegistro && ' (MÍN. 8 CARACTERES, LETRA Y NÚMERO)'}
           </label>
           <input
             id="auth-password"
             type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            minLength={esRegistro ? 8 : undefined}
+            value={form.valores.password}
+            onChange={(e) => form.setCampo('password', e.target.value)}
             autoComplete={esRegistro ? 'new-password' : 'current-password'}
-            className={CLASE_INPUT}
-            required
+            className={claseInput(form.errores.password)}
+            {...form.propsCampo('password')}
           />
+          {renderError('password')}
         </div>
 
-        {error && (
+        {esRegistro && (
+          <div className="flex flex-col gap-1">
+            <label htmlFor="auth-confirmar" className={CLASE_LABEL}>CONFIRMAR CONTRASEÑA *</label>
+            <input
+              id="auth-confirmar"
+              type="password"
+              value={form.valores.confirmarPassword}
+              onChange={(e) => form.setCampo('confirmarPassword', e.target.value)}
+              autoComplete="new-password"
+              className={claseInput(form.errores.confirmarPassword)}
+              {...form.propsCampo('confirmarPassword')}
+            />
+            {renderError('confirmarPassword')}
+          </div>
+        )}
+
+        {!esRegistro && onForgotPassword && (
+          <div className="text-right -mt-1">
+            <button
+              type="button"
+              onClick={onForgotPassword}
+              className="font-mono text-xs font-bold text-[#8E7A74] hover:text-[#E12927] transition-colors cursor-pointer bg-transparent border-none p-0"
+            >
+              ¿Olvidaste tu contraseña?
+            </button>
+          </div>
+        )}
+
+        {errorGeneral && (
           <div role="alert" className="p-3.5 rounded-md bg-[#FCEAE9] border-2 border-[#E12927]/40 flex items-start gap-2.5">
             <AlertCircle size={18} className="text-[#E12927] shrink-0 mt-0.5" />
-            <span className="font-body text-xs sm:text-sm text-[#1F1410] font-medium">{error}</span>
+            <span className="font-body text-xs sm:text-sm text-[#1F1410] font-medium">{errorGeneral}</span>
           </div>
         )}
 
@@ -158,7 +229,7 @@ export default function AuthScreen({ onLogin, onRegister, motivo }) {
 
         <p className="font-body text-xs text-[#8E7A74] m-0 font-medium text-center">
           {esRegistro
-            ? 'Al crear tu cuenta recibes tu pasaporte de sellos Club Marfil.'
+            ? 'Al crear tu cuenta recibirás un correo para verificar tu dirección.'
             : 'Para reservar una mesa no necesitas cuenta: puedes hacerlo como invitado.'}
         </p>
       </form>

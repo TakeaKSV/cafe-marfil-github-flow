@@ -37,6 +37,28 @@ export const zEntero = (min = 0, max = 100000) => zNumero.pipe(z.number().int().
 export const zPrecio = zNumero.pipe(z.number().min(0).max(100000));
 export const zListaTexto = z.array(zTexto(300)).max(30);
 export const zEmail = z.string().trim().toLowerCase().max(190).pipe(z.email());
+export const zTelefonoMX = z
+  .string()
+  .trim()
+  .max(30)
+  .refine((valor) => {
+    const digitos = valor.replace(/\D/g, '');
+    return digitos.length === 10 || (digitos.length === 12 && digitos.startsWith('52'));
+  }, 'Ingresa un teléfono válido de 10 dígitos.');
+export const zNombrePersona = z
+  .string()
+  .trim()
+  .min(2, 'El nombre debe tener al menos 2 caracteres.')
+  .max(120, 'El nombre no puede superar 120 caracteres.')
+  .regex(/^[A-Za-zÁÉÍÓÚáéíóúÑñÜü'’.\-& ]+$/, 'El nombre contiene caracteres no permitidos.');
+export const zRutaImagen = z
+  .string()
+  .trim()
+  .max(300)
+  .refine(
+    (valor) => /^(?:\/(?:images|uploads)\/[^\s<>"]+|https?:\/\/[^\s<>"]+)$/i.test(valor),
+    'Usa una ruta local (/images/... o /uploads/...) o una URL http(s):// válida.'
+  );
 export const zPasswordLogin = z
   .string()
   .min(1)

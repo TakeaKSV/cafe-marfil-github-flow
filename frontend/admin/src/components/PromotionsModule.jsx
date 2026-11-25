@@ -15,6 +15,7 @@ import {
   Check
 } from 'lucide-react';
 import { playSound } from '../utils/audioFeedback';
+import { reglas } from '../utils/validacion';
 
 export const PromotionsModule = ({ 
   promociones, 
@@ -45,6 +46,7 @@ export const PromotionsModule = ({
     vigencia: 'Válido esta semana',
     limiteDiario: 40
   });
+  const [promoErrors, setPromoErrors] = useState({});
 
   const handleToggleEstado = (promo) => {
     const nuevoEstado = promo.estado === 'activo' ? 'pausado' : 'activo';
@@ -61,18 +63,29 @@ export const PromotionsModule = ({
 
   const handleCreatePromo = (e) => {
     e.preventDefault();
-    if (!newPromo.codigo.trim() || !newPromo.titulo.trim()) return;
+    const errs = {
+      codigo: reglas.codigoCupon(newPromo.codigo),
+      titulo: reglas.texto(newPromo.titulo, { min: 3, max: 140, etiqueta: 'El título' }),
+      descuentoBadge: reglas.texto(newPromo.descuentoBadge, { min: 2, max: 40, etiqueta: 'El badge' }),
+      limiteDiario: reglas.entero(newPromo.limiteDiario, { min: 1, max: 5000, etiqueta: 'El límite diario' }),
+      beneficio: reglas.texto(newPromo.beneficio, { min: 5, max: 300, etiqueta: 'La descripción del beneficio' })
+    };
+    setPromoErrors(errs);
+    if (Object.values(errs).some(Boolean)) {
+      if (soundEnabled) playSound('alert');
+      return;
+    }
 
     const creada = {
       id: `promo-${Date.now()}`,
       codigo: newPromo.codigo.toUpperCase().trim(),
-      titulo: newPromo.titulo,
+      titulo: newPromo.titulo.trim(),
       categoria: newPromo.categoria,
-      descuentoBadge: newPromo.descuentoBadge.toUpperCase(),
-      beneficio: newPromo.beneficio,
+      descuentoBadge: newPromo.descuentoBadge.toUpperCase().trim(),
+      beneficio: newPromo.beneficio.trim(),
       vigencia: newPromo.vigencia,
       canjesHoy: 0,
-      limiteDiario: Number(newPromo.limiteDiario) || 50,
+      limiteDiario: Number(newPromo.limiteDiario),
       estado: 'activo',
       sucursales: ['porras-matriz', 'calvario']
     };
@@ -80,6 +93,7 @@ export const PromotionsModule = ({
     onAddPromocion(creada);
     if (soundEnabled) playSound('success');
     setShowNewModal(false);
+    setPromoErrors({});
     setNewPromo({
       codigo: '',
       titulo: '',
@@ -242,19 +256,25 @@ export const PromotionsModule = ({
               </button>
             </div>
 
-            <form onSubmit={handleCreatePromo} className="space-y-4 font-body">
+            <form onSubmit={handleCreatePromo} noValidate className="space-y-4 font-body">
               <div>
                 <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1.5">
                   Código de Activación (POS) *
                 </label>
                 <input
                   type="text"
-                  required
                   placeholder="Ej. MF-PROMO-WAFFLE"
                   value={newPromo.codigo}
-                  onChange={(e) => setNewPromo({ ...newPromo, codigo: e.target.value })}
-                  className="w-full px-4 py-2.5 text-xs font-mono uppercase border border-[#1F1410]/15 rounded-xl focus:border-[#E12927] focus:ring-1 focus:ring-[#E12927] focus:outline-hidden transition-all"
+                  onChange={(e) => {
+                    setNewPromo({ ...newPromo, codigo: e.target.value });
+                    setPromoErrors((p) => ({ ...p, codigo: null }));
+                  }}
+                  aria-invalid={Boolean(promoErrors.codigo)}
+                  className={`w-full px-4 py-2.5 text-xs font-mono uppercase border rounded-xl focus:ring-1 focus:outline-hidden transition-all ${
+                    promoErrors.codigo ? 'border-[#E12927] focus:border-[#E12927] focus:ring-[#E12927]' : 'border-[#1F1410]/15 focus:border-[#E12927] focus:ring-[#E12927]'
+                  }`}
                 />
+                {promoErrors.codigo && <p role="alert" className="text-[11px] font-semibold text-[#E12927] mt-1">{promoErrors.codigo}</p>}
               </div>
 
               <div>
@@ -263,52 +283,81 @@ export const PromotionsModule = ({
                 </label>
                 <input
                   type="text"
-                  required
                   placeholder="Ej. Miércoles de Waffles al 50%"
                   value={newPromo.titulo}
-                  onChange={(e) => setNewPromo({ ...newPromo, titulo: e.target.value })}
-                  className="w-full px-4 py-2.5 text-xs border border-[#1F1410]/15 rounded-xl focus:border-[#E12927] focus:ring-1 focus:ring-[#E12927] focus:outline-hidden transition-all"
+                  onChange={(e) => {
+                    setNewPromo({ ...newPromo, titulo: e.target.value });
+                    setPromoErrors((p) => ({ ...p, titulo: null }));
+                  }}
+                  aria-invalid={Boolean(promoErrors.titulo)}
+                  className={`w-full px-4 py-2.5 text-xs border rounded-xl focus:ring-1 focus:outline-hidden transition-all ${
+                    promoErrors.titulo ? 'border-[#E12927] focus:border-[#E12927] focus:ring-[#E12927]' : 'border-[#1F1410]/15 focus:border-[#E12927] focus:ring-[#E12927]'
+                  }`}
                 />
+                {promoErrors.titulo && <p role="alert" className="text-[11px] font-semibold text-[#E12927] mt-1">{promoErrors.titulo}</p>}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1.5">
-                    Badge de Descuento
+                    Badge de Descuento *
                   </label>
                   <input
                     type="text"
                     placeholder="Ej. 2x1, 50% OFF"
                     value={newPromo.descuentoBadge}
-                    onChange={(e) => setNewPromo({ ...newPromo, descuentoBadge: e.target.value })}
-                    className="w-full px-4 py-2.5 text-xs font-mono uppercase border border-[#1F1410]/15 rounded-xl focus:border-[#E12927] focus:ring-1 focus:ring-[#E12927] focus:outline-hidden transition-all"
+                    onChange={(e) => {
+                      setNewPromo({ ...newPromo, descuentoBadge: e.target.value });
+                      setPromoErrors((p) => ({ ...p, descuentoBadge: null }));
+                    }}
+                    aria-invalid={Boolean(promoErrors.descuentoBadge)}
+                    className={`w-full px-4 py-2.5 text-xs font-mono uppercase border rounded-xl focus:ring-1 focus:outline-hidden transition-all ${
+                      promoErrors.descuentoBadge ? 'border-[#E12927] focus:border-[#E12927] focus:ring-[#E12927]' : 'border-[#1F1410]/15 focus:border-[#E12927] focus:ring-[#E12927]'
+                    }`}
                   />
+                  {promoErrors.descuentoBadge && <p role="alert" className="text-[11px] font-semibold text-[#E12927] mt-1">{promoErrors.descuentoBadge}</p>}
                 </div>
 
                 <div>
                   <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1.5">
-                    Límite Canjes / Día
+                    Límite Canjes / Día *
                   </label>
                   <input
                     type="number"
+                    min="1"
+                    max="5000"
                     value={newPromo.limiteDiario}
-                    onChange={(e) => setNewPromo({ ...newPromo, limiteDiario: e.target.value })}
-                    className="w-full px-4 py-2.5 text-xs font-mono border border-[#1F1410]/15 rounded-xl focus:border-[#E12927] focus:ring-1 focus:ring-[#E12927] focus:outline-hidden transition-all"
+                    onChange={(e) => {
+                      setNewPromo({ ...newPromo, limiteDiario: e.target.value });
+                      setPromoErrors((p) => ({ ...p, limiteDiario: null }));
+                    }}
+                    aria-invalid={Boolean(promoErrors.limiteDiario)}
+                    className={`w-full px-4 py-2.5 text-xs font-mono border rounded-xl focus:ring-1 focus:outline-hidden transition-all ${
+                      promoErrors.limiteDiario ? 'border-[#E12927] focus:border-[#E12927] focus:ring-[#E12927]' : 'border-[#1F1410]/15 focus:border-[#E12927] focus:ring-[#E12927]'
+                    }`}
                   />
+                  {promoErrors.limiteDiario && <p role="alert" className="text-[11px] font-semibold text-[#E12927] mt-1">{promoErrors.limiteDiario}</p>}
                 </div>
               </div>
 
               <div>
                 <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1.5">
-                  Beneficio / Descripción para el Cliente
+                  Beneficio / Descripción para el Cliente *
                 </label>
                 <textarea
                   rows="2"
                   placeholder="Detalle de términos, consumo mínimo o productos participantes..."
                   value={newPromo.beneficio}
-                  onChange={(e) => setNewPromo({ ...newPromo, beneficio: e.target.value })}
-                  className="w-full px-4 py-2.5 text-xs border border-[#1F1410]/15 rounded-xl focus:border-[#E12927] focus:ring-1 focus:ring-[#E12927] focus:outline-hidden transition-all"
+                  onChange={(e) => {
+                    setNewPromo({ ...newPromo, beneficio: e.target.value });
+                    setPromoErrors((p) => ({ ...p, beneficio: null }));
+                  }}
+                  aria-invalid={Boolean(promoErrors.beneficio)}
+                  className={`w-full px-4 py-2.5 text-xs border rounded-xl focus:ring-1 focus:outline-hidden transition-all ${
+                    promoErrors.beneficio ? 'border-[#E12927] focus:border-[#E12927] focus:ring-[#E12927]' : 'border-[#1F1410]/15 focus:border-[#E12927] focus:ring-[#E12927]'
+                  }`}
                 />
+                {promoErrors.beneficio && <p role="alert" className="text-[11px] font-semibold text-[#E12927] mt-1">{promoErrors.beneficio}</p>}
               </div>
 
               <div className="pt-4 border-t border-[#1F1410]/8 flex justify-end gap-3">
