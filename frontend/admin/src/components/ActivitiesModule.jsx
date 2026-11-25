@@ -201,7 +201,7 @@ export const ActivitiesModule = ({
   if (editorAbierto) {
     return (
       <div className="space-y-5 animate-menu-in pb-10">
-        <div className="bg-white p-5 rounded-2xl border border-[#1F1410]/10 shadow-xs flex flex-wrap items-center justify-between gap-4">
+        <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-[#1F1410]/10 shadow-md flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -447,7 +447,7 @@ export const ActivitiesModule = ({
           </form>
 
           {/* Vista Previa PWA en Vivo */}
-          <div className="xl:col-span-5 sticky top-4 space-y-3">
+          <div className="xl:col-span-5 sticky top-28 space-y-3">
             <div className="flex items-center gap-2 text-xs font-mono font-bold text-[#1F1410]/70 uppercase tracking-wider">
               <Sparkles className="w-4 h-4 text-[#E12927]" />
               Vista previa en la App de Clientes

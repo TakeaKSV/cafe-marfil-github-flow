@@ -206,7 +206,7 @@ export const PromotionsModule = ({
   if (editorAbierto) {
     return (
       <div className="space-y-5 animate-menu-in pb-10">
-        <div className="bg-white p-5 rounded-2xl border border-[#1F1410]/10 shadow-xs flex flex-wrap items-center justify-between gap-4">
+        <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-[#1F1410]/10 shadow-md flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <button
               type="button"
