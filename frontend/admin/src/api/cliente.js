@@ -19,13 +19,13 @@ export function resolverUrlImagen(url) {
   return url;
 }
 
-export async function subirImagenMenu(archivo) {
+export async function subirImagen(archivo, carpeta = 'menu') {
   const formData = new FormData();
   formData.append('imagen', archivo);
   const token = sesion.token;
   let respuesta;
   try {
-    respuesta = await fetch(`${URL_BASE}/uploads/imagen`, {
+    respuesta = await fetch(`${URL_BASE}/uploads/imagen?carpeta=${encodeURIComponent(carpeta)}`, {
       method: 'POST',
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: formData
@@ -37,6 +37,8 @@ export async function subirImagenMenu(archivo) {
   if (respuesta.ok) return datos;
   throw new ErrorApi(datos.error || `Error ${respuesta.status} al subir la imagen.`, respuesta.status);
 }
+
+export const subirImagenMenu = (archivo) => subirImagen(archivo, 'menu');
 
 export class ErrorApi extends Error {
   constructor(mensaje, status = 0, detalles = []) {

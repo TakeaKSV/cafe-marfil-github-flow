@@ -37,6 +37,7 @@ function haceCuanto(iso) {
 export const aActividad = (a) => ({
   ...a,
   id: a.slug,
+  imagen: resolverUrlImagen(a.imagen),
   fecha: a.fechaTexto,
   fechaISO: a.fecha,
   hora: a.horarioTexto,
@@ -55,11 +56,14 @@ export const aPromocion = (p) => ({
   vigencia: p.vigencia,
   sucursalesAplicables: p.sucursalesNombres.map(sinPrefijo),
   sucursalesValidas: p.sucursalesNombres.map(sinPrefijo),
-  imagen: p.imagen,
+  imagen: p.imagen ? resolverUrlImagen(p.imagen) : '/images/dubai_frappes.jpg',
   resumen: p.descripcion ?? p.beneficio,
   descripcion: p.descripcion ?? p.beneficio,
   beneficioDetalle: p.beneficio,
   codigoCupon: p.codigo,
+  canjesHoy: p.canjesHoy ?? 0,
+  limiteDiario: p.limiteDiario ?? 50,
+  agotadaHoy: (p.canjesHoy ?? 0) >= (p.limiteDiario ?? 50),
   condiciones: p.condiciones,
   terminos: p.condiciones,
   comoUsar: p.comoUsar ?? 'Muestra tu código al ordenar en mostrador.'
