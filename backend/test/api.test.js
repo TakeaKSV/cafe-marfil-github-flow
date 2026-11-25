@@ -1295,6 +1295,47 @@ test('correos: verificación de registro, bloqueo de canje sin verificar, recupe
     assert.equal(resCancelada.status, 200);
     assert.equal(bandeja.length, 5);
     assert.match(bandeja[4].subject, /cancelada/i);
+
+    // 7. Invitación de empleado por correo (vigencia 12 h) y alta completada por el empleado.
+    assert.equal(
+      (await api('POST', '/personal/invitar', { token: sesion.host, body: { email: 'nuevo.host@example.com' } })).status,
+      403
+    );
+    const inv = await api('POST', '/personal/invitar', {
+      token: sesion.admin,
+      body: { email: 'nuevo.host@example.com', rol: 'host', puesto: 'Host Vespertino', sucursalId: 'calvario' }
+    });
+    assert.equal(inv.status, 201);
+    assert.equal(inv.datos.correoEnviado, true);
+    assert.equal(bandeja.length, 6);
+    const tokenInv = /\?invitacion=([a-f0-9]{64})/.exec(bandeja[5].text)?.[1];
+    assert.ok(tokenInv, 'el correo debe contener el enlace de invitación');
+
+    const consultaInv = await api('GET', `/auth/invitacion/${tokenInv}`);
+    assert.equal(consultaInv.status, 200);
+    assert.equal(consultaInv.datos.email, 'nuevo.host@example.com');
+
+    const completado = await api('POST', '/auth/invitacion/completar', {
+      body: {
+        token: tokenInv,
+        nombre: 'Diego Barista',
+        password: 'claveEmpleado2026',
+        turnoInicio: '14:00',
+        turnoFin: '22:00'
+      }
+    });
+    assert.equal(completado.status, 201);
+    assert.ok(completado.datos.token);
+    assert.equal(completado.datos.usuario.nombre, 'Diego Barista');
+
+    // Reutilizar el enlace falla con 400.
+    assert.equal((await api('GET', `/auth/invitacion/${tokenInv}`)).status, 400);
+
+    // El nuevo empleado puede iniciar sesión con su contraseña.
+    const loginEmp = await api('POST', '/auth/staff/login', {
+      body: { email: 'nuevo.host@example.com', password: 'claveEmpleado2026' }
+    });
+    assert.equal(loginEmp.status, 200);
   } finally {
     restaurarTransporteCorreo();
   }

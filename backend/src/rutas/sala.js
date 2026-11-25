@@ -31,7 +31,14 @@ import {
   obtenerMesa
 } from '../servicios/mesas.js';
 import { metricasDelDia } from '../servicios/metricas.js';
-import { actualizarPersona, crearPersona, listarPersonal } from '../servicios/personal.js';
+import {
+  actualizarPersona,
+  cancelarInvitacion,
+  crearPersona,
+  invitarPersona,
+  listarInvitacionesPendientes,
+  listarPersonal
+} from '../servicios/personal.js';
 import {
   leer,
   zEmail,
@@ -235,7 +242,28 @@ const filtrosPersonal = z.object({
   estado: camposPersona.estado.optional()
 });
 
+const esquemaInvitarPersona = z.object({
+  email: zEmail,
+  rol: camposPersona.rol.default('host'),
+  puesto: zTexto(80).default('Colaborador'),
+  sucursalId: zSucursalId.nullable().optional()
+});
+
 router.get('/personal', async (req, res) => res.json(await listarPersonal(leer(filtrosPersonal, req.query))));
+
+router.get('/personal/invitaciones', soloAdmin, async (_req, res) => {
+  res.json(await listarInvitacionesPendientes());
+});
+
+router.post('/personal/invitar', soloAdmin, async (req, res) => {
+  const resultado = await invitarPersona(leer(esquemaInvitarPersona, req.body), req.usuario.id);
+  res.status(201).json(resultado);
+});
+
+router.delete('/personal/invitaciones/:id', soloAdmin, async (req, res) => {
+  await cancelarInvitacion(leer(zId, req.params.id));
+  res.status(204).end();
+});
 
 router.post('/personal', soloAdmin, async (req, res) => {
   res.status(201).json(await crearPersona(leer(esquemaCrearPersona, req.body)));

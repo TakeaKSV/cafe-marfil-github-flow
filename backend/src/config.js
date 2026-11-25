@@ -38,6 +38,7 @@ const esquema = z.object({
   SMTP_PASS: z.string().default(''),
   MAIL_FROM: z.string().default('Café Marfil <no-reply@cafemarfil.mx>'),
   APP_URL: z.string().default('http://localhost:5173'),
+  ADMIN_URL: z.string().default('http://localhost:5174'),
   MAIL_ENABLED: z.string().optional(),
   MAIL_CHECK_MX: z.string().optional(),
   CLOUDINARY_CLOUD_NAME: z.string().default(''),
@@ -123,7 +124,8 @@ export function cargarConfig(env) {
       usuario: datos.SMTP_USER,
       password: datos.SMTP_PASS,
       remitente: datos.MAIL_FROM,
-      appUrl: datos.APP_URL.replace(/\/+$/, '')
+      appUrl: datos.APP_URL.replace(/\/+$/, ''),
+      adminUrl: datos.ADMIN_URL.replace(/\/+$/, '')
     },
     cloudinary: {
       cloudName: datos.CLOUDINARY_CLOUD_NAME.trim(),

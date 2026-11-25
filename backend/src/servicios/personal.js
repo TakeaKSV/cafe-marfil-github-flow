@@ -1,12 +1,32 @@
+import crypto from 'node:crypto';
+import { config } from '../config.js';
 import { enTransaccion, bloquearFila } from '../db/conexion.js';
 import { cifrarPassword, verificarPassword } from '../utils/password.js';
 import * as repo from '../repositorios/personal.js';
+import * as repoInv from '../repositorios/invitacionesPersonal.js';
 import { conflicto, noAutenticado, noEncontrado, solicitudInvalida } from '../utils/errores.js';
 import { ahoraISO } from '../utils/fechas.js';
 import { aBit } from '../repositorios/base.js';
+import { enviarInvitacionPersonal, verificarDominioCorreo } from './correo.js';
 import { exigirSucursal } from './sucursales.js';
 
 const ROLES_CON_ACCESO = ['admin', 'gerente', 'host'];
+const VIGENCIA_INVITACION_MS = 12 * 60 * 60 * 1000; // 12 horas
+const hashToken = (tokenPlano) => crypto.createHash('sha256').update(String(tokenPlano)).digest('hex');
+
+function aInvitacion(fila) {
+  return {
+    id: fila.id,
+    email: fila.email,
+    rol: fila.rol,
+    puesto: fila.puesto,
+    sucursalId: fila.sucursal_id,
+    sucursalNombre: fila.sucursal_nombre,
+    invitadoPor: fila.invitado_por_nombre,
+    expiraEn: fila.expira_en,
+    creadoEn: fila.creado_en
+  };
+}
 
 function aPersona(fila) {
   return {
@@ -98,4 +118,111 @@ export async function autenticarStaff(email, password) {
   // Mismo mensaje exista o no el correo: no revelamos qué cuentas hay.
   if (!valido) throw noAutenticado('Correo o contraseña incorrectos.');
   return { usuario: aPersona(fila), version: fila.session_version };
+}
+
+// --------------------------------------------------------------------------
+// Invitaciones por correo (vigencia 12 horas)
+// --------------------------------------------------------------------------
+
+export async function listarInvitacionesPendientes() {
+  return (await repoInv.listarPendientes(ahoraISO())).map(aInvitacion);
+}
+
+export async function invitarPersona({ email, rol = 'host', puesto = 'Colaborador', sucursalId = null }, adminId = null) {
+  const correo = String(email || '').trim().toLowerCase();
+  await verificarDominioCorreo(correo);
+  await exigirEmailLibre(correo);
+  if (sucursalId) await exigirSucursal(sucursalId);
+
+  const tokenPlano = crypto.randomBytes(32).toString('hex');
+  const ahora = ahoraISO();
+  const expiraEn = new Date(Date.now() + VIGENCIA_INVITACION_MS).toISOString();
+
+  await repoInv.invalidarPorEmail(correo, ahora);
+  const { id } = await repoInv.crear({
+    email: correo,
+    rol,
+    puesto: puesto.trim() || 'Colaborador',
+    sucursalId: sucursalId ?? null,
+    tokenHash: hashToken(tokenPlano),
+    invitadoPor: adminId,
+    expiraEn,
+    creadoEn: ahora
+  });
+
+  const fila = await repoInv.porId(id);
+  const enlace = `${config.correo.adminUrl}/?invitacion=${tokenPlano}`;
+  const resultadoCorreo = await enviarInvitacionPersonal({
+    email: fila.email,
+    rol: fila.rol,
+    puesto: fila.puesto,
+    sucursalNombre: fila.sucursal_nombre,
+    invitadoPorNombre: fila.invitado_por_nombre,
+    enlace
+  });
+
+  return {
+    invitacion: aInvitacion(fila),
+    correoEnviado: resultadoCorreo.enviado
+  };
+}
+
+export async function cancelarInvitacion(id) {
+  const eliminadas = await repoInv.eliminar(id);
+  if (!eliminadas) throw noEncontrado('No existe esa invitación.');
+}
+
+async function exigirInvitacionValida(tokenPlano) {
+  if (!tokenPlano || typeof tokenPlano !== 'string' || tokenPlano.length < 32) {
+    throw solicitudInvalida('El enlace de invitación no es válido.');
+  }
+  const fila = await repoInv.porHash(hashToken(tokenPlano));
+  if (!fila) throw solicitudInvalida('El enlace de invitación no es válido o fue cancelado.');
+  if (fila.usado_en) throw solicitudInvalida('Esta invitación ya fue utilizada.');
+  if (new Date(fila.expira_en).getTime() < Date.now()) {
+    throw solicitudInvalida('Esta invitación expiró (vigencia de 12 horas). Pide al administrador una nueva.');
+  }
+  return fila;
+}
+
+export async function consultarInvitacion(tokenPlano) {
+  const fila = await exigirInvitacionValida(tokenPlano);
+  return aInvitacion(fila);
+}
+
+export async function completarInvitacion({ token, nombre, password, puesto, turnoInicio = null, turnoFin = null }) {
+  const invitacion = await exigirInvitacionValida(token);
+  const passwordHash = await cifrarPassword(password);
+
+  const persona = await enTransaccion(async () => {
+    await bloquearFila('invitaciones_personal', invitacion.id);
+    const actual = await repoInv.porId(invitacion.id);
+    if (!actual || actual.usado_en || new Date(actual.expira_en).getTime() < Date.now()) {
+      throw solicitudInvalida('Esta invitación ya fue utilizada o expiró.');
+    }
+    await exigirEmailLibre(actual.email);
+
+    const ahora = ahoraISO();
+    const { id } = await repo.insertarPersona({
+      nombre: nombre.trim(),
+      email: actual.email,
+      passwordHash,
+      rol: actual.rol,
+      puesto: (puesto && puesto.trim()) || actual.puesto,
+      sucursalId: actual.sucursal_id ?? null,
+      turnoInicio: turnoInicio || null,
+      turnoFin: turnoFin || null,
+      estado: 'activo',
+      esEncargado: 0,
+      creadoEn: ahora
+    });
+
+    await repoInv.marcarUsada(actual.id, ahora);
+    return obtenerPersona(id);
+  });
+
+  return {
+    usuario: persona,
+    tieneAcceso: ROLES_CON_ACCESO.includes(persona.rol)
+  };
 }

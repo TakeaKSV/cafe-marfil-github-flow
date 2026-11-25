@@ -14,9 +14,14 @@ import {
   verificarCodigoCorreo,
   verificarCorreoPorToken
 } from '../servicios/clientes.js';
-import { autenticarStaff, obtenerPersona } from '../servicios/personal.js';
+import {
+  autenticarStaff,
+  completarInvitacion,
+  consultarInvitacion,
+  obtenerPersona
+} from '../servicios/personal.js';
 import { noAutenticado, solicitudInvalida } from '../utils/errores.js';
-import { leer, zEmail, zPassword, zPasswordLogin, zTexto } from '../utils/validar.js';
+import { leer, zEmail, zHora, zPassword, zPasswordLogin, zTexto } from '../utils/validar.js';
 
 const router = Router();
 
@@ -48,11 +53,34 @@ const esquemaRestablecerPassword = z.object({
   password: zPassword
 });
 
+const esquemaCompletarInvitacion = z.object({
+  token: zTexto(128),
+  nombre: zTexto(120),
+  password: zPassword,
+  puesto: zTexto(80).optional(),
+  turnoInicio: zHora.nullable().optional(),
+  turnoFin: zHora.nullable().optional()
+});
+
 // Panel de administración
 router.post('/staff/login', async (req, res) => {
   const { email, password } = leer(esquemaLogin, req.body);
   const { usuario, version } = await autenticarStaff(email, password);
   res.json({ token: firmarToken({ id: usuario.id, tipo: 'staff', version }), usuario });
+});
+
+router.get('/invitacion/:token', async (req, res) => {
+  res.json(await consultarInvitacion(req.params.token));
+});
+
+router.post('/invitacion/completar', async (req, res) => {
+  const { usuario, tieneAcceso } = await completarInvitacion(leer(esquemaCompletarInvitacion, req.body));
+  res.status(201).json({
+    ok: true,
+    usuario,
+    tieneAcceso,
+    ...(tieneAcceso ? { token: firmarToken({ id: usuario.id, tipo: 'staff', version: 0 }) } : {})
+  });
 });
 
 // PWA de clientes: el registro NO entrega sesión hasta confirmar el código de 6 dígitos.

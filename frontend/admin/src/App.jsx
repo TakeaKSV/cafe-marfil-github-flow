@@ -12,6 +12,7 @@ import { LudotecaModule } from './components/LudotecaModule';
 import { StaffSettingsModule } from './components/StaffSettingsModule';
 import { WalkInModal } from './components/WalkInModal';
 import { LoginScreen } from './components/LoginScreen';
+import { StaffOnboardingScreen } from './components/StaffOnboardingScreen';
 import { AlertCard, AlertToastStack, useAlertas } from './components/ui/AlertSystem';
 import { MainLoader } from './components/ui/MainLoader';
 import { SkeletonDashboard } from './components/ui/Skeletons';
@@ -80,7 +81,12 @@ export function App() {
   const [promociones, setPromociones] = useState([]);
   const [clientesClub, setClientesClub] = useState([]);
   const [juegos, setJuegos] = useState([]);
+  const [invitacionToken, setInvitacionToken] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('invitacion') || '';
+  });
   const [staff, setStaff] = useState([]);
+  const [invitaciones, setInvitaciones] = useState([]);
   const [escaneos, setEscaneos] = useState([]);
   const [metricas, setMetricas] = useState(METRICAS_VACIAS);
 
@@ -136,7 +142,7 @@ export function App() {
     try {
       // La fecha del servidor solo delimita los indicadores y la operación de hoy.
       const nuevasMetricas = await api('/metricas/hoy', { query: { sucursalId } });
-      const [s, m, r, productos, catsMenu, acts, promos, clientes, j, personal, historial] = await Promise.all([
+      const [s, m, r, productos, catsMenu, acts, promos, clientes, j, personal, invs, historial] = await Promise.all([
         api('/sucursales'),
         api('/mesas'),
         cargarReservacionesPanel(api, { hoy: nuevasMetricas.fecha, fecha: fechaReservaciones, sucursalId }),
@@ -147,6 +153,7 @@ export function App() {
         api('/club/clientes'),
         api('/juegos'),
         api('/personal'),
+        api('/personal/invitaciones').catch(() => []),
         api('/escaner/historial', { query: { limite: 30 } })
       ]);
       if (carga !== cargaActual.current) return;
@@ -162,6 +169,7 @@ export function App() {
       setClientesClub(clientes.map(aClienteClub));
       setJuegos(j.map(aJuego));
       setStaff(personal.map(aPersona));
+      setInvitaciones(Array.isArray(invs) ? invs : []);
       setEscaneos(historial.map(aEscaneo));
       setDatosListos(true);
     } catch (err) {
@@ -497,7 +505,37 @@ export function App() {
     }
   };
 
+  const handleInvitarEmpleado = (datos) =>
+    ejecutar(() => post('/personal/invitar', datos), `Invitación enviada a ${datos.email} (vigencia 12 h).`);
+
+  const handleCancelarInvitacion = (id) =>
+    ejecutar(() => api(`/personal/invitaciones/${id}`, { metodo: 'DELETE' }), 'Invitación cancelada.');
+
   const avisoFlotante = <AlertToastStack alertas={alertas} onDismiss={cerrarAlerta} />;
+
+  if (invitacionToken) {
+    return (
+      <>
+        <StaffOnboardingScreen
+          token={invitacionToken}
+          onCompleted={(resp) => {
+            window.history.replaceState({}, '', window.location.pathname || '/');
+            setInvitacionToken('');
+            if (resp.token) {
+              sesion.guardar(resp.token);
+              setUsuario(resp.usuario);
+              mostrarExito(`¡Bienvenido al equipo, ${resp.usuario.nombre}!`, 'Registro completado');
+            }
+          }}
+          onGoLogin={() => {
+            window.history.replaceState({}, '', window.location.pathname || '/');
+            setInvitacionToken('');
+          }}
+        />
+        {avisoFlotante}
+      </>
+    );
+  }
 
   if (restaurandoSesion) {
     return <MainLoader texto="Recuperando tu sesión..." />;
@@ -703,6 +741,10 @@ export function App() {
                 <StaffSettingsModule
                   staff={staff}
                   sucursales={sucursales}
+                  usuario={usuario}
+                  invitaciones={invitaciones}
+                  onInvitarEmpleado={handleInvitarEmpleado}
+                  onCancelarInvitacion={handleCancelarInvitacion}
                   soundEnabled={soundEnabled}
                 />
               )}
