@@ -16,6 +16,7 @@ import {
   UserCheck
 } from 'lucide-react';
 import { sounds } from '../utils/audio';
+import { reglas, useFormulario } from '../utils/validacion';
 
 export default function ProfileScreen({
   perfil,
@@ -28,29 +29,52 @@ export default function ProfileScreen({
   reservacionesCount
 }) {
   const [isEditing, setIsEditing] = useState(false);
-  const [nombre, setNombre] = useState(perfil.nombre);
-  const [telefono, setTelefono] = useState(perfil.telefono);
-  const [correo, setCorreo] = useState(perfil.correo);
-  const [leche, setLeche] = useState(perfil.preferencias?.lechePreferida || 'Leche de avena');
-  const [bebida, setBebida] = useState(perfil.preferencias?.bebidaFavorita || 'Flat White 12oz');
-  const [experiencia, setExperiencia] = useState(perfil.preferencias?.experienciaFavorita || 'Noche de Juegos');
+  const [guardando, setGuardando] = useState(false);
+  const [errorGeneral, setErrorGeneral] = useState('');
+  const [leche] = useState(perfil.preferencias?.lechePreferida || 'Leche de avena');
+  const [bebida] = useState(perfil.preferencias?.bebidaFavorita || 'Flat White 12oz');
+  const [experiencia] = useState(perfil.preferencias?.experienciaFavorita || 'Noche de Juegos');
 
-  const handleSave = (e) => {
+  const form = useFormulario(
+    {
+      nombre: perfil.nombre || '',
+      telefono: perfil.telefono || '',
+      correo: perfil.correo || ''
+    },
+    {
+      nombre: (v) => reglas.nombre(v, { min: 2, max: 120, etiqueta: 'Tu nombre' }),
+      telefono: (v) => reglas.telefonoMX(v, { opcional: true }),
+      correo: (v) => reglas.email(v)
+    }
+  );
+
+  const handleSave = async (e) => {
     e.preventDefault();
     sounds.playClick();
-    onUpdatePerfil({
-      ...perfil,
-      nombre,
-      telefono,
-      correo,
-      preferencias: {
-        ...perfil.preferencias,
-        lechePreferida: leche,
-        bebidaFavorita: bebida,
-        experienciaFavorita: experiencia
-      }
-    });
-    setIsEditing(false);
+    setErrorGeneral('');
+    const { valido } = form.validarTodo();
+    if (!valido) return;
+    setGuardando(true);
+    try {
+      await onUpdatePerfil({
+        ...perfil,
+        nombre: form.valores.nombre.trim(),
+        telefono: form.valores.telefono.trim(),
+        correo: form.valores.correo.trim(),
+        preferencias: {
+          ...perfil.preferencias,
+          lechePreferida: leche,
+          bebidaFavorita: bebida,
+          experienciaFavorita: experiencia
+        }
+      });
+      setIsEditing(false);
+    } catch (err) {
+      const mapeado = form.aplicarErroresApi(err, { email: 'correo' });
+      if (!mapeado) setErrorGeneral(err?.message || 'No se pudieron guardar los cambios.');
+    } finally {
+      setGuardando(false);
+    }
   };
 
   return (
@@ -106,54 +130,95 @@ export default function ProfileScreen({
 
             {/* Formulario de Edición o Vista */}
             {isEditing ? (
-              <form onSubmit={handleSave} className="flex flex-col gap-4 pt-2 border-t-2 border-stone-200">
-                <div className="flex flex-col gap-1.5">
-                  <label className="font-mono text-[11px] font-bold text-[#8E7A74] tracking-wider uppercase">NOMBRE COMPLETO</label>
+              <form onSubmit={handleSave} noValidate className="flex flex-col gap-4 pt-2 border-t-2 border-stone-200">
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="perfil-nombre" className="font-mono text-[11px] font-bold text-[#8E7A74] tracking-wider uppercase">
+                    NOMBRE COMPLETO *
+                  </label>
                   <input
+                    id="perfil-nombre"
                     type="text"
-                    value={nombre}
-                    onChange={(e) => setNombre(e.target.value)}
-                    className="px-4 py-3 rounded-md border-2 border-stone-300 bg-white text-sm font-body text-[#1F1410] focus:outline-none focus:border-[#E12927]"
-                    required
+                    value={form.valores.nombre}
+                    onChange={(e) => form.setCampo('nombre', e.target.value)}
+                    className={`px-4 py-3 rounded-md border-2 bg-white text-sm font-body text-[#1F1410] focus:outline-none ${
+                      form.errores.nombre ? 'border-[#E12927] bg-[#FCEAE9]/20' : 'border-stone-300 focus:border-[#E12927]'
+                    }`}
+                    {...form.propsCampo('nombre')}
                   />
+                  {form.errores.nombre && (
+                    <p id="error-nombre" role="alert" className="text-xs font-semibold text-[#E12927]">
+                      {form.errores.nombre}
+                    </p>
+                  )}
                 </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <label className="font-mono text-[11px] font-bold text-[#8E7A74] tracking-wider uppercase">TELÉFONO DE CONTACTO</label>
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="perfil-telefono" className="font-mono text-[11px] font-bold text-[#8E7A74] tracking-wider uppercase">
+                    TELÉFONO DE CONTACTO
+                  </label>
                   <input
+                    id="perfil-telefono"
                     type="tel"
-                    value={telefono}
-                    onChange={(e) => setTelefono(e.target.value)}
-                    className="px-4 py-3 rounded-md border-2 border-stone-300 bg-[#FAF7F5] text-sm font-body text-[#1F1410] focus:outline-none focus:border-[#E12927]"
-                    required
+                    value={form.valores.telefono}
+                    onChange={(e) => form.setCampo('telefono', e.target.value)}
+                    placeholder="(618) 123-4567"
+                    className={`px-4 py-3 rounded-md border-2 bg-[#FAF7F5] text-sm font-body text-[#1F1410] focus:outline-none ${
+                      form.errores.telefono ? 'border-[#E12927] bg-[#FCEAE9]/20' : 'border-stone-300 focus:border-[#E12927]'
+                    }`}
+                    {...form.propsCampo('telefono')}
                   />
+                  {form.errores.telefono && (
+                    <p id="error-telefono" role="alert" className="text-xs font-semibold text-[#E12927]">
+                      {form.errores.telefono}
+                    </p>
+                  )}
                 </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <label className="font-mono text-[11px] font-bold text-[#8E7A74] tracking-wider uppercase">CORREO ELECTRÓNICO</label>
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="perfil-correo" className="font-mono text-[11px] font-bold text-[#8E7A74] tracking-wider uppercase">
+                    CORREO ELECTRÓNICO *
+                  </label>
                   <input
+                    id="perfil-correo"
                     type="email"
-                    value={correo}
-                    onChange={(e) => setCorreo(e.target.value)}
-                    className="px-4 py-3 rounded-md border-2 border-stone-300 bg-[#FAF7F5] text-sm font-body text-[#1F1410] focus:outline-none focus:border-[#E12927]"
-                    required
+                    value={form.valores.correo}
+                    onChange={(e) => form.setCampo('correo', e.target.value)}
+                    className={`px-4 py-3 rounded-md border-2 bg-[#FAF7F5] text-sm font-body text-[#1F1410] focus:outline-none ${
+                      form.errores.correo ? 'border-[#E12927] bg-[#FCEAE9]/20' : 'border-stone-300 focus:border-[#E12927]'
+                    }`}
+                    {...form.propsCampo('correo')}
                   />
+                  {form.errores.correo && (
+                    <p id="error-correo" role="alert" className="text-xs font-semibold text-[#E12927]">
+                      {form.errores.correo}
+                    </p>
+                  )}
                 </div>
+
+                {errorGeneral && (
+                  <p role="alert" className="text-xs font-semibold text-[#E12927] bg-[#FCEAE9] px-3 py-2 rounded-md border border-[#E12927]/30">
+                    {errorGeneral}
+                  </p>
+                )}
 
                 <div className="flex justify-end gap-3 mt-2">
                   <button
                     type="button"
                     className="px-6 py-2.5 rounded-md font-mono text-xs font-bold uppercase tracking-wider border-2 border-[#1F1410] bg-white text-[#1F1410] hover:bg-[#1F1410] hover:text-white active:scale-95 transition-all cursor-pointer shadow-xs"
-                    onClick={() => setIsEditing(false)}
+                    onClick={() => {
+                      form.resetear({ nombre: perfil.nombre || '', telefono: perfil.telefono || '', correo: perfil.correo || '' });
+                      setIsEditing(false);
+                    }}
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
-                    className="inline-flex items-center gap-1.5 px-7 py-2.5 rounded-md font-mono text-xs font-bold uppercase tracking-wider bg-[#E12927] hover:bg-[#C81E1C] active:scale-95 text-white border-2 border-[#E12927] shadow-md shadow-[#E12927]/30 hover:shadow-lg transition-all duration-200 cursor-pointer"
+                    disabled={guardando}
+                    className="inline-flex items-center gap-1.5 px-7 py-2.5 rounded-md font-mono text-xs font-bold uppercase tracking-wider bg-[#E12927] hover:bg-[#C81E1C] active:scale-95 text-white border-2 border-[#E12927] shadow-md shadow-[#E12927]/30 hover:shadow-lg transition-all duration-200 cursor-pointer disabled:opacity-60"
                   >
                     <Check size={16} />
-                    <span>Guardar cambios</span>
+                    <span>{guardando ? 'Guardando...' : 'Guardar cambios'}</span>
                   </button>
                 </div>
               </form>

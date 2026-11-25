@@ -7,9 +7,10 @@ const CLAVE_TOKEN = 'marfil_cliente_token';
 const CLAVE_RESERVAS_INVITADO = 'marfil_reservas_invitado';
 
 export class ErrorApi extends Error {
-  constructor(mensaje, status = 0) {
+  constructor(mensaje, status = 0, detalles = []) {
     super(mensaje);
     this.status = status;
+    this.detalles = detalles;
   }
 }
 
@@ -79,7 +80,12 @@ export async function api(ruta, { metodo = 'GET', body } = {}) {
     sesion.cerrar();
     avisarSesionExpirada();
   }
-  // En errores de validación se muestra el mensaje del primer campo que falló.
-  const detalle = datos.detalles?.[0];
-  throw new ErrorApi(detalle?.mensaje || datos.error || `Error ${respuesta.status} del servidor.`, respuesta.status);
+  // En errores de validación se conserva la lista completa para mostrar cada campo.
+  const detalles = Array.isArray(datos.detalles) ? datos.detalles : [];
+  const detalle = detalles[0];
+  throw new ErrorApi(
+    detalle?.mensaje || datos.error || `Error ${respuesta.status} del servidor.`,
+    respuesta.status,
+    detalles
+  );
 }

@@ -6,9 +6,10 @@ const URL_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 const CLAVE_TOKEN = 'marfil_admin_token';
 
 export class ErrorApi extends Error {
-  constructor(mensaje, status = 0) {
+  constructor(mensaje, status = 0, detalles = []) {
     super(mensaje);
     this.status = status;
+    this.detalles = detalles;
   }
 }
 
@@ -65,8 +66,9 @@ export async function api(ruta, { metodo = 'GET', body, query } = {}) {
     sesion.cerrar();
     avisarSesionExpirada();
   }
-  // En errores de validación se muestra el primer campo que falló.
-  const detalle = datos.detalles?.[0];
+  // En errores de validación se conserva la lista completa para mostrar cada campo.
+  const detalles = Array.isArray(datos.detalles) ? datos.detalles : [];
+  const detalle = detalles[0];
   const mensaje = detalle ? `${datos.error} ${detalle.campo}: ${detalle.mensaje}` : datos.error;
-  throw new ErrorApi(mensaje || `Error ${respuesta.status} del servidor.`, respuesta.status);
+  throw new ErrorApi(mensaje || `Error ${respuesta.status} del servidor.`, respuesta.status, detalles);
 }

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { sounds } from '../utils/audio';
 import { fechaEnDias, fechasSugeridas as calcularFechasSugeridas } from '../api/adaptadores';
+import { reglas } from '../utils/validacion';
 
 export default function ReservationWizard({
   sucursales,
@@ -37,6 +38,11 @@ export default function ReservationWizard({
   const [notas, setNotas] = useState(initialData?.notas ?? initialData?.nota ?? '');
   const [enviando, setEnviando] = useState(false);
   const [validationError, setValidationError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
+
+  const limpiarErrorCampo = (campo) => {
+    setFieldErrors((prev) => (prev[campo] ? { ...prev, [campo]: null } : prev));
+  };
 
   // Preselección si viene de actividad o sucursal
   useEffect(() => {
@@ -96,8 +102,13 @@ export default function ReservationWizard({
   const handleNext = () => {
     sounds.playClick();
     setValidationError('');
+    setFieldErrors({});
 
     if (currentStep === 1) {
+      if (!reservaTipo) {
+        setValidationError('Selecciona el tipo de experiencia que deseas reservar.');
+        return;
+      }
       if (reservaTipo === 'actividad' && !selectedActividadId) {
         setValidationError('Por favor selecciona la actividad a la que deseas asistir.');
         return;
@@ -110,8 +121,18 @@ export default function ReservationWizard({
       }
       setCurrentStep(3);
     } else if (currentStep === 3) {
-      if (!selectedDate) {
-        setValidationError('Por favor selecciona una fecha.');
+      const errFecha = reglas.fechaNoPasada(selectedDate);
+      const maxPersonas =
+        reservaTipo === 'actividad' && actividadObj && typeof actividadObj.lugaresDisponibles === 'number'
+          ? Math.min(12, actividadObj.lugaresDisponibles)
+          : 12;
+      const errPersonas =
+        maxPersonas <= 0
+          ? 'Esta actividad ya no tiene lugares disponibles.'
+          : reglas.entero(personas, { min: 1, max: maxPersonas, etiqueta: 'El número de personas' });
+      if (errFecha || errPersonas) {
+        setFieldErrors({ fecha: errFecha, personas: errPersonas });
+        setValidationError(errFecha || errPersonas);
         return;
       }
       setCurrentStep(4);
@@ -122,13 +143,22 @@ export default function ReservationWizard({
       }
       setCurrentStep(5);
     } else if (currentStep === 5) {
-      if (!nombre.trim() || !telefono.trim()) {
-        setValidationError('Por favor completa tu nombre y teléfono de contacto.');
+      const errs = {
+        nombre: reglas.nombre(nombre, { min: 2, max: 120, etiqueta: 'Tu nombre' }),
+        telefono: reglas.telefonoMX(telefono),
+        correo: reglas.email(correo, { opcional: true }),
+        notas: reglas.texto(notas, { max: 300, opcional: true, etiqueta: 'Las notas' })
+      };
+      const primero = Object.entries(errs).find(([, v]) => Boolean(v));
+      if (primero) {
+        setFieldErrors(errs);
+        setValidationError(primero[1]);
+        const el = document.querySelector(`[data-campo="wizard-${primero[0]}"]`);
+        if (el) el.focus();
         return;
       }
       setCurrentStep(6);
     } else if (currentStep === 6) {
-      // El folio, el QR y el estado los asigna la API; aquí solo va lo que eligió el cliente.
       const nuevaReserva = {
         tipoId: reservaTipo,
         actividadId: reservaTipo === 'actividad' ? selectedActividadId : null,
@@ -141,15 +171,14 @@ export default function ReservationWizard({
         fecha: selectedDate,
         fechaISO: selectedDate,
         hora: selectedTime,
-        personas: personas,
-        nombreCliente: nombre,
-        telefonoCliente: telefono,
-        correoCliente: correo,
-        notas: notas
+        personas: Number(personas),
+        nombreCliente: nombre.trim(),
+        telefonoCliente: telefono.trim(),
+        correoCliente: correo.trim(),
+        notas: notas.trim()
       };
       if (enviando) return;
       setEnviando(true);
-      // Si la API la rechaza (sin cupo, fecha pasada...) devuelve el motivo para mostrarlo aquí.
       Promise.resolve(onCompleteReservation(nuevaReserva)).then((error) => {
         if (typeof error === 'string') {
           setValidationError(error);
@@ -475,58 +504,97 @@ export default function ReservationWizard({
           </div>
 
           <div className="p-6 sm:p-7 rounded-lg bg-white border-2 border-stone-300 flex flex-col gap-4 shadow-md">
-            <div className="flex flex-col gap-1.5">
-              <label className="font-mono text-xs font-bold text-[#8E7A74] uppercase tracking-wider">
+            <div className="flex flex-col gap-1">
+              <label htmlFor="wizard-nombre" className="font-mono text-xs font-bold text-[#8E7A74] uppercase tracking-wider">
                 NOMBRE COMPLETO *
               </label>
               <input
+                id="wizard-nombre"
+                data-campo="wizard-nombre"
                 type="text"
                 value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
+                onChange={(e) => {
+                  setNombre(e.target.value);
+                  limpiarErrorCampo('nombre');
+                }}
+                onBlur={() => setFieldErrors((p) => ({ ...p, nombre: reglas.nombre(nombre, { min: 2, max: 120, etiqueta: 'Tu nombre' }) }))}
+                aria-invalid={Boolean(fieldErrors.nombre)}
                 placeholder="Ingresa tu nombre..."
-                className="p-3.5 rounded-md border-2 border-stone-300 bg-white font-body text-sm text-[#1F1410] focus:outline-none focus:border-[#E12927]"
-                required
+                className={`p-3.5 rounded-md border-2 bg-white font-body text-sm text-[#1F1410] focus:outline-none ${
+                  fieldErrors.nombre ? 'border-[#E12927] bg-[#FCEAE9]/20' : 'border-stone-300 focus:border-[#E12927]'
+                }`}
               />
+              {fieldErrors.nombre && <p role="alert" className="text-xs font-semibold text-[#E12927]">{fieldErrors.nombre}</p>}
             </div>
 
-            <div className="flex flex-col gap-1.5">
-              <label className="font-mono text-xs font-bold text-[#8E7A74] uppercase tracking-wider">
-                TELÉFONO / WHATSAPP *
+            <div className="flex flex-col gap-1">
+              <label htmlFor="wizard-telefono" className="font-mono text-xs font-bold text-[#8E7A74] uppercase tracking-wider">
+                TELÉFONO / WHATSAPP (10 DÍGITOS) *
               </label>
               <input
+                id="wizard-telefono"
+                data-campo="wizard-telefono"
                 type="tel"
                 value={telefono}
-                onChange={(e) => setTelefono(e.target.value)}
+                onChange={(e) => {
+                  setTelefono(e.target.value);
+                  limpiarErrorCampo('telefono');
+                }}
+                onBlur={() => setFieldErrors((p) => ({ ...p, telefono: reglas.telefonoMX(telefono) }))}
+                aria-invalid={Boolean(fieldErrors.telefono)}
                 placeholder="(618) 123-4567"
-                className="p-3.5 rounded-md border-2 border-stone-300 bg-white font-body text-sm text-[#1F1410] focus:outline-none focus:border-[#E12927]"
-                required
+                className={`p-3.5 rounded-md border-2 bg-white font-body text-sm text-[#1F1410] focus:outline-none ${
+                  fieldErrors.telefono ? 'border-[#E12927] bg-[#FCEAE9]/20' : 'border-stone-300 focus:border-[#E12927]'
+                }`}
               />
+              {fieldErrors.telefono && <p role="alert" className="text-xs font-semibold text-[#E12927]">{fieldErrors.telefono}</p>}
             </div>
 
-            <div className="flex flex-col gap-1.5">
-              <label className="font-mono text-xs font-bold text-[#8E7A74] uppercase tracking-wider">
-                CORREO ELECTRÓNICO (OPCIONAL)
+            <div className="flex flex-col gap-1">
+              <label htmlFor="wizard-correo" className="font-mono text-xs font-bold text-[#8E7A74] uppercase tracking-wider">
+                CORREO ELECTRÓNICO (OPCIONAL — PARA CONFIRMACIÓN)
               </label>
               <input
+                id="wizard-correo"
+                data-campo="wizard-correo"
                 type="email"
                 value={correo}
-                onChange={(e) => setCorreo(e.target.value)}
+                onChange={(e) => {
+                  setCorreo(e.target.value);
+                  limpiarErrorCampo('correo');
+                }}
+                onBlur={() => setFieldErrors((p) => ({ ...p, correo: reglas.email(correo, { opcional: true }) }))}
+                aria-invalid={Boolean(fieldErrors.correo)}
                 placeholder="tu.correo@ejemplo.com"
-                className="p-3.5 rounded-md border-2 border-stone-300 bg-white font-body text-sm text-[#1F1410] focus:outline-none focus:border-[#E12927]"
+                className={`p-3.5 rounded-md border-2 bg-white font-body text-sm text-[#1F1410] focus:outline-none ${
+                  fieldErrors.correo ? 'border-[#E12927] bg-[#FCEAE9]/20' : 'border-stone-300 focus:border-[#E12927]'
+                }`}
               />
+              {fieldErrors.correo && <p role="alert" className="text-xs font-semibold text-[#E12927]">{fieldErrors.correo}</p>}
             </div>
 
-            <div className="flex flex-col gap-1.5">
-              <label className="font-mono text-xs font-bold text-[#8E7A74] uppercase tracking-wider">
-                NOTAS U OCASIÓN ESPECIAL (OPCIONAL)
+            <div className="flex flex-col gap-1">
+              <label htmlFor="wizard-notas" className="font-mono text-xs font-bold text-[#8E7A74] uppercase tracking-wider">
+                NOTAS U OCASIÓN ESPECIAL (OPCIONAL, MÁX. 300 CARACTERES)
               </label>
               <input
+                id="wizard-notas"
+                data-campo="wizard-notas"
                 type="text"
+                maxLength={300}
                 value={notas}
-                onChange={(e) => setNotas(e.target.value)}
+                onChange={(e) => {
+                  setNotas(e.target.value);
+                  limpiarErrorCampo('notas');
+                }}
+                onBlur={() => setFieldErrors((p) => ({ ...p, notas: reglas.texto(notas, { max: 300, opcional: true, etiqueta: 'Las notas' }) }))}
+                aria-invalid={Boolean(fieldErrors.notas)}
                 placeholder="Ej: Cumpleaños, queremos jugar Catan, pediremos combo Mamut..."
-                className="p-3.5 rounded-md border-2 border-stone-300 bg-white font-body text-sm text-[#1F1410] focus:outline-none focus:border-[#E12927]"
+                className={`p-3.5 rounded-md border-2 bg-white font-body text-sm text-[#1F1410] focus:outline-none ${
+                  fieldErrors.notas ? 'border-[#E12927] bg-[#FCEAE9]/20' : 'border-stone-300 focus:border-[#E12927]'
+                }`}
               />
+              {fieldErrors.notas && <p role="alert" className="text-xs font-semibold text-[#E12927]">{fieldErrors.notas}</p>}
             </div>
           </div>
         </div>

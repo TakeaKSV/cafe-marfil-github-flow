@@ -18,6 +18,7 @@ import {
   Ticket
 } from 'lucide-react';
 import { playSound } from '../utils/audioFeedback';
+import { reglas } from '../utils/validacion';
 
 export const ReservationsTableView = ({ 
   reservaciones, 
@@ -43,6 +44,7 @@ export const ReservationsTableView = ({
 
   const [activeTab, setActiveTab] = useState('todas');
   const [searchTerm, setSearchTerm] = useState('');
+  const [resErrors, setResErrors] = useState({});
   const [selectedItems, setSelectedItems] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [activeActionMenu, setActiveActionMenu] = useState(null);
@@ -120,17 +122,36 @@ export const ReservationsTableView = ({
 
   const handleCreateReservation = async (e) => {
     e.preventDefault();
-    if (!newRes.comensal.trim() || guardando) return;
+    if (guardando) return;
+    const errs = {
+      comensal: reglas.nombrePersona(newRes.comensal),
+      fechaISO: reglas.fechaNoPasada(newRes.fechaISO),
+      telefono: reglas.telefonoMX(newRes.telefono),
+      personas: reglas.entero(newRes.personas, { min: 1, max: 12, etiqueta: 'El número de personas' }),
+      notas: reglas.texto(newRes.notas, { max: 300, opcional: true, etiqueta: 'Las notas' })
+    };
+    setResErrors(errs);
+    if (Object.values(errs).some(Boolean)) {
+      if (soundEnabled) playSound('alert');
+      return;
+    }
+
     setGuardando(true);
     let creada;
     try {
-      creada = await onAddReservacion({ ...newRes, personas: Number(newRes.personas) });
+      creada = await onAddReservacion({
+        ...newRes,
+        comensal: newRes.comensal.trim(),
+        telefono: newRes.telefono.trim(),
+        personas: Number(newRes.personas)
+      });
     } finally {
       setGuardando(false);
     }
     if (!creada) return;
     if (soundEnabled) playSound('success');
     setShowAddModal(false);
+    setResErrors({});
     setNewRes({
       comensal: '',
       telefono: '',
@@ -683,19 +704,25 @@ export const ReservationsTableView = ({
               </button>
             </div>
 
-            <form onSubmit={handleCreateReservation} className="space-y-4 font-body">
+            <form onSubmit={handleCreateReservation} noValidate className="space-y-4 font-body">
               <div>
                 <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1.5">
                   Nombre Completo del Comensal *
                 </label>
                 <input
                   type="text"
-                  required
                   placeholder="Ej. Sofía Herrera"
                   value={newRes.comensal}
-                  onChange={(e) => setNewRes({ ...newRes, comensal: e.target.value })}
-                  className="w-full px-4 py-2.5 text-xs border border-[#1F1410]/15 rounded-xl focus:border-[#E12927] focus:ring-1 focus:ring-[#E12927] focus:outline-hidden transition-all"
+                  onChange={(e) => {
+                    setNewRes({ ...newRes, comensal: e.target.value });
+                    setResErrors((p) => ({ ...p, comensal: null }));
+                  }}
+                  aria-invalid={Boolean(resErrors.comensal)}
+                  className={`w-full px-4 py-2.5 text-xs border rounded-xl focus:ring-1 focus:outline-hidden transition-all ${
+                    resErrors.comensal ? 'border-[#E12927] focus:border-[#E12927] focus:ring-[#E12927]' : 'border-[#1F1410]/15 focus:border-[#E12927] focus:ring-[#E12927]'
+                  }`}
                 />
+                {resErrors.comensal && <p role="alert" className="text-[11px] font-semibold text-[#E12927] mt-1">{resErrors.comensal}</p>}
               </div>
 
               <div>
@@ -705,41 +732,60 @@ export const ReservationsTableView = ({
                 <input
                   id="nueva-reserva-fecha"
                   type="date"
-                  required
                   min={hoy}
                   value={newRes.fechaISO}
-                  onChange={(e) => setNewRes({ ...newRes, fechaISO: e.target.value })}
-                  className="w-full px-4 py-2.5 text-xs border border-[#1F1410]/15 rounded-xl focus:border-[#E12927] focus:outline-hidden"
+                  onChange={(e) => {
+                    setNewRes({ ...newRes, fechaISO: e.target.value });
+                    setResErrors((p) => ({ ...p, fechaISO: null }));
+                  }}
+                  aria-invalid={Boolean(resErrors.fechaISO)}
+                  className={`w-full px-4 py-2.5 text-xs border rounded-xl focus:outline-hidden ${
+                    resErrors.fechaISO ? 'border-[#E12927]' : 'border-[#1F1410]/15 focus:border-[#E12927]'
+                  }`}
                 />
+                {resErrors.fechaISO && <p role="alert" className="text-[11px] font-semibold text-[#E12927] mt-1">{resErrors.fechaISO}</p>}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1.5">
-                    WhatsApp *
+                    WhatsApp (10 dígitos) *
                   </label>
                   <input
-                    type="text"
-                    required
+                    type="tel"
                     placeholder="618-123-4567"
                     value={newRes.telefono}
-                    onChange={(e) => setNewRes({ ...newRes, telefono: e.target.value })}
-                    className="w-full px-4 py-2.5 text-xs border border-[#1F1410]/15 rounded-xl focus:border-[#E12927] focus:ring-1 focus:ring-[#E12927] focus:outline-hidden transition-all"
+                    onChange={(e) => {
+                      setNewRes({ ...newRes, telefono: e.target.value });
+                      setResErrors((p) => ({ ...p, telefono: null }));
+                    }}
+                    aria-invalid={Boolean(resErrors.telefono)}
+                    className={`w-full px-4 py-2.5 text-xs border rounded-xl focus:ring-1 focus:outline-hidden transition-all ${
+                      resErrors.telefono ? 'border-[#E12927] focus:border-[#E12927] focus:ring-[#E12927]' : 'border-[#1F1410]/15 focus:border-[#E12927] focus:ring-[#E12927]'
+                    }`}
                   />
+                  {resErrors.telefono && <p role="alert" className="text-[11px] font-semibold text-[#E12927] mt-1">{resErrors.telefono}</p>}
                 </div>
 
                 <div>
                   <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1.5">
-                    Comensales (Personas)
+                    Comensales (1-12) *
                   </label>
                   <input
                     type="number"
                     min="1"
                     max="12"
                     value={newRes.personas}
-                    onChange={(e) => setNewRes({ ...newRes, personas: e.target.value })}
-                    className="w-full px-4 py-2.5 text-xs border border-[#1F1410]/15 rounded-xl focus:border-[#E12927] focus:ring-1 focus:ring-[#E12927] focus:outline-hidden font-mono transition-all"
+                    onChange={(e) => {
+                      setNewRes({ ...newRes, personas: e.target.value });
+                      setResErrors((p) => ({ ...p, personas: null }));
+                    }}
+                    aria-invalid={Boolean(resErrors.personas)}
+                    className={`w-full px-4 py-2.5 text-xs border rounded-xl focus:ring-1 focus:outline-hidden font-mono transition-all ${
+                      resErrors.personas ? 'border-[#E12927] focus:border-[#E12927] focus:ring-[#E12927]' : 'border-[#1F1410]/15 focus:border-[#E12927] focus:ring-[#E12927]'
+                    }`}
                   />
+                  {resErrors.personas && <p role="alert" className="text-[11px] font-semibold text-[#E12927] mt-1">{resErrors.personas}</p>}
                 </div>
               </div>
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { UserPlus, X, Store, Users, Coffee, Dice5 } from 'lucide-react';
 import { playSound } from '../utils/audioFeedback';
+import { reglas } from '../utils/validacion';
 
 export const WalkInModal = ({ 
   isOpen, 
@@ -24,6 +25,10 @@ export const WalkInModal = ({
   const [personas, setPersonas] = useState(2);
   const [tipo, setTipo] = useState('brunch');
   const [notas, setNotas] = useState('');
+  const [errores, setErrores] = useState({});
+
+  const mesaSeleccionada = availableMesas.find((m) => String(m.id) === String(mesaId)) || availableMesas[0] || null;
+  const maxCapacidad = mesaSeleccionada?.capacidad || 12;
 
   // Cerrar con tecla Escape
   useEffect(() => {
@@ -51,7 +56,22 @@ export const WalkInModal = ({
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!mesaId) return;
+    const errs = {
+      mesaId: reglas.requerido(mesaId, 'Selecciona una mesa libre.'),
+      comensal: reglas.nombrePersona(comensal, { opcional: true }),
+      personas: reglas.entero(personas, {
+        min: 1,
+        max: maxCapacidad,
+        etiqueta: 'El número de personas'
+      }),
+      notas: reglas.texto(notas, { max: 300, opcional: true, etiqueta: 'Las notas' })
+    };
+    const hayError = Object.values(errs).some(Boolean);
+    setErrores(errs);
+    if (hayError) {
+      if (soundEnabled) playSound('alert');
+      return;
+    }
 
     onAssignWalkIn({
       mesaId,
@@ -62,6 +82,7 @@ export const WalkInModal = ({
     });
 
     if (soundEnabled) playSound('coin');
+    setErrores({});
     onClose();
   };
 
@@ -113,7 +134,7 @@ export const WalkInModal = ({
             </button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4 font-body">
+          <form onSubmit={handleSubmit} noValidate className="space-y-4 font-body">
             
             {/* Selección de Mesa */}
             <div>
@@ -122,7 +143,11 @@ export const WalkInModal = ({
               </label>
               <select
                 value={mesaId}
-                onChange={(e) => setMesaId(e.target.value)}
+                onChange={(e) => {
+                  setMesaId(e.target.value);
+                  setErrores((p) => ({ ...p, mesaId: null, personas: null }));
+                }}
+                aria-invalid={Boolean(errores.mesaId)}
                 className="w-full px-4 py-3 text-xs sm:text-sm border border-[#1F1410]/15 rounded-2xl focus:border-[#E12927] focus:ring-2 focus:ring-[#E12927]/20 focus:outline-hidden bg-[#FAF7F5] font-mono cursor-pointer transition-all"
               >
                 {availableMesas.map(m => (
@@ -131,6 +156,7 @@ export const WalkInModal = ({
                   </option>
                 ))}
               </select>
+              {errores.mesaId && <p role="alert" className="text-[11px] font-semibold text-[#E12927] mt-1">{errores.mesaId}</p>}
             </div>
 
             {/* Comensal y Personas */}
@@ -143,23 +169,37 @@ export const WalkInModal = ({
                   type="text"
                   placeholder="Ej. Roberto Sánchez"
                   value={comensal}
-                  onChange={(e) => setComensal(e.target.value)}
-                  className="w-full px-4 py-2.5 text-xs sm:text-sm border border-[#1F1410]/15 rounded-2xl focus:border-[#E12927] focus:ring-2 focus:ring-[#E12927]/20 focus:outline-hidden bg-[#FAF7F5] transition-all"
+                  onChange={(e) => {
+                    setComensal(e.target.value);
+                    setErrores((p) => ({ ...p, comensal: null }));
+                  }}
+                  aria-invalid={Boolean(errores.comensal)}
+                  className={`w-full px-4 py-2.5 text-xs sm:text-sm border rounded-2xl focus:ring-2 focus:outline-hidden bg-[#FAF7F5] transition-all ${
+                    errores.comensal ? 'border-[#E12927] focus:border-[#E12927] focus:ring-[#E12927]/20' : 'border-[#1F1410]/15 focus:border-[#E12927] focus:ring-[#E12927]/20'
+                  }`}
                 />
+                {errores.comensal && <p role="alert" className="text-[11px] font-semibold text-[#E12927] mt-1">{errores.comensal}</p>}
               </div>
 
               <div>
                 <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1.5">
-                  Número de Personas
+                  Número de Personas (máx. {maxCapacidad}) *
                 </label>
                 <input
                   type="number"
                   min="1"
-                  max="12"
+                  max={maxCapacidad}
                   value={personas}
-                  onChange={(e) => setPersonas(e.target.value)}
-                  className="w-full px-4 py-2.5 text-xs sm:text-sm border border-[#1F1410]/15 rounded-2xl focus:border-[#E12927] focus:ring-2 focus:ring-[#E12927]/20 focus:outline-hidden bg-[#FAF7F5] font-mono transition-all"
+                  onChange={(e) => {
+                    setPersonas(e.target.value);
+                    setErrores((p) => ({ ...p, personas: null }));
+                  }}
+                  aria-invalid={Boolean(errores.personas)}
+                  className={`w-full px-4 py-2.5 text-xs sm:text-sm border rounded-2xl focus:ring-2 focus:outline-hidden bg-[#FAF7F5] font-mono transition-all ${
+                    errores.personas ? 'border-[#E12927] focus:border-[#E12927] focus:ring-[#E12927]/20' : 'border-[#1F1410]/15 focus:border-[#E12927] focus:ring-[#E12927]/20'
+                  }`}
                 />
+                {errores.personas && <p role="alert" className="text-[11px] font-semibold text-[#E12927] mt-1">{errores.personas}</p>}
               </div>
             </div>
 
