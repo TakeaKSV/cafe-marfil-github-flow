@@ -349,6 +349,7 @@ export async function enviarInvitacionPersonal({
   rol,
   puesto,
   sucursalNombre,
+  turno,
   invitadoPorNombre,
   enlace
 }) {
@@ -357,12 +358,13 @@ export async function enviarInvitacionPersonal({
     titulo: '¡Te damos la bienvenida al equipo!',
     cuerpoHtml: `
       <p style="margin:0 0 14px 0;">Hola,</p>
-      <p style="margin:0 0 16px 0;"><strong>${escaparHtml(invitadoPorNombre || 'Administración')}</strong> te invitó a unirte al panel de <strong>Café Marfil</strong>. Haz clic en el botón para completar tu nombre, contraseña y datos de turno:</p>
+      <p style="margin:0 0 16px 0;"><strong>${escaparHtml(invitadoPorNombre || 'Administración')}</strong> te invitó a unirte al panel de <strong>Café Marfil</strong>. Haz clic en el botón para completar tu nombre y contraseña:</p>
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#FFF7F6;border:1px solid #F2CBC9;border-radius:12px;padding:16px;margin-bottom:16px;">
         <tr><td style="padding:4px 0;font-size:13px;color:#8E7A74;">Correo asignado:</td><td style="padding:4px 0;font-size:13px;font-weight:700;text-align:right;font-family:'Space Mono',monospace;">${escaparHtml(email)}</td></tr>
         <tr><td style="padding:4px 0;font-size:13px;color:#8E7A74;">Rol:</td><td style="padding:4px 0;font-size:13px;font-weight:700;text-align:right;text-transform:uppercase;color:#E12927;font-family:'Space Mono',monospace;">${escaparHtml(rol)}</td></tr>
         <tr><td style="padding:4px 0;font-size:13px;color:#8E7A74;">Puesto:</td><td style="padding:4px 0;font-size:13px;font-weight:700;text-align:right;">${escaparHtml(puesto)}</td></tr>
         ${sucursalNombre ? `<tr><td style="padding:4px 0;font-size:13px;color:#8E7A74;">Sucursal:</td><td style="padding:4px 0;font-size:13px;font-weight:700;text-align:right;">${escaparHtml(sucursalNombre)}</td></tr>` : ''}
+        ${turno ? `<tr><td style="padding:4px 0;font-size:13px;color:#8E7A74;">Turno asignado:</td><td style="padding:4px 0;font-size:13px;font-weight:700;text-align:right;font-family:'Space Mono',monospace;">${escaparHtml(turno)}</td></tr>` : ''}
       </table>
       <p style="margin:0;color:#6E5A52;font-size:13px;">Este enlace es válido por <strong>12 horas</strong> y solo puede usarse una vez.</p>
     `,

@@ -1303,10 +1303,18 @@ test('correos: verificación de registro, bloqueo de canje sin verificar, recupe
     );
     const inv = await api('POST', '/personal/invitar', {
       token: sesion.admin,
-      body: { email: 'nuevo.host@example.com', rol: 'host', puesto: 'Host Vespertino', sucursalId: 'calvario' }
+      body: {
+        email: 'nuevo.host@example.com',
+        rol: 'host',
+        puesto: 'Host Vespertino',
+        sucursalId: 'calvario',
+        turnoInicio: '14:00',
+        turnoFin: '22:00'
+      }
     });
     assert.equal(inv.status, 201);
     assert.equal(inv.datos.correoEnviado, true);
+    assert.equal(inv.datos.invitacion.turno, '14:00 - 22:00');
     assert.equal(bandeja.length, 6);
     const tokenInv = /\?invitacion=([a-f0-9]{64})/.exec(bandeja[5].text)?.[1];
     assert.ok(tokenInv, 'el correo debe contener el enlace de invitación');
@@ -1314,19 +1322,19 @@ test('correos: verificación de registro, bloqueo de canje sin verificar, recupe
     const consultaInv = await api('GET', `/auth/invitacion/${tokenInv}`);
     assert.equal(consultaInv.status, 200);
     assert.equal(consultaInv.datos.email, 'nuevo.host@example.com');
+    assert.equal(consultaInv.datos.turno, '14:00 - 22:00');
 
     const completado = await api('POST', '/auth/invitacion/completar', {
       body: {
         token: tokenInv,
         nombre: 'Diego Barista',
-        password: 'claveEmpleado2026',
-        turnoInicio: '14:00',
-        turnoFin: '22:00'
+        password: 'claveEmpleado2026'
       }
     });
     assert.equal(completado.status, 201);
     assert.ok(completado.datos.token);
     assert.equal(completado.datos.usuario.nombre, 'Diego Barista');
+    assert.equal(completado.datos.usuario.turno, '14:00 - 22:00');
 
     // Reutilizar el enlace falla con 400.
     assert.equal((await api('GET', `/auth/invitacion/${tokenInv}`)).status, 400);

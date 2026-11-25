@@ -22,6 +22,9 @@ function aInvitacion(fila) {
     puesto: fila.puesto,
     sucursalId: fila.sucursal_id,
     sucursalNombre: fila.sucursal_nombre,
+    turnoInicio: fila.turno_inicio ?? null,
+    turnoFin: fila.turno_fin ?? null,
+    turno: fila.turno_inicio && fila.turno_fin ? `${fila.turno_inicio} - ${fila.turno_fin}` : null,
     invitadoPor: fila.invitado_por_nombre,
     expiraEn: fila.expira_en,
     creadoEn: fila.creado_en
@@ -128,7 +131,10 @@ export async function listarInvitacionesPendientes() {
   return (await repoInv.listarPendientes(ahoraISO())).map(aInvitacion);
 }
 
-export async function invitarPersona({ email, rol = 'host', puesto = 'Colaborador', sucursalId = null }, adminId = null) {
+export async function invitarPersona(
+  { email, rol = 'host', puesto = 'Colaborador', sucursalId = null, turnoInicio = null, turnoFin = null },
+  adminId = null
+) {
   const correo = String(email || '').trim().toLowerCase();
   await verificarDominioCorreo(correo);
   await exigirEmailLibre(correo);
@@ -144,6 +150,8 @@ export async function invitarPersona({ email, rol = 'host', puesto = 'Colaborado
     rol,
     puesto: puesto.trim() || 'Colaborador',
     sucursalId: sucursalId ?? null,
+    turnoInicio: turnoInicio || null,
+    turnoFin: turnoFin || null,
     tokenHash: hashToken(tokenPlano),
     invitadoPor: adminId,
     expiraEn,
@@ -151,18 +159,20 @@ export async function invitarPersona({ email, rol = 'host', puesto = 'Colaborado
   });
 
   const fila = await repoInv.porId(id);
+  const inv = aInvitacion(fila);
   const enlace = `${config.correo.adminUrl}/?invitacion=${tokenPlano}`;
   const resultadoCorreo = await enviarInvitacionPersonal({
-    email: fila.email,
-    rol: fila.rol,
-    puesto: fila.puesto,
-    sucursalNombre: fila.sucursal_nombre,
-    invitadoPorNombre: fila.invitado_por_nombre,
+    email: inv.email,
+    rol: inv.rol,
+    puesto: inv.puesto,
+    sucursalNombre: inv.sucursalNombre,
+    turno: inv.turno,
+    invitadoPorNombre: inv.invitadoPor,
     enlace
   });
 
   return {
-    invitacion: aInvitacion(fila),
+    invitacion: inv,
     correoEnviado: resultadoCorreo.enviado
   };
 }
@@ -190,7 +200,7 @@ export async function consultarInvitacion(tokenPlano) {
   return aInvitacion(fila);
 }
 
-export async function completarInvitacion({ token, nombre, password, puesto, turnoInicio = null, turnoFin = null }) {
+export async function completarInvitacion({ token, nombre, password }) {
   const invitacion = await exigirInvitacionValida(token);
   const passwordHash = await cifrarPassword(password);
 
@@ -208,10 +218,10 @@ export async function completarInvitacion({ token, nombre, password, puesto, tur
       email: actual.email,
       passwordHash,
       rol: actual.rol,
-      puesto: (puesto && puesto.trim()) || actual.puesto,
+      puesto: actual.puesto,
       sucursalId: actual.sucursal_id ?? null,
-      turnoInicio: turnoInicio || null,
-      turnoFin: turnoFin || null,
+      turnoInicio: actual.turno_inicio ?? null,
+      turnoFin: actual.turno_fin ?? null,
       estado: 'activo',
       esEncargado: 0,
       creadoEn: ahora

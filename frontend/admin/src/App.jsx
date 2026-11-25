@@ -511,6 +511,9 @@ export function App() {
   const handleCancelarInvitacion = (id) =>
     ejecutar(() => api(`/personal/invitaciones/${id}`, { metodo: 'DELETE' }), 'Invitación cancelada.');
 
+  const handleUpdateEmpleado = (id, cambios) =>
+    ejecutar(() => patch(`/personal/${id}`, cambios), 'Horario y permisos del empleado actualizados.');
+
   const avisoFlotante = <AlertToastStack alertas={alertas} onDismiss={cerrarAlerta} />;
 
   if (invitacionToken) {
@@ -745,6 +748,7 @@ export function App() {
                   invitaciones={invitaciones}
                   onInvitarEmpleado={handleInvitarEmpleado}
                   onCancelarInvitacion={handleCancelarInvitacion}
+                  onUpdateEmpleado={handleUpdateEmpleado}
                   soundEnabled={soundEnabled}
                 />
               )}

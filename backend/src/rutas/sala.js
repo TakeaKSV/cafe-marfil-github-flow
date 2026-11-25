@@ -246,7 +246,9 @@ const esquemaInvitarPersona = z.object({
   email: zEmail,
   rol: camposPersona.rol.default('host'),
   puesto: zTexto(80).default('Colaborador'),
-  sucursalId: zSucursalId.nullable().optional()
+  sucursalId: zSucursalId.nullable().optional(),
+  turnoInicio: zHora.nullable().optional(),
+  turnoFin: zHora.nullable().optional()
 });
 
 router.get('/personal', async (req, res) => res.json(await listarPersonal(leer(filtrosPersonal, req.query))));

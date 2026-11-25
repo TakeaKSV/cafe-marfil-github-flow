@@ -8,12 +8,14 @@ function invitaciones() {
     .select('i.*', 's.nombre as sucursal_nombre', 'p.nombre as invitado_por_nombre');
 }
 
-export const crear = ({ email, rol, puesto, sucursalId, tokenHash, invitadoPor, expiraEn, creadoEn }) =>
+export const crear = ({ email, rol, puesto, sucursalId, turnoInicio, turnoFin, tokenHash, invitadoPor, expiraEn, creadoEn }) =>
   insertar('invitaciones_personal', {
     email,
     rol,
     puesto,
     sucursal_id: sucursalId ?? null,
+    turno_inicio: turnoInicio ?? null,
+    turno_fin: turnoFin ?? null,
     token_hash: tokenHash,
     invitado_por: invitadoPor ?? null,
     expira_en: expiraEn,

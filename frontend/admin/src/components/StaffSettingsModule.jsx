@@ -9,17 +9,22 @@ import {
   Mail,
   RefreshCw,
   Trash2,
-  Clock
+  Clock,
+  Edit3,
+  ShieldCheck,
+  ShieldOff
 } from 'lucide-react';
 import { playSound } from '../utils/audioFeedback';
 import { reglas } from '../utils/validacion';
 
 const ROLES_OPCIONES = [
-  { id: 'host', label: 'Host (Recepción, mesas y escáner)', puestoDefault: 'Host de Piso' },
-  { id: 'gerente', label: 'Gerente (Menú, actividades y cupones)', puestoDefault: 'Gerente de Sucursal' },
-  { id: 'admin', label: 'Administrador (Control total)', puestoDefault: 'Administrador' },
-  { id: 'staff', label: 'Staff operativo (Sin acceso al panel)', puestoDefault: 'Barista / Cocina' }
+  { id: 'host', label: 'Host — Con acceso al panel (Recepción, mesas y escáner)', puestoDefault: 'Host de Piso' },
+  { id: 'gerente', label: 'Gerente — Con acceso al panel (Menú, actividades y cupones)', puestoDefault: 'Gerente de Sucursal' },
+  { id: 'admin', label: 'Administrador — Acceso total al panel', puestoDefault: 'Administrador' },
+  { id: 'staff', label: 'Staff operativo — Sin acceso al panel administrativo', puestoDefault: 'Barista / Cocina' }
 ];
+
+const horaCorta = (h) => (h ? String(h).slice(0, 5) : '');
 
 export const StaffSettingsModule = ({
   staff = [],
@@ -28,6 +33,7 @@ export const StaffSettingsModule = ({
   invitaciones = [],
   onInvitarEmpleado,
   onCancelarInvitacion,
+  onUpdateEmpleado,
   soundEnabled
 }) => {
   const esAdmin = usuario?.rol === 'admin';
@@ -36,15 +42,31 @@ export const StaffSettingsModule = ({
   const [broadcastError, setBroadcastError] = useState('');
   const [broadcastSent, setBroadcastSent] = useState(false);
 
+  // Modal invitar empleado (el admin define turno, rol, puesto y sucursal)
   const [modalInvitar, setModalInvitar] = useState(false);
   const [invForm, setInvForm] = useState({
     email: '',
     rol: 'host',
     puesto: 'Host de Piso',
-    sucursalId: sucursales[0]?.id || ''
+    sucursalId: sucursales[0]?.id || '',
+    turnoInicio: '08:00',
+    turnoFin: '16:00'
   });
   const [invErrors, setInvErrors] = useState({});
   const [enviandoInv, setEnviandoInv] = useState(false);
+
+  // Modal editar empleado existente (horarios y acceso al panel)
+  const [editando, setEditando] = useState(null);
+  const [editForm, setEditForm] = useState({
+    puesto: '',
+    rol: 'host',
+    sucursalId: '',
+    turnoInicio: '',
+    turnoFin: '',
+    estado: 'activo'
+  });
+  const [editErrors, setEditErrors] = useState({});
+  const [guardandoEdit, setGuardandoEdit] = useState(false);
 
   const handleSendBroadcast = (e) => {
     e.preventDefault();
@@ -68,10 +90,26 @@ export const StaffSettingsModule = ({
       email: '',
       rol: 'host',
       puesto: 'Host de Piso',
-      sucursalId: sucursales[0]?.id || ''
+      sucursalId: sucursales[0]?.id || '',
+      turnoInicio: '08:00',
+      turnoFin: '16:00'
     });
     setInvErrors({});
     setModalInvitar(true);
+    if (soundEnabled) playSound('toggle');
+  };
+
+  const abrirModalEditar = (person) => {
+    setEditando(person);
+    setEditForm({
+      puesto: person.puesto || person.rol || '',
+      rol: person.rolAcceso || 'staff',
+      sucursalId: person.sucursalId || sucursales[0]?.id || '',
+      turnoInicio: horaCorta(person.turnoInicio),
+      turnoFin: horaCorta(person.turnoFin),
+      estado: person.estado || 'activo'
+    });
+    setEditErrors({});
     if (soundEnabled) playSound('toggle');
   };
 
@@ -92,7 +130,9 @@ export const StaffSettingsModule = ({
         email: invForm.email.trim().toLowerCase(),
         rol: invForm.rol,
         puesto: invForm.puesto.trim(),
-        sucursalId: invForm.sucursalId || null
+        sucursalId: invForm.sucursalId || null,
+        turnoInicio: invForm.turnoInicio || null,
+        turnoFin: invForm.turnoFin || null
       });
       if (ok) {
         if (soundEnabled) playSound('success');
@@ -103,12 +143,44 @@ export const StaffSettingsModule = ({
     }
   };
 
+  const handleGuardarEdicion = async (e) => {
+    e.preventDefault();
+    if (!editando || guardandoEdit) return;
+    const errs = {
+      puesto: reglas.texto(editForm.puesto, { min: 2, max: 80, etiqueta: 'El puesto' })
+    };
+    setEditErrors(errs);
+    if (Object.values(errs).some(Boolean)) {
+      if (soundEnabled) playSound('alert');
+      return;
+    }
+    setGuardandoEdit(true);
+    try {
+      const ok = await onUpdateEmpleado(editando.id, {
+        puesto: editForm.puesto.trim(),
+        rol: editForm.rol,
+        sucursalId: editForm.sucursalId || null,
+        turnoInicio: editForm.turnoInicio || null,
+        turnoFin: editForm.turnoFin || null,
+        estado: editForm.estado
+      });
+      if (ok) {
+        if (soundEnabled) playSound('success');
+        setEditando(null);
+      }
+    } finally {
+      setGuardandoEdit(false);
+    }
+  };
+
   const handleReenviarInv = async (inv) => {
     await onInvitarEmpleado({
       email: inv.email,
       rol: inv.rol,
       puesto: inv.puesto,
-      sucursalId: inv.sucursalId || null
+      sucursalId: inv.sucursalId || null,
+      turnoInicio: horaCorta(inv.turnoInicio) || null,
+      turnoFin: horaCorta(inv.turnoFin) || null
     });
     if (soundEnabled) playSound('success');
   };
@@ -121,11 +193,11 @@ export const StaffSettingsModule = ({
           <div className="flex items-center gap-2 mb-1">
             <Users className="w-5 h-5 text-[#E12927]" />
             <h1 className="font-display font-bold text-2xl text-[#1F1410]">
-              Personal en Turno & Altas por Invitación
+              Personal, Turnos & Accesos al Panel
             </h1>
           </div>
           <p className="text-xs sm:text-sm text-[#1F1410]/60 font-body">
-            Invita empleados por correo (enlace válido 12 horas) para que completen su nombre y contraseña
+            Invita empleados (enlace 12 h), asigna horarios de turno y controla quién tiene acceso al panel
           </p>
         </div>
 
@@ -141,57 +213,101 @@ export const StaffSettingsModule = ({
         )}
       </div>
 
-      {/* Grid: Personal en Piso y Configuración */}
+      {/* Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Columna Izquierda: Equipo + Invitaciones Pendientes */}
         <div className="lg:col-span-7 space-y-6">
           <div className="bg-white p-6 rounded-2xl border border-[#1F1410]/10 shadow-xs space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[#1F1410]/10">
               <h2 className="font-display font-bold text-base text-[#1F1410]">
-                Equipo Activo
+                Equipo Registrado en Base de Datos
               </h2>
               <span className="text-xs font-mono text-[#1F1410]/60">
-                {staff.length} Colaboradores
+                {staff.length} Colaborador{staff.length === 1 ? '' : 'es'}
               </span>
             </div>
 
-            <div className="divide-y divide-[#1F1410]/10">
-              {staff.map((person, idx) => (
-                <div
-                  key={person.id}
-                  style={{ animationDelay: `${idx * 40}ms` }}
-                  className="py-3 px-2 rounded-xl flex items-center justify-between gap-3 hover:bg-[#FAF7F5] transition-all"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-[#FAF7F5] border border-[#1F1410]/15 flex items-center justify-center font-mono font-bold text-xs text-[#E12927]">
-                      {person.nombre
-                        .split(' ')
-                        .slice(0, 2)
-                        .map((n) => n[0])
-                        .join('')}
+            {staff.length === 0 ? (
+              <p className="text-xs text-[#1F1410]/55 py-4 text-center">
+                No hay empleados activos registrados.
+              </p>
+            ) : (
+              <div className="divide-y divide-[#1F1410]/10">
+                {staff.map((person) => (
+                  <div
+                    key={person.id}
+                    className="py-3.5 px-2 rounded-xl flex flex-wrap items-center justify-between gap-3 hover:bg-[#FAF7F5] transition-all"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-full bg-[#FAF7F5] border border-[#1F1410]/15 flex items-center justify-center font-mono font-bold text-xs text-[#E12927] shrink-0">
+                        {person.nombre
+                          .split(' ')
+                          .slice(0, 2)
+                          .map((n) => n[0])
+                          .join('')}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-semibold text-sm text-[#1F1410] truncate">{person.nombre}</h3>
+                          <span
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono font-bold rounded-full ${
+                              person.tieneAcceso
+                                ? 'bg-[#FCEAE9] text-[#E12927]'
+                                : 'bg-stone-100 text-[#1F1410]/60'
+                            }`}
+                          >
+                            {person.tieneAcceso ? (
+                              <>
+                                <ShieldCheck className="w-3 h-3" /> Acceso: {person.rolAcceso}
+                              </>
+                            ) : (
+                              <>
+                                <ShieldOff className="w-3 h-3" /> Sin acceso panel
+                              </>
+                            )}
+                          </span>
+                        </div>
+                        <p className="text-xs text-[#1F1410]/60 font-mono truncate">
+                          {person.rol} · {person.sucursal}
+                          {person.email ? ` · ${person.email}` : ''}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-semibold text-sm text-[#1F1410]">{person.nombre}</h3>
-                      <p className="text-xs text-[#1F1410]/60 font-mono">
-                        {person.rol} · {person.sucursal}
-                      </p>
-                    </div>
-                  </div>
 
-                  <div className="text-right font-mono">
-                    <span className="inline-block px-2.5 py-0.5 text-[10px] font-bold rounded-full bg-emerald-50 text-emerald-800 border border-emerald-300">
-                      ACTIVO
-                    </span>
-                    {person.turno && (
-                      <div className="text-[11px] text-[#1F1410]/60 mt-0.5">{person.turno}</div>
-                    )}
+                    <div className="flex items-center gap-3">
+                      <div className="text-right font-mono">
+                        <span
+                          className={`inline-block px-2.5 py-0.5 text-[10px] font-bold rounded-full border ${
+                            person.estado === 'activo'
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                              : 'bg-amber-50 text-amber-800 border-amber-300'
+                          }`}
+                        >
+                          {(person.estado || 'activo').toUpperCase()}
+                        </span>
+                        <div className="text-[11px] text-[#1F1410]/60 mt-0.5 flex items-center justify-end gap-1">
+                          <Clock className="w-3 h-3 text-[#E12927]" />
+                          {person.turno}
+                        </div>
+                      </div>
+
+                      {esAdmin && (
+                        <button
+                          type="button"
+                          onClick={() => abrirModalEditar(person)}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white border border-[#1F1410]/15 hover:border-[#E12927] text-xs font-semibold text-[#1F1410] hover:text-[#E12927] cursor-pointer"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" /> Editar
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Invitaciones pendientes (solo admin) */}
+          {/* Invitaciones pendientes */}
           {esAdmin && (
             <div className="bg-white p-6 rounded-2xl border border-[#1F1410]/10 shadow-xs space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-[#1F1410]/10">
@@ -208,7 +324,7 @@ export const StaffSettingsModule = ({
 
               {invitaciones.length === 0 ? (
                 <p className="text-xs text-[#1F1410]/55 font-body py-2">
-                  No hay invitaciones pendientes. Usa el botón <strong>Invitar empleado</strong> para enviar un enlace de registro por correo.
+                  No hay invitaciones pendientes. Usa <strong>Invitar empleado</strong> para enviar un enlace por correo.
                 </p>
               ) : (
                 <div className="divide-y divide-[#1F1410]/10">
@@ -216,10 +332,11 @@ export const StaffSettingsModule = ({
                     <div key={inv.id} className="py-3 flex flex-wrap items-center justify-between gap-3">
                       <div className="min-w-0">
                         <div className="font-mono text-xs font-bold text-[#1F1410] truncate">{inv.email}</div>
-                        <div className="text-[11px] text-[#1F1410]/60 flex items-center gap-2 mt-0.5">
+                        <div className="text-[11px] text-[#1F1410]/60 flex flex-wrap items-center gap-2 mt-0.5">
                           <span className="uppercase font-mono font-bold text-[#E12927]">{inv.rol}</span>
                           <span>· {inv.puesto}</span>
                           {inv.sucursalNombre && <span>· {inv.sucursalNombre}</span>}
+                          {inv.turno && <span className="font-mono">· Turno {inv.turno}</span>}
                         </div>
                         <div className="text-[10px] font-mono text-[#1F1410]/50 flex items-center gap-1 mt-0.5">
                           <Clock className="w-3 h-3" /> Expira: {new Date(inv.expiraEn).toLocaleString('es-MX')}
@@ -251,7 +368,7 @@ export const StaffSettingsModule = ({
           )}
         </div>
 
-        {/* Columna Derecha: Parámetros de Aforo y Aviso */}
+        {/* Columna Derecha */}
         <div className="lg:col-span-5 space-y-6">
           <div className="bg-white p-6 rounded-2xl border border-[#1F1410]/10 shadow-xs space-y-4">
             <h2 className="font-display font-bold text-base text-[#1F1410] pb-2 border-b border-[#1F1410]/10">
@@ -341,7 +458,7 @@ export const StaffSettingsModule = ({
                 <div>
                   <h3 className="font-display font-bold text-lg text-[#1F1410]">Invitar nuevo empleado</h3>
                   <p className="text-xs text-[#1F1410]/60">
-                    Recibirá un correo con botón para completar su registro (válido 12 horas).
+                    Define rol, turno y sucursal; el empleado completará su nombre y contraseña (vigencia 12 h).
                   </p>
                 </div>
                 <button
@@ -356,7 +473,7 @@ export const StaffSettingsModule = ({
               <form onSubmit={handleEnviarInvitacion} noValidate className="space-y-4">
                 <div>
                   <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1">
-                    Correo electrónico del empleado *
+                    Correo electrónico *
                   </label>
                   <input
                     type="email"
@@ -374,7 +491,9 @@ export const StaffSettingsModule = ({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1">Rol *</label>
+                  <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1">
+                    Rol y acceso al panel *
+                  </label>
                   <select
                     value={invForm.rol}
                     onChange={(e) => {
@@ -382,7 +501,7 @@ export const StaffSettingsModule = ({
                       const opt = ROLES_OPCIONES.find((r) => r.id === rol);
                       setInvForm({ ...invForm, rol, puesto: opt?.puestoDefault || invForm.puesto });
                     }}
-                    className="w-full px-4 py-2.5 text-xs border border-[#1F1410]/15 rounded-xl bg-white focus:outline-hidden focus:border-[#E12927]"
+                    className="w-full px-3.5 py-2.5 text-xs border border-[#1F1410]/15 rounded-xl bg-white focus:outline-hidden focus:border-[#E12927]"
                   >
                     {ROLES_OPCIONES.map((r) => (
                       <option key={r.id} value={r.id}>{r.label}</option>
@@ -419,6 +538,27 @@ export const StaffSettingsModule = ({
                   </div>
                 </div>
 
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1">Inicio de turno</label>
+                    <input
+                      type="time"
+                      value={invForm.turnoInicio}
+                      onChange={(e) => setInvForm({ ...invForm, turnoInicio: e.target.value })}
+                      className="w-full px-3.5 py-2 text-xs font-mono border border-[#1F1410]/15 rounded-xl focus:outline-hidden focus:border-[#E12927]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1">Fin de turno</label>
+                    <input
+                      type="time"
+                      value={invForm.turnoFin}
+                      onChange={(e) => setInvForm({ ...invForm, turnoFin: e.target.value })}
+                      className="w-full px-3.5 py-2 text-xs font-mono border border-[#1F1410]/15 rounded-xl focus:outline-hidden focus:border-[#E12927]"
+                    />
+                  </div>
+                </div>
+
                 <div className="flex justify-end gap-2 pt-2">
                   <button
                     type="button"
@@ -432,7 +572,140 @@ export const StaffSettingsModule = ({
                     disabled={enviandoInv}
                     className="px-5 py-2 rounded-full bg-[#E12927] hover:bg-[#c9201f] disabled:opacity-50 text-white text-xs font-mono font-bold cursor-pointer"
                   >
-                    {enviandoInv ? 'Enviando correo...' : 'Enviar invitación'}
+                    {enviandoInv ? 'Enviando...' : 'Enviar invitación'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>,
+          document.body
+        )}
+
+      {/* Modal Editar Horario y Acceso al Panel de un Empleado */}
+      {editando &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[9999] bg-[#1F1410]/70 backdrop-blur-xs flex items-center justify-center p-4"
+            onClick={() => setEditando(null)}
+          >
+            <div
+              className="bg-white rounded-3xl border border-[#1F1410]/10 max-w-md w-full p-6 shadow-2xl space-y-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-[#1F1410]/10">
+                <div>
+                  <h3 className="font-display font-bold text-lg text-[#1F1410]">
+                    Editar: {editando.nombre}
+                  </h3>
+                  <p className="text-xs text-[#1F1410]/60 font-mono">
+                    {editando.email || 'Sin correo registrado'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditando(null)}
+                  className="w-8 h-8 rounded-full bg-[#FAF7F5] flex items-center justify-center text-[#1F1410]/60 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleGuardarEdicion} noValidate className="space-y-4">
+                <div>
+                  <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1">
+                    Acceso al panel administrativo *
+                  </label>
+                  <select
+                    value={editForm.rol}
+                    onChange={(e) => setEditForm({ ...editForm, rol: e.target.value })}
+                    className="w-full px-3.5 py-2.5 text-xs border border-[#1F1410]/15 rounded-xl bg-white focus:outline-hidden focus:border-[#E12927]"
+                  >
+                    {ROLES_OPCIONES.map((r) => (
+                      <option key={r.id} value={r.id}>{r.label}</option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-[#1F1410]/55 mt-1">
+                    Cambiar a <strong>Staff operativo</strong> revoca el acceso al panel inmediatamente.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1">Puesto *</label>
+                    <input
+                      type="text"
+                      value={editForm.puesto}
+                      onChange={(e) => {
+                        setEditForm({ ...editForm, puesto: e.target.value });
+                        setEditErrors((p) => ({ ...p, puesto: null }));
+                      }}
+                      className="w-full px-3.5 py-2 text-xs border border-[#1F1410]/15 rounded-xl focus:outline-hidden focus:border-[#E12927]"
+                    />
+                    {editErrors.puesto && <p className="text-xs font-semibold text-[#E12927] mt-1">{editErrors.puesto}</p>}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1">Sucursal</label>
+                    <select
+                      value={editForm.sucursalId}
+                      onChange={(e) => setEditForm({ ...editForm, sucursalId: e.target.value })}
+                      className="w-full px-3.5 py-2 text-xs border border-[#1F1410]/15 rounded-xl bg-white"
+                    >
+                      {sucursales.map((s) => (
+                        <option key={s.id} value={s.id}>{s.nombre}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1">Inicio de turno</label>
+                    <input
+                      type="time"
+                      value={editForm.turnoInicio}
+                      onChange={(e) => setEditForm({ ...editForm, turnoInicio: e.target.value })}
+                      className="w-full px-3.5 py-2 text-xs font-mono border border-[#1F1410]/15 rounded-xl focus:outline-hidden focus:border-[#E12927]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1">Fin de turno</label>
+                    <input
+                      type="time"
+                      value={editForm.turnoFin}
+                      onChange={(e) => setEditForm({ ...editForm, turnoFin: e.target.value })}
+                      className="w-full px-3.5 py-2 text-xs font-mono border border-[#1F1410]/15 rounded-xl focus:outline-hidden focus:border-[#E12927]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1">Estado</label>
+                  <select
+                    value={editForm.estado}
+                    onChange={(e) => setEditForm({ ...editForm, estado: e.target.value })}
+                    className="w-full px-3.5 py-2 text-xs border border-[#1F1410]/15 rounded-xl bg-white"
+                  >
+                    <option value="activo">Activo</option>
+                    <option value="descanso">En descanso</option>
+                    <option value="inactivo">Inactivo (dar de baja y cerrar sesión)</option>
+                  </select>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditando(null)}
+                    className="px-4 py-2 rounded-full text-xs font-semibold text-[#1F1410]/70 hover:bg-[#FAF7F5] cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={guardandoEdit}
+                    className="px-5 py-2 rounded-full bg-[#E12927] hover:bg-[#c9201f] disabled:opacity-50 text-white text-xs font-mono font-bold cursor-pointer"
+                  >
+                    {guardandoEdit ? 'Guardando...' : 'Guardar cambios'}
                   </button>
                 </div>
               </form>

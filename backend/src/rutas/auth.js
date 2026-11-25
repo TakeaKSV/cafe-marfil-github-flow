@@ -21,7 +21,7 @@ import {
   obtenerPersona
 } from '../servicios/personal.js';
 import { noAutenticado, solicitudInvalida } from '../utils/errores.js';
-import { leer, zEmail, zHora, zPassword, zPasswordLogin, zTexto } from '../utils/validar.js';
+import { leer, zEmail, zPassword, zPasswordLogin, zTexto } from '../utils/validar.js';
 
 const router = Router();
 
@@ -56,10 +56,7 @@ const esquemaRestablecerPassword = z.object({
 const esquemaCompletarInvitacion = z.object({
   token: zTexto(128),
   nombre: zTexto(120),
-  password: zPassword,
-  puesto: zTexto(80).optional(),
-  turnoInicio: zHora.nullable().optional(),
-  turnoFin: zHora.nullable().optional()
+  password: zPassword
 });
 
 // Panel de administración

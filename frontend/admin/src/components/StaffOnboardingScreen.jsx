@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowRight, CheckCircle2, Coffee, KeyRound, Mail, MapPin, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Clock, Coffee, KeyRound, Mail, MapPin, ShieldCheck } from 'lucide-react';
 import { api } from '../api/cliente';
 import { reglas } from '../utils/validacion';
 import { AlertCard } from './ui/AlertSystem';
@@ -12,9 +12,6 @@ export function StaffOnboardingScreen({ token, onCompleted, onGoLogin }) {
 
   const [form, setForm] = useState({
     nombre: '',
-    puesto: '',
-    turnoInicio: '08:00',
-    turnoFin: '16:00',
     password: '',
     confirmarPassword: ''
   });
@@ -29,7 +26,6 @@ export function StaffOnboardingScreen({ token, onCompleted, onGoLogin }) {
       .then((datos) => {
         if (!activo) return;
         setInvitacion(datos);
-        setForm((prev) => ({ ...prev, puesto: datos.puesto || '' }));
       })
       .catch((err) => {
         if (!activo) return;
@@ -53,7 +49,6 @@ export function StaffOnboardingScreen({ token, onCompleted, onGoLogin }) {
     e.preventDefault();
     const errs = {
       nombre: reglas.nombrePersona(form.nombre),
-      puesto: reglas.texto(form.puesto, { min: 2, max: 80, etiqueta: 'El puesto' }),
       password:
         !form.password || form.password.length < 8
           ? 'La contraseña debe tener al menos 8 caracteres.'
@@ -74,9 +69,6 @@ export function StaffOnboardingScreen({ token, onCompleted, onGoLogin }) {
         body: {
           token,
           nombre: form.nombre.trim(),
-          puesto: form.puesto.trim(),
-          turnoInicio: form.turnoInicio || null,
-          turnoFin: form.turnoFin || null,
           password: form.password
         }
       });
@@ -131,7 +123,7 @@ export function StaffOnboardingScreen({ token, onCompleted, onGoLogin }) {
   return (
     <div className="min-h-screen w-screen bg-[#FAF7F5] flex items-center justify-center p-4 sm:p-6 font-body">
       <div className="max-w-lg w-full bg-white rounded-3xl border border-[#1F1410]/10 shadow-xl overflow-hidden">
-        {/* Cabecera Café Marfil */}
+        {/* Cabecera Café Marfil con datos asignados por el admin */}
         <div className="bg-[#1F1410] p-6 sm:p-7 border-b-4 border-[#E12927] text-white">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-2xl bg-[#E12927] flex items-center justify-center">
@@ -152,11 +144,16 @@ export function StaffOnboardingScreen({ token, onCompleted, onGoLogin }) {
               <Mail className="w-3 h-3 text-[#FCEAE9]" /> {invitacion.email}
             </span>
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#E12927] text-white uppercase font-bold">
-              <ShieldCheck className="w-3 h-3" /> {invitacion.rol}
+              <ShieldCheck className="w-3 h-3" /> {invitacion.puesto} ({invitacion.rol})
             </span>
             {invitacion.sucursalNombre && (
               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/10 text-white">
                 <MapPin className="w-3 h-3 text-[#FCEAE9]" /> {invitacion.sucursalNombre}
+              </span>
+            )}
+            {invitacion.turno && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/10 text-white">
+                <Clock className="w-3 h-3 text-[#FCEAE9]" /> Turno: {invitacion.turno}
               </span>
             )}
           </div>
@@ -172,52 +169,12 @@ export function StaffOnboardingScreen({ token, onCompleted, onGoLogin }) {
               value={form.nombre}
               onChange={(e) => actualizar('nombre', e.target.value)}
               placeholder="Ej. Andrea Morales"
+              autoComplete="name"
               className={`w-full px-4 py-2.5 text-sm border rounded-xl focus:outline-hidden ${
                 errores.nombre ? 'border-[#E12927]' : 'border-[#1F1410]/15 focus:border-[#E12927]'
               }`}
             />
             {errores.nombre && <p className="text-xs font-semibold text-[#E12927] mt-1">{errores.nombre}</p>}
-          </div>
-
-          <div>
-            <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1">
-              Puesto *
-            </label>
-            <input
-              type="text"
-              value={form.puesto}
-              onChange={(e) => actualizar('puesto', e.target.value)}
-              placeholder="Ej. Barista / Hostess"
-              className={`w-full px-4 py-2.5 text-sm border rounded-xl focus:outline-hidden ${
-                errores.puesto ? 'border-[#E12927]' : 'border-[#1F1410]/15 focus:border-[#E12927]'
-              }`}
-            />
-            {errores.puesto && <p className="text-xs font-semibold text-[#E12927] mt-1">{errores.puesto}</p>}
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-mono font-bold text-[#1F1410]/70 mb-1">
-                Inicio de turno
-              </label>
-              <input
-                type="time"
-                value={form.turnoInicio}
-                onChange={(e) => actualizar('turnoInicio', e.target.value)}
-                className="w-full px-3.5 py-2.5 text-xs font-mono border border-[#1F1410]/15 rounded-xl focus:outline-hidden focus:border-[#E12927]"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-mono font-bold text-[#1F1410]/70 mb-1">
-                Fin de turno
-              </label>
-              <input
-                type="time"
-                value={form.turnoFin}
-                onChange={(e) => actualizar('turnoFin', e.target.value)}
-                className="w-full px-3.5 py-2.5 text-xs font-mono border border-[#1F1410]/15 rounded-xl focus:outline-hidden focus:border-[#E12927]"
-              />
-            </div>
           </div>
 
           <div>
