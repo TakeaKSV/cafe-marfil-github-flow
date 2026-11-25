@@ -325,6 +325,8 @@ En los dos se siguió la misma idea para no rehacer la interfaz:
   y vuelve a cargar.
 
 **Panel admin.** Inicia sesión contra la API, restaura la sesión al recargar y refresca los datos cada 30 segundos.
+El registro muestra todas las fechas por defecto (hasta 500 registros por consulta); permite elegir una fecha,
+volver a hoy o actualizar manualmente. Los indicadores y el escáner conservan exclusivamente la operación de hoy.
 El plano de mesas dibuja las mesas reales de la sucursal elegida. Al hacer check-in de una reservación sin mesa, el
 panel le asigna la mesa libre más chica en la que cabe el grupo.
 
@@ -362,7 +364,6 @@ Nombres de campo que cambian respecto a los mocks:
 - **Posición de las mesas en el plano.** El plano acomoda las mesas en filas en el orden en que están registradas;
   faltaría guardar la posición de cada una.
 - **Métricas por semana y mes**, que el dashboard hoy simula multiplicando las del día.
-- **Reservaciones de otros días en el panel.** La tabla muestra las de hoy; no hay selector de fecha en la interfaz.
 - **Pantalla de inicio de la PWA.** De `HomeScreen` solo la sección de sucursales viene de la API; el resto
   (hero, platillos destacados, textos) sigue fijo en el código.
 - **Escanear beneficios.** La API ya identifica y canjea códigos de beneficio (`MF-BEN-...`), pero la pantalla del

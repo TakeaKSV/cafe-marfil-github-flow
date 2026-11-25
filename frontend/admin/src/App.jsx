@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
 import { DashboardView } from './components/DashboardView';
@@ -14,6 +14,7 @@ import { LoginScreen } from './components/LoginScreen';
 
 import { alExpirarSesion, api, sesion } from './api/cliente';
 import { aClienteClub, aEscaneo, aJuego, aPersona, aReservacion, aSucursal } from './api/adaptadores';
+import { cargarReservacionesPanel } from './api/reservaciones';
 
 const SEGUNDOS_ENTRE_RECARGAS = 30;
 
@@ -48,6 +49,10 @@ export function App() {
   const [sucursales, setSucursales] = useState([]);
   const [mesas, setMesas] = useState([]);
   const [reservaciones, setReservaciones] = useState([]);
+  const [reservacionesHoy, setReservacionesHoy] = useState([]);
+  const [fechaReservaciones, setFechaReservaciones] = useState('');
+  const [cargandoReservaciones, setCargandoReservaciones] = useState(false);
+  const cargaActual = useRef(0);
   const [menuItems, setMenuItems] = useState([]);
   const [promociones, setPromociones] = useState([]);
   const [clientesClub, setClientesClub] = useState([]);
@@ -69,6 +74,7 @@ export function App() {
   // ------------------------------------------------------------------------
 
   const cerrarSesion = useCallback(() => {
+    cargaActual.current += 1;
     sesion.cerrar();
     setUsuario(null);
     setDatosListos(false);
@@ -76,6 +82,7 @@ export function App() {
 
   useEffect(() => {
     alExpirarSesion(() => {
+      cargaActual.current += 1;
       setUsuario(null);
       setDatosListos(false);
       setAviso({ tipo: 'error', texto: 'Tu sesión expiró. Inicia sesión de nuevo.' });
@@ -122,14 +129,16 @@ export function App() {
   // ------------------------------------------------------------------------
 
   const cargarDatos = useCallback(async () => {
+    const carga = ++cargaActual.current;
+    setCargandoReservaciones(true);
     const sucursalId = selectedSucursal === 'todas' ? undefined : selectedSucursal;
     try {
-      // Las métricas traen la fecha de "hoy" según el servidor; con ella se piden las reservaciones.
+      // La fecha del servidor solo delimita los indicadores y la operación de hoy.
       const nuevasMetricas = await api('/metricas/hoy', { query: { sucursalId } });
       const [s, m, r, productos, promos, clientes, j, personal, historial] = await Promise.all([
         api('/sucursales'),
         api('/mesas'),
-        api('/reservaciones', { query: { fecha: nuevasMetricas.fecha } }),
+        cargarReservacionesPanel(api, { hoy: nuevasMetricas.fecha, fecha: fechaReservaciones, sucursalId }),
         api('/menu/productos'),
         api('/promociones'),
         api('/club/clientes'),
@@ -137,10 +146,12 @@ export function App() {
         api('/personal'),
         api('/escaner/historial', { query: { limite: 30 } })
       ]);
+      if (carga !== cargaActual.current) return;
       setMetricas(nuevasMetricas);
       setSucursales(s.map(aSucursal));
       setMesas(m);
-      setReservaciones(r.map(aReservacion(nuevasMetricas.fecha)));
+      setReservaciones(r.reservaciones.map(aReservacion(nuevasMetricas.fecha)));
+      setReservacionesHoy(r.reservacionesHoy.map(aReservacion(nuevasMetricas.fecha)));
       setMenuItems(productos);
       setPromociones(promos);
       setClientesClub(clientes.map(aClienteClub));
@@ -149,9 +160,11 @@ export function App() {
       setEscaneos(historial.map(aEscaneo));
       setDatosListos(true);
     } catch (err) {
+      if (carga !== cargaActual.current) return;
       if (!(import.meta.env.DEV && import.meta.env.VITE_DEMO_OFFLINE === 'true' && !err.status)) throw err;
       console.warn('API no disponible en panel admin, usando mock data local.', err);
       const mock = await import('./data/adminMockData');
+      if (carga !== cargaActual.current) return;
       setMetricas(mock.INITIAL_METRICAS || {
         ocupacionPorcentaje: 73,
         mesasOcupadas: 11,
@@ -165,6 +178,7 @@ export function App() {
       setSucursales(mock.INITIAL_SUCURSALES);
       setMesas(mock.INITIAL_MESAS);
       setReservaciones(mock.INITIAL_RESERVAS);
+      setReservacionesHoy(mock.INITIAL_RESERVAS);
       setMenuItems(mock.INITIAL_MENU_ITEMS);
       setPromociones(mock.INITIAL_PROMOCIONES);
       setClientesClub(mock.INITIAL_CLIENTES_CLUB || []);
@@ -172,8 +186,10 @@ export function App() {
       setStaff(mock.INITIAL_STAFF);
       setEscaneos(mock.INITIAL_HISTORIAL_ESCANEOS || []);
       setDatosListos(true);
+    } finally {
+      if (carga === cargaActual.current) setCargandoReservaciones(false);
     }
-  }, [selectedSucursal]);
+  }, [selectedSucursal, fechaReservaciones]);
 
   // Carga inicial y recarga periódica para que mesas y tiempos se mantengan al día.
   useEffect(() => {
@@ -181,7 +197,10 @@ export function App() {
     const recargar = () => cargarDatos().catch((error) => mostrarError(error.message));
     recargar();
     const intervalo = setInterval(recargar, SEGUNDOS_ENTRE_RECARGAS * 1000);
-    return () => clearInterval(intervalo);
+    return () => {
+      clearInterval(intervalo);
+      cargaActual.current += 1;
+    };
   }, [usuario, cargarDatos]);
 
   /**
@@ -191,16 +210,17 @@ export function App() {
   const ejecutar = async (accion) => {
     try {
       await accion();
-      await cargarDatos();
-      return true;
     } catch (error) {
-      if (!error.status) {
-        return true;
-      }
       mostrarError(error.message);
       cargarDatos().catch(() => {});
       return false;
     }
+    try {
+      await cargarDatos();
+    } catch {
+      mostrarError('El cambio se guardó, pero no se pudo recargar el panel. Pulsa Actualizar para verlo.');
+    }
+    return true;
   };
 
   const post = (ruta, body = {}) => api(ruta, { metodo: 'POST', body });
@@ -252,7 +272,8 @@ export function App() {
 
   /** Los componentes mandan la reservación con su nuevo estado; aquí se traduce a la acción de la API. */
   const handleUpdateReservacion = (actualizada) => {
-    const anterior = reservaciones.find((r) => r.folio === actualizada.folio);
+    const anterior = reservaciones.find((r) => r.folio === actualizada.folio)
+      ?? reservacionesHoy.find((r) => r.folio === actualizada.folio);
     if (!anterior || anterior.estado === actualizada.estado) return Promise.resolve(true);
     const ruta = `/reservaciones/${actualizada.folio}`;
 
@@ -279,7 +300,7 @@ export function App() {
         tipo: nueva.tipo === 'juegos' ? 'juegos' : 'mesa',
         tipoNombre: nueva.tipoNombre,
         sucursalId: nueva.sucursalId,
-        fecha: metricas.fecha,
+        fecha: nueva.fechaISO || metricas.fecha,
         hora: nueva.hora,
         personas: nueva.personas,
         comensal: nueva.comensal,
@@ -417,7 +438,7 @@ export function App() {
 
   const badges = {
     mesasOcupadas: currentBranchMesas.filter(m => m.estado === 'ocupada').length,
-    reservasHoy: reservaciones.filter(r => r.estado === 'confirmada' || r.estado === 'en_curso').length,
+    reservasHoy: reservacionesHoy.filter(r => r.estado === 'confirmada' || r.estado === 'en_curso').length,
     agotados: menuItems.filter(i => !i.disponibleEnCocina).length,
     juegosEnMesa: juegos.filter(j => j.estado === 'en_mesa').length
   };
@@ -520,6 +541,16 @@ export function App() {
               {activeTab === 'reservations' && (
                 <ReservationsTableView
                   reservaciones={reservaciones}
+                  reservacionesHoy={reservacionesHoy}
+                  fecha={fechaReservaciones}
+                  hoy={metricas.fecha}
+                  onChangeFecha={(fecha) => {
+                    if (fecha === fechaReservaciones) return;
+                    setCargandoReservaciones(true);
+                    setFechaReservaciones(fecha);
+                  }}
+                  cargando={cargandoReservaciones}
+                  onRecargar={() => cargarDatos().catch((error) => mostrarError(error.message))}
                   onUpdateReservacion={handleUpdateReservacion}
                   onAddReservacion={handleAddReservacion}
                   promociones={promociones}
@@ -545,7 +576,7 @@ export function App() {
               {/* 4. Scanner POS & Caja */}
               {activeTab === 'scanner' && (
                 <ScannerModule
-                  reservaciones={reservaciones}
+                  reservaciones={reservacionesHoy}
                   promociones={promociones}
                   clientesClub={clientesClub}
                   historial={escaneos}
