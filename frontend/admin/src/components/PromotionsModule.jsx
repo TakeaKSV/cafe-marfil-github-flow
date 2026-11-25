@@ -1,52 +1,95 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { 
-  Tag, 
-  Plus, 
-  Gift, 
-  Calendar, 
-  CheckCircle2, 
-  PauseCircle, 
-  Sparkles, 
-  Flame, 
+import {
+  Tag,
+  Plus,
+  CheckCircle2,
+  PauseCircle,
   X,
-  Share2,
   Copy,
-  Check
+  Check,
+  Edit3,
+  Ticket,
+  ArrowLeft,
+  Upload,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
+import { resolverUrlImagen, subirImagen } from '../api/cliente';
 import { playSound } from '../utils/audioFeedback';
 import { reglas } from '../utils/validacion';
 
-export const PromotionsModule = ({ 
-  promociones, 
-  onUpdatePromocion, 
+const CATEGORIAS_PROMO = [
+  { slug: 'mes', nombre: 'Promociones del mes' },
+  { slug: 'temporada', nombre: 'Frappés & Indulgencia' },
+  { slug: 'sucursal', nombre: 'Postres & Especialidad' },
+  { slug: 'frecuentes', nombre: 'Clientes frecuentes' }
+];
+
+function estadoInicialPromo(base = null, sucursales = []) {
+  return {
+    id: base?.id ?? null,
+    codigo: base?.codigo ?? '',
+    titulo: base?.titulo ?? '',
+    categoriaSlug: base?.categoriaSlug ?? 'mes',
+    descuentoBadge: base?.descuentoBadge ?? '2x1',
+    beneficio: base?.beneficio ?? '',
+    vigencia: base?.vigencia ?? 'Válido esta semana',
+    limiteDiario: base?.limiteDiario ?? 40,
+    imagen: base?.imagen ?? '/images/dubai_frappes.jpg',
+    sucursales:
+      Array.isArray(base?.sucursales) && base.sucursales.length > 0
+        ? base.sucursales
+        : sucursales.map((s) => s.id)
+  };
+}
+
+export const PromotionsModule = ({
+  promociones = [],
+  sucursales = [],
+  selectedSucursal = 'todas',
+  usuario,
+  onUpdatePromocion,
   onAddPromocion,
-  soundEnabled 
+  onCanjearPromocion,
+  soundEnabled
 }) => {
-  const [showNewModal, setShowNewModal] = useState(false);
+  const esGerencia = usuario?.rol === 'admin' || usuario?.rol === 'gerente';
+
+  const [editorAbierto, setEditorAbierto] = useState(false);
+  const [esNueva, setEsNueva] = useState(true);
+  const [mostrarAvanzado, setMostrarAvanzado] = useState(false);
+  const [form, setForm] = useState(() => estadoInicialPromo(null, sucursales));
+  const [promoErrors, setPromoErrors] = useState({});
+  const [subiendo, setSubiendo] = useState(false);
+  const [guardando, setGuardando] = useState(false);
   const [copiedCode, setCopiedCode] = useState(null);
 
-  // Cerrar modal con tecla Escape
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape' && showNewModal) {
-        setShowNewModal(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showNewModal]);
+  // Modal rápido de canje en caja
+  const [promoACanjear, setPromoACanjear] = useState(null);
+  const [sucursalCanje, setSucursalCanje] = useState('');
+  const [codigoClienteCanje, setCodigoClienteCanje] = useState('');
+  const [canjeando, setCanjeando] = useState(false);
 
-  const [newPromo, setNewPromo] = useState({
-    codigo: '',
-    titulo: '',
-    categoria: 'Frappés & Indulgencia',
-    descuentoBadge: '2x1',
-    beneficio: '',
-    vigencia: 'Válido esta semana',
-    limiteDiario: 40
-  });
-  const [promoErrors, setPromoErrors] = useState({});
+  const abrirNueva = () => {
+    if (!esGerencia) return;
+    setEsNueva(true);
+    setForm(estadoInicialPromo(null, sucursales));
+    setPromoErrors({});
+    setMostrarAvanzado(false);
+    setEditorAbierto(true);
+    if (soundEnabled) playSound('toggle');
+  };
+
+  const abrirEditar = (promo) => {
+    if (!esGerencia) return;
+    setEsNueva(false);
+    setForm(estadoInicialPromo(promo, sucursales));
+    setPromoErrors({});
+    setMostrarAvanzado(false);
+    setEditorAbierto(true);
+    if (soundEnabled) playSound('toggle');
+  };
 
   const handleToggleEstado = (promo) => {
     const nuevoEstado = promo.estado === 'activo' ? 'pausado' : 'activo';
@@ -61,55 +104,322 @@ export const PromotionsModule = ({
     setTimeout(() => setCopiedCode(null), 2000);
   };
 
-  const handleCreatePromo = (e) => {
+  const toggleSucursal = (id) => {
+    setForm((prev) => {
+      const existe = prev.sucursales.includes(id);
+      const siguientes = existe ? prev.sucursales.filter((s) => s !== id) : [...prev.sucursales, id];
+      return { ...prev, sucursales: siguientes };
+    });
+    setPromoErrors((p) => ({ ...p, sucursales: null }));
+  };
+
+  const handleSubirFoto = async (e) => {
+    const archivo = e.target.files?.[0];
+    e.target.value = '';
+    if (!archivo) return;
+    setSubiendo(true);
+    try {
+      const resp = await subirImagen(archivo, 'promociones');
+      setForm((prev) => ({ ...prev, imagen: resp.url }));
+      if (soundEnabled) playSound('success');
+    } catch (err) {
+      setPromoErrors((p) => ({ ...p, imagen: err.message }));
+    } finally {
+      setSubiendo(false);
+    }
+  };
+
+  const handleGuardarPromo = async (e) => {
     e.preventDefault();
     const errs = {
-      codigo: reglas.codigoCupon(newPromo.codigo),
-      titulo: reglas.texto(newPromo.titulo, { min: 3, max: 140, etiqueta: 'El título' }),
-      descuentoBadge: reglas.texto(newPromo.descuentoBadge, { min: 2, max: 40, etiqueta: 'El badge' }),
-      limiteDiario: reglas.entero(newPromo.limiteDiario, { min: 1, max: 5000, etiqueta: 'El límite diario' }),
-      beneficio: reglas.texto(newPromo.beneficio, { min: 5, max: 300, etiqueta: 'La descripción del beneficio' })
+      codigo: reglas.codigoCupon(form.codigo),
+      titulo: reglas.texto(form.titulo, { min: 3, max: 140, etiqueta: 'El título' }),
+      descuentoBadge: reglas.texto(form.descuentoBadge, { min: 2, max: 30, etiqueta: 'El badge' }),
+      limiteDiario: reglas.entero(form.limiteDiario, { min: 1, max: 5000, etiqueta: 'El límite diario' }),
+      beneficio: reglas.texto(form.beneficio, { min: 5, max: 300, etiqueta: 'El beneficio' }),
+      vigencia: reglas.texto(form.vigencia, { min: 3, max: 140, etiqueta: 'La vigencia' }),
+      sucursales: form.sucursales.length === 0 ? 'Selecciona al menos una sucursal.' : null
     };
     setPromoErrors(errs);
-    if (Object.values(errs).some(Boolean)) {
+    if (Object.values(errs).some(Boolean) || guardando) {
       if (soundEnabled) playSound('alert');
       return;
     }
 
-    const creada = {
-      id: `promo-${Date.now()}`,
-      codigo: newPromo.codigo.toUpperCase().trim(),
-      titulo: newPromo.titulo.trim(),
-      categoria: newPromo.categoria,
-      descuentoBadge: newPromo.descuentoBadge.toUpperCase().trim(),
-      beneficio: newPromo.beneficio.trim(),
-      vigencia: newPromo.vigencia,
-      canjesHoy: 0,
-      limiteDiario: Number(newPromo.limiteDiario),
-      estado: 'activo',
-      sucursales: ['porras-matriz', 'calvario']
-    };
+    setGuardando(true);
+    try {
+      const cat = CATEGORIAS_PROMO.find((c) => c.slug === form.categoriaSlug) || CATEGORIAS_PROMO[0];
+      const payload = {
+        ...(form.id ? { id: form.id } : {}),
+        codigo: form.codigo.toUpperCase().trim(),
+        titulo: form.titulo.trim(),
+        categoria: cat.nombre,
+        categoriaSlug: cat.slug,
+        descuentoBadge: form.descuentoBadge.toUpperCase().trim(),
+        beneficio: form.beneficio.trim(),
+        vigencia: form.vigencia.trim(),
+        limiteDiario: Number(form.limiteDiario),
+        imagen: form.imagen?.trim() || null,
+        sucursales: form.sucursales
+      };
 
-    onAddPromocion(creada);
-    if (soundEnabled) playSound('success');
-    setShowNewModal(false);
-    setPromoErrors({});
-    setNewPromo({
-      codigo: '',
-      titulo: '',
-      categoria: 'Frappés & Indulgencia',
-      descuentoBadge: '2x1',
-      beneficio: '',
-      vigencia: 'Válido esta semana',
-      limiteDiario: 40
-    });
+      const ok = esNueva ? await onAddPromocion(payload) : await onUpdatePromocion(payload);
+      if (ok) {
+        if (soundEnabled) playSound('success');
+        setEditorAbierto(false);
+      }
+    } finally {
+      setGuardando(false);
+    }
   };
 
+  const abrirCanje = (promo) => {
+    setPromoACanjear(promo);
+    const defaultSuc =
+      selectedSucursal !== 'todas' && promo.sucursales?.includes(selectedSucursal)
+        ? selectedSucursal
+        : promo.sucursales?.[0] || sucursales[0]?.id || '';
+    setSucursalCanje(defaultSuc);
+    setCodigoClienteCanje('');
+    if (soundEnabled) playSound('toggle');
+  };
+
+  const confirmarCanje = async (e) => {
+    e.preventDefault();
+    if (!promoACanjear || canjeando) return;
+    setCanjeando(true);
+    try {
+      const ok = await onCanjearPromocion(promoACanjear.id, {
+        sucursalId: sucursalCanje || undefined,
+        codigoCliente: codigoClienteCanje.trim().toUpperCase() || undefined
+      });
+      if (ok) {
+        if (soundEnabled) playSound('coin');
+        setPromoACanjear(null);
+      }
+    } finally {
+      setCanjeando(false);
+    }
+  };
+
+  // --- EDITOR A PANTALLA COMPLETA ---
+  if (editorAbierto) {
+    return (
+      <div className="space-y-5 animate-menu-in pb-10">
+        <div className="bg-white p-5 rounded-2xl border border-[#1F1410]/10 shadow-xs flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setEditorAbierto(false)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#FAF7F5] hover:bg-[#FCEAE9] text-[#1F1410] hover:text-[#E12927] text-xs font-mono font-bold cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4" /> Volver a Cupones
+            </button>
+            <div>
+              <h1 className="font-display font-bold text-xl sm:text-2xl text-[#1F1410]">
+                {esNueva ? 'Nuevo Cupón o Promoción' : `Editando: ${form.codigo}`}
+              </h1>
+              <p className="text-xs text-[#1F1410]/60 font-body">
+                Los cambios se sincronizan al instante con la app de clientes y el escáner de caja.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            disabled={guardando}
+            onClick={handleGuardarPromo}
+            className="px-6 py-2.5 rounded-full bg-[#E12927] hover:bg-[#c9201f] disabled:opacity-50 text-white text-xs font-mono font-bold uppercase tracking-wider shadow-sm cursor-pointer"
+          >
+            {guardando ? 'Guardando...' : esNueva ? 'Lanzar Cupón' : 'Guardar Cambios'}
+          </button>
+        </div>
+
+        <form
+          onSubmit={handleGuardarPromo}
+          noValidate
+          className="max-w-3xl bg-white p-6 rounded-2xl border border-[#1F1410]/10 shadow-xs space-y-5"
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1.5">Código del cupón *</label>
+              <input
+                type="text"
+                placeholder="Ej. MF-PROMO-WAFFLE"
+                value={form.codigo}
+                onChange={(e) => {
+                  setForm({ ...form, codigo: e.target.value });
+                  setPromoErrors((p) => ({ ...p, codigo: null }));
+                }}
+                className={`w-full px-4 py-2.5 text-sm font-mono uppercase border rounded-xl focus:outline-hidden ${
+                  promoErrors.codigo ? 'border-[#E12927]' : 'border-[#1F1410]/15 focus:border-[#E12927]'
+                }`}
+              />
+              {promoErrors.codigo && <p className="text-xs font-semibold text-[#E12927] mt-1">{promoErrors.codigo}</p>}
+            </div>
+
+            <div>
+              <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1.5">Badge de descuento *</label>
+              <input
+                type="text"
+                placeholder="Ej. 2x1, 20% OFF"
+                value={form.descuentoBadge}
+                onChange={(e) => {
+                  setForm({ ...form, descuentoBadge: e.target.value });
+                  setPromoErrors((p) => ({ ...p, descuentoBadge: null }));
+                }}
+                className={`w-full px-4 py-2.5 text-sm font-mono uppercase border rounded-xl focus:outline-hidden ${
+                  promoErrors.descuentoBadge ? 'border-[#E12927]' : 'border-[#1F1410]/15 focus:border-[#E12927]'
+                }`}
+              />
+              {promoErrors.descuentoBadge && <p className="text-xs font-semibold text-[#E12927] mt-1">{promoErrors.descuentoBadge}</p>}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1.5">Título de la promoción *</label>
+            <input
+              type="text"
+              placeholder="Ej. Miércoles de Waffles al 50%"
+              value={form.titulo}
+              onChange={(e) => {
+                setForm({ ...form, titulo: e.target.value });
+                setPromoErrors((p) => ({ ...p, titulo: null }));
+              }}
+              className={`w-full px-4 py-2.5 text-sm border rounded-xl focus:outline-hidden ${
+                promoErrors.titulo ? 'border-[#E12927]' : 'border-[#1F1410]/15 focus:border-[#E12927]'
+              }`}
+            />
+            {promoErrors.titulo && <p className="text-xs font-semibold text-[#E12927] mt-1">{promoErrors.titulo}</p>}
+          </div>
+
+          <div>
+            <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1.5">Beneficio para el cliente *</label>
+            <textarea
+              rows="2"
+              placeholder="Ej. Segundo frappé de igual o menor precio gratis"
+              value={form.beneficio}
+              onChange={(e) => {
+                setForm({ ...form, beneficio: e.target.value });
+                setPromoErrors((p) => ({ ...p, beneficio: null }));
+              }}
+              className={`w-full px-4 py-2.5 text-sm border rounded-xl focus:outline-hidden ${
+                promoErrors.beneficio ? 'border-[#E12927]' : 'border-[#1F1410]/15 focus:border-[#E12927]'
+              }`}
+            />
+            {promoErrors.beneficio && <p className="text-xs font-semibold text-[#E12927] mt-1">{promoErrors.beneficio}</p>}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1.5">Vigencia *</label>
+              <input
+                type="text"
+                placeholder="Ej. Jueves de 4:00 PM a 8:00 PM"
+                value={form.vigencia}
+                onChange={(e) => {
+                  setForm({ ...form, vigencia: e.target.value });
+                  setPromoErrors((p) => ({ ...p, vigencia: null }));
+                }}
+                className="w-full px-4 py-2.5 text-sm border border-[#1F1410]/15 rounded-xl focus:outline-hidden focus:border-[#E12927]"
+              />
+              {promoErrors.vigencia && <p className="text-xs font-semibold text-[#E12927] mt-1">{promoErrors.vigencia}</p>}
+            </div>
+
+            <div>
+              <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1.5">Límite de canjes / día *</label>
+              <input
+                type="number"
+                min="1"
+                max="5000"
+                value={form.limiteDiario}
+                onChange={(e) => {
+                  setForm({ ...form, limiteDiario: e.target.value });
+                  setPromoErrors((p) => ({ ...p, limiteDiario: null }));
+                }}
+                className="w-full px-4 py-2.5 text-sm font-mono border border-[#1F1410]/15 rounded-xl focus:outline-hidden focus:border-[#E12927]"
+              />
+              {promoErrors.limiteDiario && <p className="text-xs font-semibold text-[#E12927] mt-1">{promoErrors.limiteDiario}</p>}
+            </div>
+          </div>
+
+          <div>
+            <span className="block text-xs font-mono font-bold text-[#1F1410] mb-2">Sucursales participantes *</span>
+            <div className="flex flex-wrap gap-2">
+              {sucursales.map((s) => {
+                const activa = form.sucursales.includes(s.id);
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => toggleSucursal(s.id)}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-semibold border cursor-pointer transition-colors ${
+                      activa
+                        ? 'bg-[#FCEAE9] border-[#E12927] text-[#E12927]'
+                        : 'bg-white border-[#1F1410]/15 text-[#1F1410]/70'
+                    }`}
+                  >
+                    {activa ? '✓ ' : ''}{s.nombre}
+                  </button>
+                );
+              })}
+            </div>
+            {promoErrors.sucursales && <p className="text-xs font-semibold text-[#E12927] mt-1">{promoErrors.sucursales}</p>}
+          </div>
+
+          <div className="border border-[#1F1410]/10 rounded-xl overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setMostrarAvanzado((v) => !v)}
+              className="w-full px-4 py-3 bg-[#FAF7F5] hover:bg-[#FCEAE9]/50 flex items-center justify-between text-xs font-mono font-bold text-[#1F1410] cursor-pointer"
+            >
+              <span>Foto y categoría de filtro (opcional)</span>
+              {mostrarAvanzado ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
+
+            {mostrarAvanzado && (
+              <div className="p-4 space-y-4 border-t border-[#1F1410]/10">
+                <div>
+                  <label className="block text-[11px] font-mono font-bold text-[#1F1410]/70 mb-1">Categoría en la app</label>
+                  <select
+                    value={form.categoriaSlug}
+                    onChange={(e) => setForm({ ...form, categoriaSlug: e.target.value })}
+                    className="w-full px-3 py-2 text-xs border border-[#1F1410]/15 rounded-lg bg-white"
+                  >
+                    {CATEGORIAS_PROMO.map((c) => (
+                      <option key={c.slug} value={c.slug}>{c.nombre}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={resolverUrlImagen(form.imagen)}
+                      alt="Vista previa"
+                      className="w-14 h-14 rounded-lg object-cover border border-[#1F1410]/10"
+                    />
+                    <span className="text-xs text-[#1F1410]/70">Imagen de portada del cupón</span>
+                  </div>
+                  <label className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-[#1F1410] hover:bg-[#E12927] text-white text-xs font-mono font-bold cursor-pointer">
+                    <Upload className="w-3.5 h-3.5" />
+                    {subiendo ? 'Subiendo...' : 'Subir foto'}
+                    <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleSubirFoto} className="hidden" disabled={subiendo} />
+                  </label>
+                </div>
+              </div>
+            )}
+          </div>
+        </form>
+      </div>
+    );
+  }
+
+  // --- LISTADO DE PROMOCIONES Y CUPONES ---
   return (
     <div className="space-y-6 animate-menu-in">
-      
       {/* Header */}
-      <div className="bg-white p-5 rounded-md border border-[#1F1410]/10 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="bg-white p-5 rounded-2xl border border-[#1F1410]/10 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Tag className="w-5 h-5 text-[#E12927]" />
@@ -118,269 +428,222 @@ export const PromotionsModule = ({
             </h1>
           </div>
           <p className="text-xs sm:text-sm text-[#1F1410]/60 font-body">
-            Configuración de dinámicas comerciales ("2x1", "Combo Dubái"), límites diarios y monitoreo de canjes en caja
+            Crea, edita, pausa y canjea cupones en caja con control de límite diario por sucursal
           </p>
         </div>
 
-        <button
-          onClick={() => {
-            if (soundEnabled) playSound('toggle');
-            setShowNewModal(true);
-          }}
-          className="flex items-center gap-2 px-4 py-2 bg-[#E12927] hover:bg-[#c9201f] text-white text-xs sm:text-sm font-semibold rounded-md shadow-xs transition-colors cursor-pointer"
-        >
-          <Plus className="w-4 h-4 stroke-[2.5]" />
-          Nueva Promoción o Cupón
-        </button>
+        {esGerencia && (
+          <button
+            type="button"
+            onClick={abrirNueva}
+            className="flex items-center gap-2 px-4 py-2.5 bg-[#E12927] hover:bg-[#c9201f] text-white text-xs sm:text-sm font-semibold rounded-full shadow-xs transition-colors cursor-pointer"
+          >
+            <Plus className="w-4 h-4 stroke-[2.5]" />
+            Nuevo Cupón
+          </button>
+        )}
       </div>
 
-      {/* Grid de Campañas Promocionales */}
+      {/* Grid de Campañas */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {promociones.map((promo, idx) => {
           const isActiva = promo.estado === 'activo';
-          const porcentajeUso = Math.round((promo.canjesHoy / promo.limiteDiario) * 100);
+          const agotado = promo.canjesHoy >= promo.limiteDiario;
+          const porcentajeUso = promo.limiteDiario ? Math.round((promo.canjesHoy / promo.limiteDiario) * 100) : 0;
 
           return (
-            <div 
+            <div
               key={promo.id}
-              style={{ animationDelay: `${(idx % 4) * 60}ms` }}
-              className={`bg-white rounded-2xl border p-5 shadow-2xs transition-all flex flex-col justify-between hover-lift animate-fade-up ${
-                isActiva 
-                  ? 'border-[#1F1410]/10 hover:border-[#E12927]/40' 
-                  : 'border-gray-200 bg-gray-50/50 opacity-70'
+              style={{ animationDelay: `${(idx % 4) * 50}ms` }}
+              className={`bg-white rounded-2xl border p-5 shadow-2xs transition-all flex flex-col justify-between ${
+                isActiva
+                  ? 'border-[#1F1410]/10 hover:border-[#E12927]/40'
+                  : 'border-gray-200 bg-gray-50/50 opacity-75'
               }`}
             >
               <div>
                 <div className="flex items-start justify-between gap-2 mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono font-bold text-xs bg-[#E12927] text-white px-2 py-0.5 rounded-xs shadow-2xs">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono font-bold text-xs bg-[#E12927] text-white px-2.5 py-0.5 rounded-sm">
                       {promo.descuentoBadge}
                     </span>
-                    <span className="text-xs text-[#1F1410]/60 font-mono">
-                      {promo.categoria}
-                    </span>
+                    <span className="text-xs text-[#1F1410]/60 font-mono">{promo.categoria}</span>
                   </div>
 
-                  <button
-                    onClick={() => handleToggleEstado(promo)}
-                    className={`text-xs font-mono font-bold px-2 py-0.5 rounded-xs transition-colors cursor-pointer flex items-center gap-1 ${
-                      isActiva 
-                        ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200' 
-                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                    }`}
-                  >
-                    {isActiva ? <CheckCircle2 className="w-3.5 h-3.5" /> : <PauseCircle className="w-3.5 h-3.5" />}
-                    {isActiva ? 'Campaña Activa' : 'Pausada'}
-                  </button>
+                  {esGerencia ? (
+                    <button
+                      type="button"
+                      onClick={() => handleToggleEstado(promo)}
+                      className={`text-xs font-mono font-bold px-2.5 py-0.5 rounded-full transition-colors cursor-pointer flex items-center gap-1 ${
+                        isActiva
+                          ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}
+                    >
+                      {isActiva ? <CheckCircle2 className="w-3.5 h-3.5" /> : <PauseCircle className="w-3.5 h-3.5" />}
+                      {isActiva ? 'Activa' : 'Pausada'}
+                    </button>
+                  ) : (
+                    <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-stone-100 text-[#1F1410]/70">
+                      {isActiva ? 'Activa' : 'Pausada'}
+                    </span>
+                  )}
                 </div>
 
-                <h3 className="font-display font-bold text-lg text-[#1F1410] mb-1">
-                  {promo.titulo}
-                </h3>
-                <p className="text-xs text-[#1F1410]/80 leading-relaxed mb-4">
-                  {promo.beneficio}
-                </p>
+                <h3 className="font-display font-bold text-lg text-[#1F1410] mb-1">{promo.titulo}</h3>
+                <p className="text-xs text-[#1F1410]/80 leading-relaxed mb-4">{promo.beneficio}</p>
 
-                {/* Código de Cupón para Caja */}
-                <div className="flex items-center justify-between p-2.5 bg-[#FAF7F5] border border-dashed border-[#1F1410]/20 rounded-sm mb-4">
+                {/* Código de Cupón */}
+                <div className="flex items-center justify-between p-2.5 bg-[#FAF7F5] border border-dashed border-[#1F1410]/20 rounded-xl mb-4">
                   <div className="font-mono text-xs">
                     <span className="text-[#1F1410]/50 block text-[10px]">CÓDIGO DIGITAL:</span>
                     <strong className="text-sm text-[#1F1410] tracking-wider">{promo.codigo}</strong>
                   </div>
-                  <button
-                    onClick={() => handleCopyCode(promo.codigo)}
-                    className="p-1.5 bg-white border border-[#1F1410]/15 hover:border-[#E12927] text-[#1F1410] rounded-xs text-xs font-mono flex items-center gap-1 cursor-pointer transition-colors"
-                  >
-                    {copiedCode === promo.codigo ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 text-emerald-600" /> Copiado
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5" /> Copiar
-                      </>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleCopyCode(promo.codigo)}
+                      className="px-2.5 py-1.5 bg-white border border-[#1F1410]/15 hover:border-[#E12927] text-[#1F1410] rounded-lg text-xs font-mono flex items-center gap-1 cursor-pointer"
+                    >
+                      {copiedCode === promo.codigo ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-600" /> Copiado
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" /> Copiar
+                        </>
+                      )}
+                    </button>
+                    {esGerencia && (
+                      <button
+                        type="button"
+                        onClick={() => abrirEditar(promo)}
+                        className="px-2.5 py-1.5 bg-white border border-[#1F1410]/15 hover:border-[#E12927] text-[#1F1410] hover:text-[#E12927] rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" /> Editar
+                      </button>
                     )}
-                  </button>
+                  </div>
                 </div>
               </div>
 
-              {/* Estadísticas de canje hoy */}
-              <div className="pt-3 border-t border-[#1F1410]/10 space-y-1.5">
+              {/* Progreso + Botón Canjear */}
+              <div className="pt-3 border-t border-[#1F1410]/10 space-y-2.5">
                 <div className="flex items-center justify-between text-xs font-mono">
-                  <span className="text-[#1F1410]/60">Canjes Hoy en Caja:</span>
-                  <span className="font-bold text-[#1F1410]">
-                    {promo.canjesHoy} / {promo.limiteDiario} cupos ({porcentajeUso}%)
+                  <span className="text-[#1F1410]/60">Canjes hoy:</span>
+                  <span className={`font-bold ${agotado ? 'text-[#E12927]' : 'text-[#1F1410]'}`}>
+                    {promo.canjesHoy} / {promo.limiteDiario} ({porcentajeUso}%)
                   </span>
                 </div>
-                <div className="w-full h-1.5 bg-[#FAF7F5] rounded-xs overflow-hidden border border-[#1F1410]/10">
-                  <div 
-                    className="h-full bg-[#E12927] rounded-xs transition-all duration-300"
+                <div className="w-full h-1.5 bg-[#FAF7F5] rounded-full overflow-hidden border border-[#1F1410]/10">
+                  <div
+                    className="h-full bg-[#E12927] transition-all duration-300"
                     style={{ width: `${Math.min(porcentajeUso, 100)}%` }}
                   />
                 </div>
-                <div className="text-[11px] text-[#1F1410]/50 font-mono">
-                  Vigencia: {promo.vigencia}
+
+                <div className="flex items-center justify-between gap-2 pt-1">
+                  <span className="text-[11px] text-[#1F1410]/55 font-mono truncate">
+                    {promo.vigencia}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={!isActiva || agotado}
+                    onClick={() => abrirCanje(promo)}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#1F1410] hover:bg-[#E12927] disabled:opacity-40 text-white text-xs font-mono font-bold cursor-pointer transition-colors shrink-0"
+                  >
+                    <Ticket className="w-3.5 h-3.5" />
+                    {agotado ? 'Agotado hoy' : 'Canjear en caja'}
+                  </button>
                 </div>
               </div>
-
             </div>
           );
         })}
       </div>
 
-      {/* Modal Nueva Promoción (Portal a document.body para tapar toda la pantalla) */}
-      {showNewModal && createPortal(
-        <div 
-          className="fixed inset-0 z-[9999] bg-[#1F1410]/75 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 overflow-y-auto animate-modal-backdrop"
-          onClick={() => setShowNewModal(false)}
-        >
-          <div 
-            className="bg-white rounded-[32px] border border-[#1F1410]/10 max-w-md w-full p-6 sm:p-8 shadow-[0_25px_60px_-15px_rgba(31,20,16,0.35)] animate-modal-card relative max-h-[92vh] overflow-y-auto my-auto"
-            onClick={(e) => e.stopPropagation()}
+      {/* Modal Rápido de Canje de Cupón */}
+      {promoACanjear &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[9999] bg-[#1F1410]/70 backdrop-blur-xs flex items-center justify-center p-4"
+            onClick={() => setPromoACanjear(null)}
           >
-            <div className="flex items-center justify-between pb-4 border-b border-[#1F1410]/8 mb-5">
-              <div>
-                <h3 className="font-display font-bold text-lg sm:text-xl text-[#1F1410]">
-                  Crear Campaña o Cupón
-                </h3>
-                <p className="text-xs text-[#1F1410]/60 font-body mt-0.5">
-                  Cuponera Digital & Promociones Marfil
-                </p>
-              </div>
-              <button 
-                onClick={() => setShowNewModal(false)} 
-                className="w-9 h-9 rounded-full bg-[#FAF7F5] hover:bg-[#FCEAE9] text-[#1F1410]/50 hover:text-[#E12927] flex items-center justify-center transition-colors cursor-pointer"
-                title="Cerrar (Esc)"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreatePromo} noValidate className="space-y-4 font-body">
-              <div>
-                <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1.5">
-                  Código de Activación (POS) *
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ej. MF-PROMO-WAFFLE"
-                  value={newPromo.codigo}
-                  onChange={(e) => {
-                    setNewPromo({ ...newPromo, codigo: e.target.value });
-                    setPromoErrors((p) => ({ ...p, codigo: null }));
-                  }}
-                  aria-invalid={Boolean(promoErrors.codigo)}
-                  className={`w-full px-4 py-2.5 text-xs font-mono uppercase border rounded-xl focus:ring-1 focus:outline-hidden transition-all ${
-                    promoErrors.codigo ? 'border-[#E12927] focus:border-[#E12927] focus:ring-[#E12927]' : 'border-[#1F1410]/15 focus:border-[#E12927] focus:ring-[#E12927]'
-                  }`}
-                />
-                {promoErrors.codigo && <p role="alert" className="text-[11px] font-semibold text-[#E12927] mt-1">{promoErrors.codigo}</p>}
-              </div>
-
-              <div>
-                <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1.5">
-                  Título de la Promoción *
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ej. Miércoles de Waffles al 50%"
-                  value={newPromo.titulo}
-                  onChange={(e) => {
-                    setNewPromo({ ...newPromo, titulo: e.target.value });
-                    setPromoErrors((p) => ({ ...p, titulo: null }));
-                  }}
-                  aria-invalid={Boolean(promoErrors.titulo)}
-                  className={`w-full px-4 py-2.5 text-xs border rounded-xl focus:ring-1 focus:outline-hidden transition-all ${
-                    promoErrors.titulo ? 'border-[#E12927] focus:border-[#E12927] focus:ring-[#E12927]' : 'border-[#1F1410]/15 focus:border-[#E12927] focus:ring-[#E12927]'
-                  }`}
-                />
-                {promoErrors.titulo && <p role="alert" className="text-[11px] font-semibold text-[#E12927] mt-1">{promoErrors.titulo}</p>}
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
+            <div
+              className="bg-white rounded-2xl border border-[#1F1410]/10 max-w-md w-full p-6 shadow-2xl space-y-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between">
                 <div>
-                  <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1.5">
-                    Badge de Descuento *
+                  <span className="font-mono text-[11px] font-bold uppercase text-[#E12927]">
+                    {promoACanjear.codigo}
+                  </span>
+                  <h3 className="font-display font-bold text-lg text-[#1F1410]">
+                    Canjear cupón en caja
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPromoACanjear(null)}
+                  className="w-8 h-8 rounded-full bg-[#FAF7F5] flex items-center justify-center text-[#1F1410]/60 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <p className="text-xs text-[#1F1410]/75 bg-[#FCEAE9]/60 border border-[#E12927]/20 rounded-xl p-3">
+                <strong>{promoACanjear.titulo}:</strong> {promoACanjear.beneficio}
+              </p>
+
+              <form onSubmit={confirmarCanje} className="space-y-3.5">
+                <div>
+                  <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1">Sucursal</label>
+                  <select
+                    value={sucursalCanje}
+                    onChange={(e) => setSucursalCanje(e.target.value)}
+                    className="w-full px-3.5 py-2 text-xs border border-[#1F1410]/15 rounded-xl bg-white"
+                  >
+                    {sucursales.map((s) => (
+                      <option key={s.id} value={s.id}>{s.nombre}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1">
+                    Código Club Marfil del cliente (opcional)
                   </label>
                   <input
                     type="text"
-                    placeholder="Ej. 2x1, 50% OFF"
-                    value={newPromo.descuentoBadge}
-                    onChange={(e) => {
-                      setNewPromo({ ...newPromo, descuentoBadge: e.target.value });
-                      setPromoErrors((p) => ({ ...p, descuentoBadge: null }));
-                    }}
-                    aria-invalid={Boolean(promoErrors.descuentoBadge)}
-                    className={`w-full px-4 py-2.5 text-xs font-mono uppercase border rounded-xl focus:ring-1 focus:outline-hidden transition-all ${
-                      promoErrors.descuentoBadge ? 'border-[#E12927] focus:border-[#E12927] focus:ring-[#E12927]' : 'border-[#1F1410]/15 focus:border-[#E12927] focus:ring-[#E12927]'
-                    }`}
+                    placeholder="Ej. MF-CLUB-33109"
+                    value={codigoClienteCanje}
+                    onChange={(e) => setCodigoClienteCanje(e.target.value)}
+                    className="w-full px-3.5 py-2 text-xs font-mono uppercase border border-[#1F1410]/15 rounded-xl focus:outline-hidden focus:border-[#E12927]"
                   />
-                  {promoErrors.descuentoBadge && <p role="alert" className="text-[11px] font-semibold text-[#E12927] mt-1">{promoErrors.descuentoBadge}</p>}
                 </div>
 
-                <div>
-                  <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1.5">
-                    Límite Canjes / Día *
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="5000"
-                    value={newPromo.limiteDiario}
-                    onChange={(e) => {
-                      setNewPromo({ ...newPromo, limiteDiario: e.target.value });
-                      setPromoErrors((p) => ({ ...p, limiteDiario: null }));
-                    }}
-                    aria-invalid={Boolean(promoErrors.limiteDiario)}
-                    className={`w-full px-4 py-2.5 text-xs font-mono border rounded-xl focus:ring-1 focus:outline-hidden transition-all ${
-                      promoErrors.limiteDiario ? 'border-[#E12927] focus:border-[#E12927] focus:ring-[#E12927]' : 'border-[#1F1410]/15 focus:border-[#E12927] focus:ring-[#E12927]'
-                    }`}
-                  />
-                  {promoErrors.limiteDiario && <p role="alert" className="text-[11px] font-semibold text-[#E12927] mt-1">{promoErrors.limiteDiario}</p>}
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setPromoACanjear(null)}
+                    className="px-4 py-2 rounded-full text-xs font-semibold text-[#1F1410]/70 hover:bg-[#FAF7F5] cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={canjeando}
+                    className="px-5 py-2 rounded-full bg-[#E12927] hover:bg-[#c9201f] disabled:opacity-50 text-white text-xs font-mono font-bold cursor-pointer"
+                  >
+                    {canjeando ? 'Registrando...' : 'Confirmar Canje'}
+                  </button>
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1.5">
-                  Beneficio / Descripción para el Cliente *
-                </label>
-                <textarea
-                  rows="2"
-                  placeholder="Detalle de términos, consumo mínimo o productos participantes..."
-                  value={newPromo.beneficio}
-                  onChange={(e) => {
-                    setNewPromo({ ...newPromo, beneficio: e.target.value });
-                    setPromoErrors((p) => ({ ...p, beneficio: null }));
-                  }}
-                  aria-invalid={Boolean(promoErrors.beneficio)}
-                  className={`w-full px-4 py-2.5 text-xs border rounded-xl focus:ring-1 focus:outline-hidden transition-all ${
-                    promoErrors.beneficio ? 'border-[#E12927] focus:border-[#E12927] focus:ring-[#E12927]' : 'border-[#1F1410]/15 focus:border-[#E12927] focus:ring-[#E12927]'
-                  }`}
-                />
-                {promoErrors.beneficio && <p role="alert" className="text-[11px] font-semibold text-[#E12927] mt-1">{promoErrors.beneficio}</p>}
-              </div>
-
-              <div className="pt-4 border-t border-[#1F1410]/8 flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowNewModal(false)}
-                  className="px-5 py-2.5 text-xs font-semibold text-[#1F1410]/60 hover:text-[#1F1410] cursor-pointer rounded-full hover:bg-[#FAF7F5] transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-6 py-2.5 bg-[#E12927] hover:bg-[#c9201f] text-white text-xs font-bold rounded-full cursor-pointer shadow-md shadow-[#E12927]/25 font-mono transition-transform active:scale-[0.98]"
-                >
-                  Lanzar Promoción
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>,
-        document.body
-      )}
-
+              </form>
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 };
