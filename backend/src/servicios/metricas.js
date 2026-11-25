@@ -1,7 +1,7 @@
 // Indicadores del día para el dashboard. Todo se calcula al vuelo desde las
 // tablas operativas (reservaciones, servicios de mesa, sellos, canjes, escaneos).
 
-import { db } from '../db/conexion.js';
+import * as repo from '../repositorios/metricas.js';
 import { horaLocal, hoyLocal, rangoDia } from '../utils/fechas.js';
 
 const HORA_APERTURA = 8;
@@ -9,26 +9,15 @@ const HORA_CIERRE = 22;
 
 export async function metricasDelDia({ sucursalId, fecha = hoyLocal() } = {}) {
   const { desde, hasta } = rangoDia(fecha);
-  const valores = { desde, hasta, fecha, sucursalId: sucursalId ?? null };
-  // Con sucursalId = NULL el filtro no aplica y se suman todas las sucursales.
-  const porSucursal = (columna) => `(:sucursalId IS NULL OR ${columna} = :sucursalId)`;
+  const filtros = { desde, hasta, fecha, sucursalId };
 
   // Reservaciones del día por estado
   const reservas = { confirmada: 0, en_curso: 0, asistida: 0, cancelada: 0, no_show: 0 };
-  const porEstado = await db.todos(
-    `SELECT estado, COUNT(*) AS total FROM reservaciones r
-     WHERE r.fecha = :fecha AND ${porSucursal('r.sucursal_id')} GROUP BY estado`,
-    valores
-  );
+  const porEstado = await repo.reservasPorEstado(filtros);
   for (const fila of porEstado) reservas[fila.estado] = fila.total;
 
   // Servicios de mesa iniciados en el día
-  const servicios = await db.todos(
-    `SELECT sv.personas, sv.ticket_total, sv.inicio, sv.fin
-     FROM servicios_mesa sv JOIN mesas m ON m.id = sv.mesa_id
-     WHERE sv.inicio >= :desde AND sv.inicio < :hasta AND ${porSucursal('m.sucursal_id')}`,
-    valores
-  );
+  const servicios = await repo.serviciosDelDia(filtros);
 
   const horas = new Map();
   for (let h = HORA_APERTURA; h <= HORA_CIERRE; h += 1) {
@@ -59,26 +48,10 @@ export async function metricasDelDia({ sucursalId, fecha = hoyLocal() } = {}) {
   }
 
   // Aforo en este momento (servicios abiertos) contra la capacidad de las sucursales
-  const aforo = await db.uno(
-    `SELECT
-       (SELECT COALESCE(SUM(aforo_max), 0) FROM sucursales s
-         WHERE s.activa = 1 AND ${porSucursal('s.id')}) AS maximo,
-       (SELECT COALESCE(SUM(sv.personas), 0) FROM servicios_mesa sv JOIN mesas m ON m.id = sv.mesa_id
-         WHERE sv.fin IS NULL AND ${porSucursal('m.sucursal_id')}) AS actual`,
-    valores
-  );
-
-  const contar = async (sql, parametros = valores) => (await db.uno(sql, parametros)).total;
-  const sellos = await contar(
-    `SELECT COUNT(*) AS total FROM movimientos_club mc
-     WHERE mc.tipo = 'sello' AND mc.creado_en >= :desde AND mc.creado_en < :hasta AND ${porSucursal('mc.sucursal_id')}`
-  );
-  const cupones = await contar(
-    `SELECT COUNT(*) AS total FROM canjes_promocion c
-     WHERE c.creado_en >= :desde AND c.creado_en < :hasta AND ${porSucursal('c.sucursal_id')}`
-  );
-  // La bitácora del escáner no guarda sucursal: este dato siempre es global.
-  const escaneos = await contar('SELECT COUNT(*) AS total FROM escaneos WHERE creado_en >= ? AND creado_en < ?', [desde, hasta]);
+  const aforo = await repo.aforo(sucursalId);
+  const sellos = await repo.sellos(filtros);
+  const cupones = await repo.cupones(filtros);
+  const escaneos = await repo.escaneos(filtros);
 
   return {
     fecha,

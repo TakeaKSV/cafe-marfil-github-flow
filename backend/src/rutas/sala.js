@@ -6,19 +6,43 @@ import { z } from 'zod';
 import { requiereStaff } from '../middleware/auth.js';
 import { historialEscaneos } from '../servicios/bitacora.js';
 import {
-  canjearBeneficio, canjearRecompensa, listarClientes, obtenerClientePorCodigo, registrarCliente, sumarSello
+  canjearBeneficio,
+  canjearRecompensa,
+  listarClientes,
+  obtenerClientePorCodigo,
+  registrarCliente,
+  sumarSello
 } from '../servicios/clientes.js';
 import { resolverCodigo } from '../servicios/escaner.js';
 import {
-  actualizarJuego, crearJuego, devolverJuego, eliminarJuego, listarJuegos, prestarJuego
+  actualizarJuego,
+  crearJuego,
+  devolverJuego,
+  eliminarJuego,
+  listarJuegos,
+  prestarJuego
 } from '../servicios/juegos.js';
 import {
-  abrirServicio, actualizarMesa, actualizarTicket, cerrarServicio, listarMesas, marcarLimpia, obtenerMesa
+  abrirServicio,
+  actualizarMesa,
+  cerrarServicio,
+  listarMesas,
+  marcarLimpia,
+  obtenerMesa
 } from '../servicios/mesas.js';
 import { metricasDelDia } from '../servicios/metricas.js';
 import { actualizarPersona, crearPersona, listarPersonal } from '../servicios/personal.js';
 import {
-  leer, zEmail, zEntero, zFecha, zHora, zId, zPassword, zPrecio, zTexto, zTextoOpcional
+  leer,
+  zEmail,
+  zEntero,
+  zFecha,
+  zHora,
+  zId,
+  zPassword,
+  zPrecio,
+  zTexto,
+  zTextoOpcional
 } from '../utils/validar.js';
 
 const router = Router();
@@ -57,8 +81,7 @@ router.get('/mesas/:id', async (req, res) => res.json(await obtenerMesa(leer(zId
 
 router.patch('/mesas/:id', async (req, res) => {
   const id = leer(zId, req.params.id);
-  const { ticketTotal, ...cambios } = leer(esquemaEditarMesa, req.body);
-  if (ticketTotal !== undefined) await actualizarTicket(id, ticketTotal);
+  const cambios = leer(esquemaEditarMesa, req.body);
   res.json(await actualizarMesa(id, cambios));
 });
 
@@ -99,8 +122,8 @@ router.get('/club/clientes/:codigo', async (req, res) => res.json(await obtenerC
 
 router.post('/club/clientes/:codigo/sello', async (req, res) => {
   const { sucursalId } = leer(filtroSucursal, req.body);
-  res.json(await 
-    sumarSello(req.params.codigo, {
+  res.json(
+    await sumarSello(req.params.codigo, {
       sucursalId: sucursalId ?? req.usuario.sucursalId ?? null,
       personalId: req.usuario.id
     })

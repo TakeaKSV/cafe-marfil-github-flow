@@ -23,12 +23,28 @@ export function leer(esquema, datos) {
 
 export const zTexto = (max = 200) => z.string().trim().min(1).max(max);
 export const zTextoOpcional = (max = 500) => z.string().trim().max(max);
-export const zId = z.coerce.number().int().positive();
-export const zEntero = (min = 0, max = 100000) => z.coerce.number().int().min(min).max(max);
-export const zPrecio = z.coerce.number().min(0).max(100000);
+const zNumero = z
+  .union([
+    z.number(),
+    z
+      .string()
+      .trim()
+      .regex(/^\d+(?:\.\d+)?$/)
+  ])
+  .pipe(z.coerce.number());
+export const zId = zNumero.pipe(z.number().int().positive().max(4294967295));
+export const zEntero = (min = 0, max = 100000) => zNumero.pipe(z.number().int().min(min).max(max));
+export const zPrecio = zNumero.pipe(z.number().min(0).max(100000));
 export const zListaTexto = z.array(zTexto(300)).max(30);
 export const zEmail = z.string().trim().toLowerCase().max(190).pipe(z.email());
-export const zPassword = z.string().min(8, 'La contraseña debe tener al menos 8 caracteres.').max(72);
+export const zPasswordLogin = z
+  .string()
+  .min(1)
+  .refine((valor) => Buffer.byteLength(valor, 'utf8') <= 72, 'La contraseña no puede exceder 72 bytes UTF-8.');
+export const zPassword = z
+  .string()
+  .min(8, 'La contraseña debe tener al menos 8 caracteres.')
+  .refine((valor) => Buffer.byteLength(valor, 'utf8') <= 72, 'La contraseña no puede exceder 72 bytes UTF-8.');
 
 export const zFecha = z.string().refine(esFechaValida, 'Usa el formato AAAA-MM-DD.');
 

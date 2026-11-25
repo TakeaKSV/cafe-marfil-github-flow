@@ -4,19 +4,35 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { esGerencia, esStaff, requiereStaff } from '../middleware/auth.js';
+import { actualizarActividad, crearActividad, listarActividades, obtenerActividad } from '../servicios/actividades.js';
 import {
-  actualizarActividad, crearActividad, listarActividades, obtenerActividad
-} from '../servicios/actividades.js';
-import {
-  actualizarProducto, crearProducto, eliminarProducto, listarCategorias, listarProductos, obtenerProducto
+  actualizarProducto,
+  crearProducto,
+  eliminarProducto,
+  listarCategorias,
+  listarProductos,
+  obtenerProducto
 } from '../servicios/menu.js';
 import {
-  actualizarPromocion, canjearPromocion, crearPromocion, listarPromociones, obtenerPromocion
+  actualizarPromocion,
+  canjearPromocion,
+  crearPromocion,
+  listarPromociones,
+  obtenerPromocion
 } from '../servicios/promociones.js';
 import { listarSucursales, obtenerSucursal } from '../servicios/sucursales.js';
 import { noEncontrado, sinPermiso } from '../utils/errores.js';
 import {
-  leer, zBanderaQuery, zEntero, zFecha, zHora, zId, zListaTexto, zPrecio, zTexto, zTextoOpcional
+  leer,
+  zBanderaQuery,
+  zEntero,
+  zFecha,
+  zHora,
+  zId,
+  zListaTexto,
+  zPrecio,
+  zTexto,
+  zTextoOpcional
 } from '../utils/validar.js';
 
 const router = Router();
@@ -52,7 +68,10 @@ const camposProducto = {
   imagen: zTexto(300).nullable(),
   badge: zTexto(40).nullable(),
   calorias: zEntero(0, 5000).nullable(),
-  colorCard: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Usa un color hexadecimal, ej. #E12927.').nullable(),
+  colorCard: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/, 'Usa un color hexadecimal, ej. #E12927.')
+    .nullable(),
   ingredientes: zListaTexto,
   alergenos: zListaTexto,
   disponibleEnCocina: z.boolean(),

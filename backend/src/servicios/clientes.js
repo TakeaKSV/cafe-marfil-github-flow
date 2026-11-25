@@ -1,22 +1,17 @@
 // Clientes y Club Marfil: cuentas de la PWA, pasaporte de sellos y beneficios.
 
-import bcrypt from 'bcryptjs';
+import { cifrarPassword, verificarPassword } from '../utils/password.js';
 import { config } from '../config.js';
-import { bloquearFila, db, enTransaccion } from '../db/conexion.js';
+import { bloquearFila, enTransaccion } from '../db/conexion.js';
+import * as repo from '../repositorios/clientes.js';
 import { codigoUnico, generarCodigoBeneficio, generarCodigoClub, leerJSON } from '../utils/codigos.js';
 import { conflicto, noAutenticado, noEncontrado } from '../utils/errores.js';
 import { ahoraISO, fechaEnFrase, hoyLocal } from '../utils/fechas.js';
-import { armarUpdate } from '../utils/sql.js';
+
 import { crearNotificacion, registrarEscaneo } from './bitacora.js';
 import { exigirSucursal } from './sucursales.js';
 
 // recompensa_nombre: premio del pasaporte que el cliente ya ganó y aún no canjea.
-const SQL_CLIENTES = `
-  SELECT c.*, s.nombre AS sucursal_habitual,
-    (SELECT b.titulo FROM beneficios b
-      WHERE b.cliente_id = c.id AND b.origen = 'sellos' AND b.estado = 'disponible'
-      ORDER BY b.id LIMIT 1) AS recompensa_nombre
-  FROM clientes c LEFT JOIN sucursales s ON s.id = c.sucursal_habitual_id`;
 
 function nivelPorVisitas(visitas) {
   if (visitas >= 20) return 'Marfil VIP';
@@ -52,26 +47,18 @@ function aCliente(fila) {
 // Consulta y alta
 // --------------------------------------------------------------------------
 
-export async function listarClientes({ q } = {}) {
-  const filas = q
-    ? await db.todos(
-        `${SQL_CLIENTES}
-         WHERE c.nombre LIKE :patron OR c.telefono LIKE :patron OR c.email LIKE :patron OR c.codigo_club LIKE :patron
-         ORDER BY c.nombre LIMIT 200`,
-        { patron: `%${q}%` }
-      )
-    : await db.todos(`${SQL_CLIENTES} ORDER BY c.nombre LIMIT 200`);
-  return filas.map(aCliente);
+export async function listarClientes(filtros = {}) {
+  return (await repo.listar(filtros)).map(aCliente);
 }
 
 export async function obtenerCliente(id) {
-  const fila = await db.uno(`${SQL_CLIENTES} WHERE c.id = ?`, [id]);
+  const fila = await repo.porId(id);
   if (!fila) throw noEncontrado('No existe ese cliente.');
   return aCliente(fila);
 }
 
 export async function buscarClientePorCodigo(codigo) {
-  const fila = await db.uno(`${SQL_CLIENTES} WHERE c.codigo_club = ?`, [String(codigo).trim().toUpperCase()]);
+  const fila = await repo.porCodigo(String(codigo).trim().toUpperCase());
   return fila ? aCliente(fila) : null;
 }
 
@@ -84,62 +71,52 @@ export async function obtenerClientePorCodigo(codigo) {
 /** Alta de cliente. Con `password` crea cuenta para la PWA; sin ella es un alta en caja. */
 export async function registrarCliente(datos) {
   if (datos.sucursalHabitualId) await exigirSucursal(datos.sucursalHabitualId);
-  if (datos.email && (await db.uno('SELECT 1 FROM clientes WHERE email = ?', [datos.email]))) {
+  if (datos.email && (await repo.emailExiste(datos.email))) {
     throw conflicto('Ya existe una cuenta con ese correo.');
   }
 
-  const codigo = await codigoUnico(generarCodigoClub, (c) => db.uno('SELECT 1 FROM clientes WHERE codigo_club = ?', [c]));
-  const { id } = await db.ejecutar(
-    `INSERT INTO clientes (codigo_club, nombre, email, telefono, password_hash, ciudad, sucursal_habitual_id, creado_en)
-     VALUES (:codigo, :nombre, :email, :telefono, :passwordHash, :ciudad, :sucursalHabitualId, :creadoEn)`,
-    {
-      codigo,
-      nombre: datos.nombre,
-      email: datos.email ?? null,
-      telefono: datos.telefono ?? null,
-      passwordHash: datos.password ? await bcrypt.hash(datos.password, 10) : null,
-      ciudad: datos.ciudad ?? null,
-      sucursalHabitualId: datos.sucursalHabitualId ?? null,
-      creadoEn: ahoraISO()
-    }
-  );
+  const codigo = await codigoUnico(generarCodigoClub, (c) => repo.codigoExiste(c));
+  const { id } = await repo.insertarCliente({
+    codigo,
+    nombre: datos.nombre,
+    email: datos.email ?? null,
+    telefono: datos.telefono ?? null,
+    passwordHash: datos.password ? await cifrarPassword(datos.password) : null,
+    ciudad: datos.ciudad ?? null,
+    sucursalHabitualId: datos.sucursalHabitualId ?? null,
+    creadoEn: ahoraISO()
+  });
   return obtenerCliente(id);
 }
 
 export async function autenticarCliente(email, password) {
-  const fila = await db.uno(`${SQL_CLIENTES} WHERE c.email = ?`, [email]);
-  const valido = fila?.password_hash && (await bcrypt.compare(password, fila.password_hash));
+  const fila = await repo.porEmail(email);
+  const valido = await verificarPassword(password, fila?.password_hash);
   if (!valido) throw noAutenticado('Correo o contraseña incorrectos.');
-  return aCliente(fila);
+  return { cliente: aCliente(fila), version: fila.session_version };
 }
 
 export async function actualizarPerfil(id, cambios) {
-  const actual = await obtenerCliente(id);
-  if (cambios.email && cambios.email !== actual.email) {
-    if (await db.uno('SELECT 1 FROM clientes WHERE email = ? AND id <> ?', [cambios.email, id])) {
-      throw conflicto('Ese correo ya está en uso por otra cuenta.');
-    }
-  }
-  if (cambios.sucursalHabitualId) await exigirSucursal(cambios.sucursalHabitualId);
+  return enTransaccion(async () => {
+    await bloquearFila('clientes', id);
 
-  // Las preferencias se mezclan con las existentes en lugar de reemplazarlas.
-  const preferencias = cambios.preferencias
-    ? JSON.stringify({ ...actual.preferencias, ...cambios.preferencias })
-    : undefined;
-
-  const update = armarUpdate(
-    { ...cambios, preferencias },
-    {
-      nombre: 'nombre',
-      email: 'email',
-      telefono: 'telefono',
-      ciudad: 'ciudad',
-      sucursalHabitualId: 'sucursal_habitual_id',
-      preferencias: 'preferencias'
+    const actual = await obtenerCliente(id);
+    if (cambios.email && cambios.email !== actual.email) {
+      if (await repo.emailEnUso(cambios.email, id)) {
+        throw conflicto('Ese correo ya está en uso por otra cuenta.');
+      }
     }
-  );
-  if (update) await db.ejecutar(`UPDATE clientes SET ${update.sets} WHERE id = :id`, { ...update.valores, id });
-  return obtenerCliente(id);
+    if (cambios.sucursalHabitualId) await exigirSucursal(cambios.sucursalHabitualId);
+
+    // Las preferencias se mezclan con las existentes en lugar de reemplazarlas.
+    const preferencias = cambios.preferencias
+      ? JSON.stringify({ ...actual.preferencias, ...cambios.preferencias })
+      : undefined;
+
+    await repo.actualizarClientes(id, { ...cambios, preferencias });
+
+    return obtenerCliente(id);
+  });
 }
 
 // --------------------------------------------------------------------------
@@ -163,26 +140,17 @@ export function sumarSello(codigo, { sucursalId = null, personalId = null } = {}
     const completoAhora = !yaEstabaLleno && sellos >= cliente.sellosMeta;
     const ahora = ahoraISO();
 
-    await db.ejecutar(
-      `UPDATE clientes
-          SET sellos_actuales = ?, puntos = puntos + ?, visitas_totales = visitas_totales + 1, ultima_visita = ?
-        WHERE id = ?`,
-      [sellos, config.puntosPorSello, ahora, cliente.id]
-    );
+    await repo.acreditarVisita(sellos, config.puntosPorSello, ahora, cliente.id);
 
-    await db.ejecutar(
-      `INSERT INTO movimientos_club (cliente_id, tipo, sellos, puntos, descripcion, sucursal_id, personal_id, creado_en)
-       VALUES (?, 'sello', ?, ?, ?, ?, ?, ?)`,
-      [
-        cliente.id,
-        yaEstabaLleno ? 0 : 1,
-        config.puntosPorSello,
-        `Sello por visita (${sellos}/${cliente.sellosMeta})`,
-        sucursalId,
-        personalId,
-        ahora
-      ]
-    );
+    await repo.registrarVisita({
+      clienteId: cliente.id,
+      sellos: yaEstabaLleno ? 0 : 1,
+      puntos: config.puntosPorSello,
+      descripcion: `Sello por visita (${sellos}/${cliente.sellosMeta})`,
+      sucursalId: sucursalId,
+      personalId: personalId,
+      creadoEn: ahora
+    });
 
     if (completoAhora) {
       await otorgarBeneficio(cliente.id, {
@@ -228,12 +196,17 @@ export async function otorgarBeneficio(
   clienteId,
   { titulo, subtitulo = null, icono = 'Gift', origen = 'manual', venceEn = null }
 ) {
-  const codigo = await codigoUnico(generarCodigoBeneficio, (c) => db.uno('SELECT 1 FROM beneficios WHERE codigo = ?', [c]));
-  const { id } = await db.ejecutar(
-    `INSERT INTO beneficios (cliente_id, codigo, titulo, subtitulo, icono, origen, vence_en, creado_en)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [clienteId, codigo, titulo, subtitulo, icono, origen, venceEn, ahoraISO()]
-  );
+  const codigo = await codigoUnico(generarCodigoBeneficio, (c) => repo.beneficioExiste(c));
+  const { id } = await repo.insertarBeneficio({
+    clienteId: clienteId,
+    codigo: codigo,
+    titulo: titulo,
+    subtitulo: subtitulo,
+    icono: icono,
+    origen: origen,
+    venceEn: venceEn,
+    creadoEn: ahoraISO()
+  });
 
   await crearNotificacion(clienteId, {
     titulo: '¡Nuevo beneficio disponible!',
@@ -241,7 +214,7 @@ export async function otorgarBeneficio(
     tipo: 'beneficio',
     screenDestino: 'beneficios'
   });
-  return aBeneficio(await db.uno('SELECT * FROM beneficios WHERE id = ?', [id]));
+  return aBeneficio(await repo.beneficioPorId(id));
 }
 
 /**
@@ -250,7 +223,7 @@ export async function otorgarBeneficio(
  */
 export async function listarBeneficios(clienteId) {
   const cliente = await obtenerCliente(clienteId);
-  const filas = await db.todos('SELECT * FROM beneficios WHERE cliente_id = ? ORDER BY estado, id DESC', [clienteId]);
+  const filas = await repo.beneficiosDeCliente(clienteId);
   const beneficios = filas.map(aBeneficio);
 
   if (!cliente.recompensaDisponible) {
@@ -269,13 +242,14 @@ export async function listarBeneficios(clienteId) {
 }
 
 export async function buscarBeneficioPorCodigo(codigo) {
-  const fila = await db.uno(
-    `SELECT b.*, c.nombre AS cliente_nombre, c.codigo_club
-     FROM beneficios b JOIN clientes c ON c.id = b.cliente_id WHERE b.codigo = ?`,
-    [String(codigo).trim().toUpperCase()]
-  );
+  const fila = await repo.beneficioPorCodigo(String(codigo).trim().toUpperCase());
   return fila
-    ? { ...aBeneficio(fila), clienteNombre: fila.cliente_nombre, codigoCliente: fila.codigo_club, clienteId: fila.cliente_id }
+    ? {
+        ...aBeneficio(fila),
+        clienteNombre: fila.cliente_nombre,
+        codigoCliente: fila.codigo_club,
+        clienteId: fila.cliente_id
+      }
     : null;
 }
 
@@ -284,6 +258,7 @@ export function canjearBeneficio(codigo, { personalId = null } = {}) {
   return enTransaccion(async () => {
     const encontrado = await buscarBeneficioPorCodigo(codigo);
     if (!encontrado) throw noEncontrado(`No existe un beneficio con el código ${codigo}.`);
+    await bloquearFila('clientes', encontrado.clienteId);
     await bloquearFila('beneficios', encontrado.id);
     const beneficio = await buscarBeneficioPorCodigo(codigo); // estado real, ya con la fila bloqueada
 
@@ -291,15 +266,16 @@ export function canjearBeneficio(codigo, { personalId = null } = {}) {
     if (beneficio.estado === 'vencido') throw conflicto(`Este beneficio venció el ${fechaEnFrase(beneficio.venceEn)}.`);
 
     const ahora = ahoraISO();
-    await db.ejecutar("UPDATE beneficios SET estado = 'usado', usado_en = ? WHERE id = ?", [ahora, beneficio.id]);
+    await repo.usarBeneficio(ahora, beneficio.id);
 
     if (beneficio.origen === 'sellos') {
-      await db.ejecutar('UPDATE clientes SET sellos_actuales = 0 WHERE id = ?', [beneficio.clienteId]);
-      await db.ejecutar(
-        `INSERT INTO movimientos_club (cliente_id, tipo, descripcion, personal_id, creado_en)
-         VALUES (?, 'recompensa_canjeada', ?, ?, ?)`,
-        [beneficio.clienteId, `Canjeó: ${beneficio.titulo}. Nuevo pasaporte en 0 sellos.`, personalId, ahora]
-      );
+      await repo.reiniciarPasaporte(beneficio.clienteId);
+      await repo.registrarCanjeRecompensa({
+        clienteId: beneficio.clienteId,
+        descripcion: `Canjeó: ${beneficio.titulo}. Nuevo pasaporte en 0 sellos.`,
+        personalId: personalId,
+        creadoEn: ahora
+      });
     }
 
     await registrarEscaneo({
@@ -317,10 +293,7 @@ export function canjearBeneficio(codigo, { personalId = null } = {}) {
 /** Atajo del panel: canjea la recompensa de pasaporte pendiente de un cliente. */
 export async function canjearRecompensa(codigoCliente, opciones) {
   const cliente = await obtenerClientePorCodigo(codigoCliente);
-  const pendiente = await db.uno(
-    "SELECT codigo FROM beneficios WHERE cliente_id = ? AND origen = 'sellos' AND estado = 'disponible' ORDER BY id LIMIT 1",
-    [cliente.id]
-  );
+  const pendiente = await repo.recompensaPendiente(cliente.id);
   if (!pendiente) throw conflicto(`${cliente.nombre} no tiene una recompensa de pasaporte por canjear.`);
   return canjearBeneficio(pendiente.codigo, opciones);
 }
@@ -330,7 +303,7 @@ export async function canjearRecompensa(codigoCliente, opciones) {
 // --------------------------------------------------------------------------
 
 export async function listarNotificaciones(clienteId) {
-  const filas = await db.todos('SELECT * FROM notificaciones WHERE cliente_id = ? ORDER BY id DESC LIMIT 50', [clienteId]);
+  const filas = await repo.notificaciones(clienteId);
   return filas.map((fila) => ({
     id: fila.id,
     titulo: fila.titulo,
@@ -345,12 +318,9 @@ export async function listarNotificaciones(clienteId) {
 /** Marca como leída una notificación, o todas si no se pasa id. */
 export async function marcarNotificacionesLeidas(clienteId, notificacionId) {
   if (notificacionId === undefined) {
-    await db.ejecutar('UPDATE notificaciones SET leida = 1 WHERE cliente_id = ?', [clienteId]);
+    await repo.leerTodas(clienteId);
   } else {
-    const { afectadas } = await db.ejecutar('UPDATE notificaciones SET leida = 1 WHERE id = ? AND cliente_id = ?', [
-      notificacionId,
-      clienteId
-    ]);
+    const { afectadas } = await repo.leerNotificacion(notificacionId, clienteId);
     if (!afectadas) throw noEncontrado('No existe esa notificación.');
   }
   return listarNotificaciones(clienteId);

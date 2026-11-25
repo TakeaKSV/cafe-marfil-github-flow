@@ -127,6 +127,7 @@ export default function App() {
       setSecciones(aSeccionesDeMenu(productos));
       setCatalogoListo(true);
     } catch (err) {
+      if (!(import.meta.env.DEV && import.meta.env.VITE_DEMO_OFFLINE === 'true' && !err.status)) throw err;
       console.warn('API no disponible, usando catálogo local simulado.', err);
       const { SUCURSALES, ACTIVIDADES, PROMOCIONES, SECCIONES_MENU } = await import('./data/marfilData');
       setSucursales(SUCURSALES);
@@ -305,7 +306,8 @@ export default function App() {
       navigateTo('confirmacion_reservacion');
       return null;
     } catch (error) {
-      if (!error.status) {
+      if (import.meta.env.DEV && import.meta.env.VITE_DEMO_OFFLINE === 'true' && !error.status) {
+        setAviso('Modo demo: esta confirmación es simulada y no reserva lugares.');
         // Fallback cuando la API está offline
         const mockConfirmacion = {
           id: `res-${Date.now().toString().slice(-4)}`,

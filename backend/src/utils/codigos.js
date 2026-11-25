@@ -7,7 +7,7 @@ const hex = (bytes) => crypto.randomBytes(bytes).toString('hex').toUpperCase();
 export const generarFolio = () => `MF-RES-${digitos(5)}`;
 
 /** Secreto del QR de una reservación: no se puede adivinar a partir del folio. */
-export const generarTokenQR = () => `QR-${hex(8)}`;
+export const generarTokenQR = () => `QR-${hex(16)}`;
 
 export const generarCodigoClub = () => `MF-CLUB-${digitos(5)}`;
 export const generarCodigoBeneficio = () => `MF-BEN-${hex(3)}`;

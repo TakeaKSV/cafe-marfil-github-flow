@@ -101,8 +101,9 @@ export function App() {
       sesion.guardar(respuesta.token);
       setUsuario(respuesta.usuario);
     } catch (err) {
-      if (!err.status) {
+      if (import.meta.env.DEV && import.meta.env.VITE_DEMO_OFFLINE === 'true' && !err.status) {
         console.warn('API no disponible, iniciando en modo demostración/offline');
+        setAviso({ tipo: 'error', texto: 'Modo demo: los datos son simulados y no se guardan.' });
         setUsuario({
           id: 1,
           nombre: 'Sofía Valenzuela',
@@ -148,6 +149,7 @@ export function App() {
       setEscaneos(historial.map(aEscaneo));
       setDatosListos(true);
     } catch (err) {
+      if (!(import.meta.env.DEV && import.meta.env.VITE_DEMO_OFFLINE === 'true' && !err.status)) throw err;
       console.warn('API no disponible en panel admin, usando mock data local.', err);
       const mock = await import('./data/adminMockData');
       setMetricas(mock.INITIAL_METRICAS || {

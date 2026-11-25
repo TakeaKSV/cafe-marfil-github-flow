@@ -1,0 +1,86 @@
+import { consulta } from '../db/conexion.js';
+import { insertar, actualizar, mapearCampos, aBit, aJSON } from './base.js';
+
+function productos() {
+  return consulta('productos as p')
+    .join('categorias_menu as c', 'c.id', 'p.categoria_id')
+    .select('p.*', 'c.slug as categoria_slug', 'c.nombre as categoria')
+    .where('p.activo', 1);
+}
+export const listarCategorias = () =>
+  consulta('categorias_menu as c')
+    .select(
+      'c.id',
+      'c.slug',
+      'c.nombre',
+      consulta('productos as p').count('*').whereColumn('p.categoria_id', 'c.id').where('p.activo', 1).as('productos')
+    )
+    .orderBy(['c.orden', 'c.id']);
+export function listar({ categoria, q, disponibles, destacados }) {
+  const query = productos();
+  if (categoria) query.where('c.slug', categoria);
+  if (q)
+    query.where(function () {
+      this.where('p.nombre', 'like', '%' + q + '%').orWhere('p.descripcion', 'like', '%' + q + '%');
+    });
+  if (disponibles) query.where('p.disponible', 1);
+  if (destacados) query.where('p.destacado', 1);
+  return query.orderBy(['c.orden', 'p.id']);
+}
+export const buscar = (clave) =>
+  productos()
+    .where(/^\d+$/.test(String(clave)) ? 'p.id' : 'p.slug', clave)
+    .first();
+
+export const insertarProducto = (datos) =>
+  insertar('productos', {
+    slug: datos.slug,
+    nombre: datos.nombre,
+    nombre_corto: datos.nombreCorto,
+    categoria_id: datos.categoriaId,
+    etiqueta: datos.etiqueta,
+    descripcion: datos.descripcion,
+    porcion: datos.porcion,
+    precio: datos.precio,
+    imagen: datos.imagen,
+    badge: datos.badge,
+    calorias: datos.calorias,
+    color_card: datos.colorCard,
+    ingredientes: datos.ingredientes,
+    alergenos: datos.alergenos,
+    disponible: datos.disponible,
+    stock_diario: datos.stockDiario,
+    tiempo_prep_min: datos.tiempoPrepMin,
+    destacado: datos.destacado,
+    creado_en: datos.creadoEn
+  });
+
+const CAMPOS_PRODUCTOS = {
+  nombre: 'nombre',
+  nombreCorto: 'nombre_corto',
+  categoriaId: 'categoria_id',
+  etiqueta: 'etiqueta',
+  descripcion: 'descripcion',
+  porcion: 'porcion',
+  precio: 'precio',
+  imagen: 'imagen',
+  badge: 'badge',
+  calorias: 'calorias',
+  colorCard: 'color_card',
+  ingredientes: ['ingredientes', aJSON],
+  alergenos: ['alergenos', aJSON],
+  disponibleEnCocina: ['disponible', aBit],
+  stockDiario: 'stock_diario',
+  vendidosHoy: 'vendidos_hoy',
+  tiempoPrepMin: 'tiempo_prep_min',
+  destacado: ['destacado', aBit]
+};
+
+export const actualizarProductos = (id, cambios) =>
+  actualizar('productos', id, mapearCampos(cambios, CAMPOS_PRODUCTOS));
+
+export const categoriaPorSlug = (slug) => consulta('categorias_menu').select('id').where({ slug }).first();
+
+export const slugExiste = (slug) => consulta('productos').select('id').where({ slug }).first();
+
+export const desactivar = (id) => actualizar('productos', id, { activo: 0 });
