@@ -19,242 +19,25 @@ import {
 } from 'lucide-react';
 import { sounds } from '../utils/audio';
 
-/**
- * Catálogo del Menú organizado en 2 Secciones Principales
- * Basado estrictamente en las referencias visuales de Café Marfil Durango:
- * - Sección 1: Frappés & Bebidas de Autor
- * - Sección 2: Cocina, Hamburguesas & Snacks
- */
-export const MENU_SECTIONS = [
-  {
-    id: 'seccion-1',
-    numero: 'Seccion 1',
-    titulo: 'Frappés de Autor & Especialidad',
-    subtitulo: 'Indulgencia fría con granos de altura y confitería premium',
-    productos: [
-      {
-        id: 'frappe-moka',
-        nombre: 'CAFE TAL',
-        nombreCompleto: 'Frappé Moka Avellana & Caramelo',
-        categoria: 'Frappé de Autor',
-        precio: '$98 MXN',
-        precioNum: 98,
-        tamano: '16 oz',
-        calorias: '410 kcal',
-        imagen: '/images/Menu/vaso-cafe.png',
-        colorCard: '#C6A686', // Moka avellana tostada intenso
-        queTrae: [
-          'Doble shot de espresso chiapaneco 100% Arábica de especialidad.',
-          'Crema artesanal de avellanas tostadas y cacao belga.',
-          'Leche entera o deslactosada al vapor frío con textura frappeada.',
-          'Corona abundante de crema chantilly batida en casa.',
-          'Drizzle espeso de chocolate fundido y jarabe de avellana silvestre.',
-          'Topping crujiente de barquillo de canela.'
-        ],
-        alergenos: ['Lácteos', 'Avellana', 'Gluten'],
-        badge: 'TOP SELLER'
-      },
-      {
-        id: 'frappe-fresa-dubai',
-        nombre: 'FRESA DUBÁI',
-        nombreCompleto: 'Frappé Fresa Estilo Dubái con Pistache & Kataifi',
-        categoria: 'Edición Especial Dubái',
-        precio: '$145 MXN',
-        precioNum: 145,
-        tamano: '16 oz',
-        calorias: '430 kcal',
-        imagen: '/images/Menu/vaso-principal.png',
-        colorCard: '#F48B89', // Rosa fresa dulce intenso
-        queTrae: [
-          'Fresas orgánicas frescas machacadas al momento con toque cítrico.',
-          'Crema untuosa de pistache siciliano puro 100% importado.',
-          'Lluvia crocante de pasta kataifi dorada lentamente en mantequilla.',
-          'Chocolate semi-amargo derretido en las paredes del vaso.',
-          'Crema chantilly montada con pistache molido espolvoreado.',
-          'Topping de fresa natural entera bañada en chocolate.'
-        ],
-        alergenos: ['Lácteos', 'Pistache', 'Gluten'],
-        badge: 'TENDENCIA DUBÁI'
-      },
-      {
-        id: 'frappe-velvet-lavanda',
-        nombre: 'VELVET LAVANDA',
-        nombreCompleto: 'Frappé Velvet Lavanda & Frutos del Bosque',
-        categoria: 'Coctelería Lúdica de Sala',
-        precio: '$105 MXN',
-        precioNum: 105,
-        tamano: '16 oz',
-        calorias: '340 kcal',
-        imagen: '/images/Menu/vaso-morado.png',
-        colorCard: '#BFA5E5', // Lavanda taro violeta intenso
-        queTrae: [
-          'Infusión artesanal de flores de lavanda francesa orgánica.',
-          'Coulis concentrado de moras silvestres, zarzamora y frambuesa.',
-          'Base cremosa de taro dulce y leche a elegir.',
-          'Perlas explosivas de fruta natural con jugo de moras.',
-          'Crema chantilly ligera con toques de pétalos comestibles.',
-          'Toque de menta fresca perfumada al momento.'
-        ],
-        alergenos: ['Lácteos'],
-        badge: 'NUEVO'
-      },
-      {
-        id: 'frappe-kinder-bueno',
-        nombre: 'KINDER BUENO',
-        nombreCompleto: 'Frappé de Confitería Kinder Bueno',
-        categoria: 'Barra de Confitería',
-        precio: '$115 MXN',
-        precioNum: 115,
-        tamano: '16 oz',
-        calorias: '450 kcal',
-        imagen: '/images/Menu/vaso-cafe.png',
-        colorCard: '#D8B288', // Avellana y barquillo dorado intenso
-        queTrae: [
-          'Crema suave de chocolate con leche y avellana Kinder.',
-          'Barra entera de chocolate Kinder Bueno crocante.',
-          'Shot de café espresso para equilibrar dulzor.',
-          'Crema batida fresca y lluvia de trocitos de oblea con chocolate.',
-          'Salsa tibia de avellana derretida al servir.'
-        ],
-        alergenos: ['Lácteos', 'Avellana', 'Gluten'],
-        badge: 'FAVORITO'
-      },
-      {
-        id: 'frappe-mazapan',
-        nombre: 'MAZAPÁN ARTESANAL',
-        nombreCompleto: 'Frappé Tradicional de Mazapán con Leche Condensada',
-        categoria: 'Sabor Mexicano',
-        precio: '$95 MXN',
-        precioNum: 95,
-        tamano: '16 oz',
-        calorias: '390 kcal',
-        imagen: '/images/Menu/vaso-principal.png',
-        colorCard: '#E0BC83', // Cacahuate tostado y dulce de leche intenso
-        queTrae: [
-          'Dos piezas completas de mazapán de cacahuate artesanal.',
-          'Toque sutil de canela de Ceilán molida.',
-          'Base láctea cremosa con leche condensada.',
-          'Corona de crema chantilly con cacahuates tostados triturados.',
-          'Medio mazapán coronando la copa.'
-        ],
-        alergenos: ['Lácteos', 'Cacahuate'],
-        badge: 'CLÁSICO'
-      }
-    ]
-  },
-  {
-    id: 'seccion-2',
-    numero: 'Seccion 2',
-    titulo: 'Cocina Salada, Hamburguesas & Snacks',
-    subtitulo: 'Recetas contundentes con carne de res local y pan brioche de masa madre',
-    productos: [
-      {
-        id: 'burger-doble-marfil',
-        nombre: 'CAFE TAL',
-        nombreCompleto: 'Hamburguesa Doble Carne Marfil con Asadero Duranguense',
-        categoria: 'Cocina Salada Contundente',
-        precio: '$185 MXN',
-        precioNum: 185,
-        tamano: 'Plato individual con papas',
-        calorias: '720 kcal',
-        imagen: '/images/Menu/Hamburguesa.png',
-        colorCard: '#D1A56A', // Asadero fundido y brioche dorado intenso
-        queTrae: [
-          '200g de carne de res selecta molida al día y sazonada con sales de autor.',
-          'Pan brioche rústico de masa madre dorado a la plancha con mantequilla.',
-          'Generosa costra dorada de queso asadero artesanal de Durango.',
-          'Tocino ahumado en madera de manzano súper crujiente.',
-          'Cebolla morada caramelizada lentamente en azúcar mascabado.',
-          'Salsa especial tártara de la casa con pepinillos agridulces.',
-          'Acompañada de generosa porción de papas gajo sazonadas con paprika y romero.'
-        ],
-        alergenos: ['Gluten', 'Lácteos', 'Huevo'],
-        badge: 'ESTRELLA'
-      },
-      {
-        id: 'burger-boneless-bbq',
-        nombre: 'BURGER BONELESS',
-        nombreCompleto: 'Hamburguesa Boneless Crujientes BBQ',
-        categoria: 'Pollo Crujiente',
-        precio: '$165 MXN',
-        precioNum: 165,
-        tamano: 'Plato individual con papas',
-        calorias: '680 kcal',
-        imagen: '/images/Menu/Hamburguesa.png',
-        colorCard: '#E58370', // Salsa BBQ ahumada y paprika intensa
-        queTrae: [
-          '180g de boneless de pechuga de pollo extra crujientes.',
-          'Bañados en salsa BBQ ahumada con miel de agave artesanal.',
-          'Queso asadero fundido de la región.',
-          'Ensalada fresca de col morada con aderezo cremoso (coleslaw).',
-          'Pan brioche tostado con ajonjolí negro tostado.',
-          'Servida con papas a la francesa crujientes.'
-        ],
-        alergenos: ['Gluten', 'Lácteos', 'Sésamo'],
-        badge: 'CRISPY'
-      },
-      {
-        id: 'burger-clasica-urban',
-        nombre: 'BURGER CLÁSICA',
-        nombreCompleto: 'Hamburguesa Clásica Urban con Queso Cheddar Madurado',
-        categoria: 'Clásicos Urban Brunch',
-        precio: '$150 MXN',
-        precioNum: 150,
-        tamano: 'Plato individual con papas',
-        calorias: '590 kcal',
-        imagen: '/images/Menu/Hamburguesa.png',
-        colorCard: '#E5B757', // Queso cheddar fundido dorado intenso
-        queTrae: [
-          '150g de carne de res jugosa a la parrilla.',
-          'Doble lámina de queso cheddar madurado fundido.',
-          'Jitomate bola fresco y hojas de lechuga orejona crujiente.',
-          'Pepinillos encurtidos al estilo tradicional.',
-          'Mayonesa de ajo asado y mostaza dijon suave.',
-          'Papas fritas sazonadas al punto de sal marina.'
-        ],
-        alergenos: ['Gluten', 'Lácteos', 'Huevo'],
-        badge: 'TRADICIONAL'
-      },
-      {
-        id: 'burger-smash-melt',
-        nombre: 'BURGER SMASH',
-        nombreCompleto: 'Hamburguesa Smash con Triple Queso & Cebolla Crispy',
-        categoria: 'Estilo Smash Burger',
-        precio: '$160 MXN',
-        precioNum: 160,
-        tamano: 'Plato individual con papas',
-        calorias: '640 kcal',
-        imagen: '/images/Menu/Hamburguesa.png',
-        colorCard: '#CFA065', // Mantequilla tostada smash intensa
-        queTrae: [
-          'Doble medallón smash con bordes ultra crujientes caramelizados.',
-          'Triple queso americano fundido entre las carnes.',
-          'Cebolla frita crujiente con toque de pimienta negra.',
-          'Salsa secreta Marfil con matices ahumados y relish.',
-          'Pan de papa artesanal esponjoso dorado en mantequilla.',
-          'Papas gajo crujientes con aderezo chipotle de cortesía.'
-        ],
-        alergenos: ['Gluten', 'Lácteos', 'Huevo'],
-        badge: 'SMASH CRAFT'
-      }
-    ]
-  }
-];
-
-// `secciones` llega de la API (ver aSeccionesDeMenu); MENU_SECTIONS queda como respaldo.
-export default function MenuScreen({ onOrderNow, onNavigate, secciones = MENU_SECTIONS }) {
+// `secciones` llega desde la API (ver aSeccionesDeMenu).
+export default function MenuScreen({
+  onOrderNow,
+  onNavigate,
+  secciones = [],
+  initialProduct = null,
+  onClearInitialProduct
+}) {
   const [selectedProduct, setSelectedProduct] = useState(null);
-  const [viewModeMobile, setViewModeMobile] = useState('carousel'); // 'carousel' | 'grid'
-  const [activeTab, setActiveTab] = useState('todos'); // 'todos' | 'seccion-1' | 'seccion-2'
-
-  // Tamaño / porción seleccionada
   const [selectedSize, setSelectedSize] = useState('Individual');
+  const [expandedSections, setExpandedSections] = useState({});
 
-  // Control de acordeones para móvil (inician contraídos por defecto)
-  const [expandedSections, setExpandedSections] = useState({
-    'seccion-1': false,
-    'seccion-2': false
-  });
+  useEffect(() => {
+    if (!initialProduct) return;
+    const todos = secciones.flatMap((s) => s.productos || []);
+    const encontrado = todos.find((p) => p.id === initialProduct.id || p.nombreCompleto === initialProduct.nombreCompleto);
+    if (encontrado) setSelectedProduct(encontrado);
+    if (onClearInitialProduct) onClearInitialProduct();
+  }, [initialProduct, secciones, onClearInitialProduct]);
 
   const toggleSection = (seccionId) => {
     sounds.playClick();
@@ -264,20 +47,12 @@ export default function MenuScreen({ onOrderNow, onNavigate, secciones = MENU_SE
     }));
   };
 
-  // Refs de desplazamiento para los carruseles de cada sección (Desktop)
-  const carouselRefs = {
-    'seccion-1': useRef(null),
-    'seccion-2': useRef(null)
-  };
-
-  // Estado para saber si se puede scrollear a izquierda/derecha y ocultar el difuminado en extremos
-  const [scrollFades, setScrollFades] = useState({
-    'seccion-1': { canScrollLeft: false, canScrollRight: true },
-    'seccion-2': { canScrollLeft: false, canScrollRight: true }
-  });
+  // Refs dinámicos para los carruseles de cada sección (Desktop)
+  const carouselRefs = useRef({});
+  const [scrollFades, setScrollFades] = useState({});
 
   const checkScrollFades = (seccionId) => {
-    const el = carouselRefs[seccionId]?.current;
+    const el = carouselRefs.current[seccionId];
     if (el) {
       const canLeft = el.scrollLeft > 10;
       const canRight = el.scrollLeft < el.scrollWidth - el.clientWidth - 10;
@@ -289,20 +64,17 @@ export default function MenuScreen({ onOrderNow, onNavigate, secciones = MENU_SE
   };
 
   useEffect(() => {
-    // Medir estado inicial de scroll
     secciones.forEach((s) => checkScrollFades(s.id));
-
     const handleResize = () => {
       secciones.forEach((s) => checkScrollFades(s.id));
     };
-
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  }, [secciones]);
 
   const handleScroll = (seccionId, direction) => {
     sounds.playClick();
-    const container = carouselRefs[seccionId]?.current;
+    const container = carouselRefs.current[seccionId];
     if (container) {
       const scrollAmount = direction === 'left' ? -260 : 260;
       container.scrollBy({ left: scrollAmount, behavior: 'smooth' });
@@ -335,6 +107,15 @@ export default function MenuScreen({ onOrderNow, onNavigate, secciones = MENU_SE
       {/* ====================================================================
           1. VISTA DESKTOP: SECCIÓN CON CARRUSEL HORIZONTAL & CARDS VERTICALES
           ==================================================================== */}
+      {secciones.length === 0 ? (
+        <div className="max-w-md mx-auto my-20 px-6 py-12 text-center bg-white rounded-3xl border border-stone-200 shadow-xs">
+          <Utensils size={32} className="mx-auto text-stone-300 mb-3" />
+          <h2 className="font-display font-bold text-xl text-[#1F1410]">Menú en preparación</h2>
+          <p className="font-body text-sm text-stone-500 mt-1">
+            Aún no hay productos publicados en el catálogo. Vuelve pronto.
+          </p>
+        </div>
+      ) : (
       <main className="hidden md:flex max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 flex-col gap-8">
         {secciones.map((seccion) => (
           <section key={seccion.id} className="w-full flex flex-col">
@@ -383,7 +164,7 @@ export default function MenuScreen({ onOrderNow, onNavigate, secciones = MENU_SE
               )}
 
               <div
-                ref={carouselRefs[seccion.id]}
+                ref={(el) => { carouselRefs.current[seccion.id] = el; }}
                 onScroll={() => checkScrollFades(seccion.id)}
                 className="w-full flex overflow-x-auto gap-7 pt-20 pb-10 px-8 scroll-smooth scrollbar-none snap-x snap-mandatory"
                 style={{
@@ -455,6 +236,7 @@ export default function MenuScreen({ onOrderNow, onNavigate, secciones = MENU_SE
           </section>
         ))}
       </main>
+      )}
 
       {/* ====================================================================
           2. VISTA MÓVIL: BLOQUES CONTRAÍBLES/DESPLEGABLES Y CARDS HORIZONTALES
@@ -495,7 +277,7 @@ export default function MenuScreen({ onOrderNow, onNavigate, secciones = MENU_SE
                       : 'bg-stone-300 text-[#1F1410]'
                       }`}
                   >
-                    {sIdx === 0 ? '01' : '02'}
+                    {String(sIdx + 1).padStart(2, '0')}
                   </span>
                   <div>
                     <div className="flex items-center gap-2">

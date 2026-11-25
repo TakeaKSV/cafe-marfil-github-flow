@@ -5,15 +5,17 @@ import { sembrar } from './semilla.js';
 
 const opciones = new Set(process.argv.slice(2));
 try {
-  if ([...opciones].some((opcion) => !['--reset', '--seed'].includes(opcion))) throw new Error('Opción desconocida.');
-  if (config.esProduccion && (opciones.has('--seed') || opciones.has('--reset'))) {
+  if ([...opciones].some((opcion) => !['--reset', '--seed', '--demo'].includes(opcion))) {
+    throw new Error('Opción desconocida.');
+  }
+  if (config.esProduccion && (opciones.has('--demo') || opciones.has('--reset'))) {
     throw new Error('Los datos demo y el reset están deshabilitados en producción.');
   }
   if (opciones.has('--reset')) await borrarTodo();
   await prepararBase();
-  if (opciones.has('--seed')) {
+  if (opciones.has('--seed') || opciones.has('--demo')) {
     if (await consulta('sucursales').first('id')) throw new Error('La base ya tiene datos.');
-    console.table(await sembrar());
+    console.table(await sembrar({ soloCatalogo: !opciones.has('--demo') }));
   }
   console.log('Migraciones aplicadas correctamente.');
 } catch (error) {

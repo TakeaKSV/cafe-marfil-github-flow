@@ -14,80 +14,37 @@ import {
 } from 'lucide-react';
 import { sounds } from '../utils/audio';
 
-/**
- * Catálogo de bebidas para el Hero interactivo "Coffee & Co." de Café Marfil Durango.
- * Utiliza los assets ubicados en /images/hero/ (/public/images/hero).
- */
-export const BEBIDAS_HERO = [
-    {
-        id: 'frappe-marfil-fresa',
-        nombre: 'Frappé Fresa Dubái',
-        subtitulo: 'EDICIÓN ESPECIAL ALL-DAY BRUNCH',
-        categoria: 'COFFEE & CO.',
-        badge: 'TOP SELLER',
-        descripcion:
-            'EXPLORE A REALM OF RICH AROMAS WITH OUR EXCLUSIVE COFFEE SELECTION. AT CAFÉ MARFIL, WE HARNESS THE ESSENCE OF NATURE’S BEST BEANS TO DELIVER YOU A TRULY EXCEPTIONAL EXPERIENCE.',
-        precio: '$9.00',
-        precioMXN: '$145 MXN',
-        colorFondo: '#C85A48',
-        gradienteFondo: 'linear-gradient(135deg, #DE7A68 0%, #C35645 50%, #B04737 100%)',
-        colorAcento: '#FCEAE9',
-        imagen: '/images/hero/vaso-principal.png',
-        notas: 'Pistache & Kataifi Dubái',
-        calorias: '380 kcal',
-        tamano: '16 oz'
-    },
-    {
-        id: 'frappe-kinder-bueno',
-        nombre: 'Frappé Moka Avellana',
-        subtitulo: 'SELECCIÓN CONFITERÍA & ARÁBICA',
-        categoria: 'COFFEE & CO.',
-        badge: 'ARÁBICA 100%',
-        descripcion:
-            'EXPLORE A REALM OF RICH AROMAS WITH OUR EXCLUSIVE COFFEE SELECTION. AT CAFÉ MARFIL, WE HARNESS THE ESSENCE OF NATURE’S BEST BEANS TO DELIVER YOU A TRULY EXCEPTIONAL EXPERIENCE.',
-        precio: '$8.50',
-        precioMXN: '$135 MXN',
-        colorFondo: '#8C5238',
-        gradienteFondo: 'linear-gradient(135deg, #A26245 0%, #874C32 50%, #6E3B24 100%)',
-        colorAcento: '#F6E4D6',
-        imagen: '/images/hero/vaso-cafe.png',
-        notas: 'Avellana & Caramelo Tostado',
-        calorias: '410 kcal',
-        tamano: '16 oz'
-    },
-    {
-        id: 'frappe-barbie-taro',
-        nombre: 'Frappé Velvet Lavanda',
-        subtitulo: 'COCTELERÍA LÚDICA DE SALA',
-        categoria: 'COFFEE & CO.',
-        badge: 'NUEVO',
-        descripcion:
-            'EXPLORE A REALM OF RICH AROMAS WITH OUR EXCLUSIVE COFFEE SELECTION. AT CAFÉ MARFIL, WE HARNESS THE ESSENCE OF NATURE’S BEST BEANS TO DELIVER YOU A TRULY EXCEPTIONAL EXPERIENCE.',
-        precio: '$8.75',
-        precioMXN: '$140 MXN',
-        colorFondo: '#734C7D',
-        gradienteFondo: 'linear-gradient(135deg, #8E5F9A 0%, #6E4578 50%, #54315D 100%)',
-        colorAcento: '#EEDDF6',
-        imagen: '/images/hero/vaso-morado.png',
-        notas: 'Frutos del Bosque & Menta',
-        calorias: '340 kcal',
-        tamano: '16 oz'
-    }
+const GRADIENTES_HERO = [
+    'linear-gradient(135deg, #DE7A68 0%, #C35645 50%, #B04737 100%)',
+    'linear-gradient(135deg, #A26245 0%, #874C32 50%, #6E3B24 100%)',
+    'linear-gradient(135deg, #8E5F9A 0%, #6E4578 50%, #54315D 100%)'
 ];
 
-export default function HeroSection({ onOrderNow, onNavigateBack, fullBleed = true }) {
+export default function HeroSection({ productos = [], onOrderNow }) {
+    const bebidasHero = React.useMemo(() => {
+        const bebidas = productos.filter((p) => p.categoriaSlug === 'frappes' && p.imagen);
+        const lista = (bebidas.length >= 3 ? bebidas : productos.filter((p) => p.imagen)).slice(0, 3);
+        return lista.map((p, idx) => ({
+            id: p.slug || String(p.id),
+            nombre: p.nombre,
+            imagen: p.imagen,
+            gradienteFondo: GRADIENTES_HERO[idx % GRADIENTES_HERO.length]
+        }));
+    }, [productos]);
+
     const [activeIndex, setActiveIndex] = useState(0);
     const [direction, setDirection] = useState('next'); // 'next' | 'prev'
     const [isAnimating, setIsAnimating] = useState(false);
-    const [orderedSuccess, setOrderedSuccess] = useState(false);
     const containerRef = useRef(null);
 
-    const activeDrink = BEBIDAS_HERO[activeIndex];
-    const prevIndex = (activeIndex - 1 + BEBIDAS_HERO.length) % BEBIDAS_HERO.length;
-    const nextIndex = (activeIndex + 1) % BEBIDAS_HERO.length;
+    const total = bebidasHero.length;
+    const safeIndex = total > 0 ? activeIndex % total : 0;
+    const activeDrink = bebidasHero[safeIndex] || null;
+    const prevIndex = total > 0 ? (safeIndex - 1 + total) % total : 0;
+    const nextIndex = total > 0 ? (safeIndex + 1) % total : 0;
 
     const handlePrev = () => {
-        if (isAnimating) return;
+        if (isAnimating || total < 2) return;
         sounds.playClick();
         setDirection('prev');
         setIsAnimating(true);
@@ -95,19 +52,11 @@ export default function HeroSection({ onOrderNow, onNavigateBack, fullBleed = tr
     };
 
     const handleNext = () => {
-        if (isAnimating) return;
+        if (isAnimating || total < 2) return;
         sounds.playClick();
         setDirection('next');
         setIsAnimating(true);
         setActiveIndex(nextIndex);
-    };
-
-    const handleSelectDrink = (index) => {
-        if (isAnimating || index === activeIndex) return;
-        sounds.playClick();
-        setDirection(index > activeIndex ? 'next' : 'prev');
-        setIsAnimating(true);
-        setActiveIndex(index);
     };
 
     useEffect(() => {
@@ -119,13 +68,14 @@ export default function HeroSection({ onOrderNow, onNavigateBack, fullBleed = tr
 
     // Transición automática cada 5 segundos
     useEffect(() => {
+        if (total < 2) return undefined;
         const interval = setInterval(() => {
             setDirection('next');
             setIsAnimating(true);
-            setActiveIndex((prev) => (prev + 1) % BEBIDAS_HERO.length);
+            setActiveIndex((prev) => (prev + 1) % total);
         }, 5000);
         return () => clearInterval(interval);
-    }, []);
+    }, [total]);
 
     // Soporte para flechas del teclado (izquierda/derecha)
     useEffect(() => {
@@ -135,7 +85,7 @@ export default function HeroSection({ onOrderNow, onNavigateBack, fullBleed = tr
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [activeIndex, isAnimating]);
+    }, [safeIndex, isAnimating, total]);
 
     // Soporte para gestos táctiles (Swipe en móvil)
     const touchStartX = useRef(null);
@@ -150,12 +100,30 @@ export default function HeroSection({ onOrderNow, onNavigateBack, fullBleed = tr
         touchStartX.current = null;
     };
 
-    const handleActionOrder = () => {
-        sounds.playClick();
-        setOrderedSuccess(true);
-        setTimeout(() => setOrderedSuccess(false), 2400);
-        if (onOrderNow) onOrderNow(activeDrink);
-    };
+    if (!activeDrink) {
+        return (
+            <section
+                className="relative w-full min-h-[420px] pt-28 flex flex-col items-center justify-center overflow-hidden select-none font-body"
+                style={{ background: GRADIENTES_HERO[0] }}
+                aria-label="Café Marfil Hero"
+            >
+                <img
+                    src="/images/hero/logo-hero.png"
+                    alt="Café Marfil"
+                    className="w-72 sm:w-96 object-contain drop-shadow-[0_14px_16px_rgba(0,0,0,0.45)]"
+                />
+                {onOrderNow && (
+                    <button
+                        type="button"
+                        onClick={() => onOrderNow({ nombre: 'Café de Especialidad' })}
+                        className="mt-6 px-7 py-3 rounded-full bg-white text-[#1F1410] font-mono text-xs font-bold uppercase tracking-wider shadow-lg hover:bg-[#FCEAE9] hover:text-[#E12927] transition-all cursor-pointer"
+                    >
+                        Reservar Mesa
+                    </button>
+                )}
+            </section>
+        );
+    }
 
     return (
         <section
@@ -195,12 +163,12 @@ export default function HeroSection({ onOrderNow, onNavigateBack, fullBleed = tr
                                     ? 'translate(25px, 15px) scale(0.92)'
                                     : 'translateY(20px) scale(0.85)'
                         }}
-                        title={`Sabor anterior: ${BEBIDAS_HERO[prevIndex].nombre}`}
+                        title={`Sabor anterior: ${bebidasHero[prevIndex].nombre}`}
                     >
                         <div className="relative w-44 sm:w-56 md:w-64 h-56 sm:h-72 md:h-80 flex items-center justify-center">
                             <img
-                                src={BEBIDAS_HERO[prevIndex].imagen}
-                                alt={BEBIDAS_HERO[prevIndex].nombre}
+                                src={bebidasHero[prevIndex].imagen}
+                                alt={bebidasHero[prevIndex].nombre}
                                 className="w-full h-full object-contain filter drop-shadow-[0_18px_20px_rgba(0,0,0,0.55)] transition-transform duration-500"
                             />
                         </div>
@@ -245,12 +213,12 @@ export default function HeroSection({ onOrderNow, onNavigateBack, fullBleed = tr
                                     ? 'translate(40px, 35px) scale(0.72)'
                                     : 'translateY(20px) scale(0.85)'
                         }}
-                        title={`Siguiente sabor: ${BEBIDAS_HERO[nextIndex].nombre}`}
+                        title={`Siguiente sabor: ${bebidasHero[nextIndex].nombre}`}
                     >
                         <div className="relative w-44 sm:w-56 md:w-64 h-56 sm:h-72 md:h-80 flex items-center justify-center">
                             <img
-                                src={BEBIDAS_HERO[nextIndex].imagen}
-                                alt={BEBIDAS_HERO[nextIndex].nombre}
+                                src={bebidasHero[nextIndex].imagen}
+                                alt={bebidasHero[nextIndex].nombre}
                                 className="w-full h-full object-contain filter drop-shadow-[0_18px_20px_rgba(0,0,0,0.55)] transition-transform duration-500"
                             />
                         </div>

@@ -15,21 +15,18 @@ import { playSound } from '../utils/audioFeedback';
 
 export const DashboardView = ({
   metricas,
+  menuItems = [],
   selectedSucursal,
   sucursales,
   soundEnabled,
   onNavigateToTab
 }) => {
-  const [timeRange, setTimeRange] = useState('hoy');
   const [hoveredBarIndex, setHoveredBarIndex] = useState(null);
 
-  // Multiplicador simulado si se cambia el rango de tiempo
-  const multiplier = timeRange === 'hoy' ? 1 : timeRange === 'semana' ? 6.5 : 28;
-
-  const totalReservaciones = Math.round(metricas.reservasHoy * multiplier);
-  const codigosEscaneados = Math.round((metricas.codigosEscaneadosHoy ?? 0) * multiplier);
-  const totalVisitors = Math.round(metricas.comensalesHoy * multiplier);
-  const sellosEmitidos = Math.round(metricas.sellosEmitidosHoy * multiplier);
+  const totalReservaciones = metricas.reservasHoy ?? 0;
+  const codigosEscaneados = metricas.codigosEscaneadosHoy ?? 0;
+  const totalVisitors = metricas.comensalesHoy ?? 0;
+  const sellosEmitidos = metricas.sellosEmitidosHoy ?? 0;
 
   // Afluencia real del día: la API entrega comensales por hora y aquí se agrupan
   // en franjas de dos horas (8:00, 10:00 ... 22:00) para el gráfico de barras.
@@ -51,14 +48,26 @@ export const DashboardView = ({
     ? new Intl.DateTimeFormat('es-MX', { timeZone: 'UTC', day: 'numeric', month: 'long' }).format(new Date(`${metricas.fecha}T12:00:00Z`))
     : 'hoy';
 
-  // Mix de consumo en sala (Donut Chart original)
-  const categories = [
-    { name: 'Chilaquiles & Molletes', pct: 38, color: '#E12927' },
-    { name: 'Frappés de Confitería', pct: 26, color: '#F87171' },
-    { name: 'Café de Especialidad', pct: 18, color: '#1F1410' },
-    { name: 'Fresas Estilo Dubái', pct: 12, color: '#FBBF24' },
-    { name: 'Bebidas Sociales & Mezcal', pct: 6, color: '#10B981' }
-  ];
+  // Distribución real por categoría calculada a partir del catálogo/ventas del servidor
+  const COLORES_DONUT = ['#E12927', '#F87171', '#1F1410', '#FBBF24', '#10B981', '#8B5CF6'];
+  const totalVendidos = menuItems.reduce((acc, item) => acc + (Number(item.vendidosHoy) || 0), 0);
+  const conteoPorCat = menuItems.reduce((acc, item) => {
+    const nombre = item.categoria || 'Sin categoría';
+    const peso = totalVendidos > 0 ? (Number(item.vendidosHoy) || 0) : 1;
+    acc[nombre] = (acc[nombre] || 0) + peso;
+    return acc;
+  }, {});
+  const totalBase = Object.values(conteoPorCat).reduce((a, b) => a + b, 0);
+  let offsetAcum = 0;
+  const categories = Object.entries(conteoPorCat)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([name, val], idx) => {
+      const pct = totalBase > 0 ? Math.round((val / totalBase) * 100) : 0;
+      const offset = -offsetAcum;
+      offsetAcum += pct;
+      return { name, pct, offset, color: COLORES_DONUT[idx % COLORES_DONUT.length] };
+    });
 
   return (
     <div className="h-full flex flex-col justify-between gap-3 text-xs select-none">
@@ -74,23 +83,11 @@ export const DashboardView = ({
           </p>
         </div>
 
-        {/* Dropdown de período */}
+        {/* Etiqueta de fecha real */}
         <div className="flex items-center gap-2 shrink-0">
-          <div className="relative">
-            <select
-              value={timeRange}
-              onChange={(e) => {
-                setTimeRange(e.target.value);
-                if (soundEnabled) playSound('toggle');
-              }}
-              className="appearance-none bg-white border border-[#1F1410]/10 rounded-full px-3 py-1 pr-7 text-[11px] font-semibold text-[#1F1410] shadow-2xs hover:border-[#1F1410]/30 transition-colors cursor-pointer"
-            >
-              <option value="hoy">Hoy ({etiquetaHoy})</option>
-              <option value="semana">Esta semana</option>
-              <option value="mes">Este mes</option>
-            </select>
-            <ChevronDown className="w-3 h-3 absolute right-2.5 top-1/2 -translate-y-1/2 text-[#1F1410]/50 pointer-events-none" />
-          </div>
+          <span className="bg-white border border-[#1F1410]/10 rounded-full px-3 py-1 text-[11px] font-semibold text-[#1F1410] shadow-2xs">
+            Hoy ({etiquetaHoy})
+          </span>
 
           <button
             onClick={() => {
@@ -127,12 +124,9 @@ export const DashboardView = ({
                 <span className="font-display font-bold text-lg sm:text-xl text-white tracking-tight leading-none">
                   {totalReservaciones} Reservas
                 </span>
-                <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold bg-[#10B981] text-white shadow-2xs">
-                  +14%
-                </span>
               </div>
               <p className="text-[10px] text-white/70">
-                {timeRange === 'hoy' ? `${metricas.reservasAsistidas ?? 0} asistidas · ${metricas.reservasNoShow ?? 0} no-show` : 'Ciclo comparativo'}
+                {metricas.reservasAsistidas ?? 0} asistidas · {metricas.reservasNoShow ?? 0} no-show
               </p>
             </div>
           </div>
@@ -152,9 +146,6 @@ export const DashboardView = ({
               <div className="flex items-baseline gap-1.5 mb-0.5">
                 <span className="font-display font-bold text-lg sm:text-xl text-[#1F1410] tracking-tight leading-none">
                   {codigosEscaneados}
-                </span>
-                <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold bg-[#10B981] text-white shadow-2xs">
-                  +18%
                 </span>
               </div>
               <p className="text-[10px] text-[#1F1410]/40">
@@ -179,9 +170,6 @@ export const DashboardView = ({
                 <span className="font-display font-bold text-lg sm:text-xl text-[#1F1410] tracking-tight leading-none">
                   {totalVisitors} PAX
                 </span>
-                <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold bg-[#10B981] text-white shadow-2xs">
-                  +8.5%
-                </span>
               </div>
               <p className="text-[10px] text-[#1F1410]/40">
                 Aforo: {metricas.aforoPorcentaje ?? 0}% ocupado
@@ -204,9 +192,6 @@ export const DashboardView = ({
               <div className="flex items-baseline gap-1.5 mb-0.5">
                 <span className="font-display font-bold text-lg sm:text-xl text-[#1F1410] tracking-tight leading-none">
                   {sellosEmitidos} sellos
-                </span>
-                <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold bg-[#10B981] text-white shadow-2xs">
-                  +12%
                 </span>
               </div>
               <p className="text-[10px] text-[#1F1410]/40">
@@ -354,31 +339,47 @@ export const DashboardView = ({
           </div>
 
           <div className="flex items-center gap-3 py-1">
-            {/* SVG Donut */}
-            <div className="relative w-20 h-20 sm:w-22 sm:h-22 shrink-0">
-              <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
-                <circle cx="18" cy="18" r="14" fill="transparent" stroke="#E12927" strokeWidth="6" strokeDasharray="38 62" strokeDashoffset="0" />
-                <circle cx="18" cy="18" r="14" fill="transparent" stroke="#F87171" strokeWidth="6" strokeDasharray="26 74" strokeDashoffset="-38" />
-                <circle cx="18" cy="18" r="14" fill="transparent" stroke="#1F1410" strokeWidth="6" strokeDasharray="18 82" strokeDashoffset="-64" />
-                <circle cx="18" cy="18" r="14" fill="transparent" stroke="#FBBF24" strokeWidth="6" strokeDasharray="12 88" strokeDashoffset="-82" />
-                <circle cx="18" cy="18" r="14" fill="transparent" stroke="#10B981" strokeWidth="6" strokeDasharray="6 94" strokeDashoffset="-94" />
-              </svg>
-            </div>
-
-            {/* Leyenda */}
-            <div className="space-y-1 text-[10px] font-body flex-1">
-              {categories.map((cat, idx) => (
-                <div key={idx} className="flex items-center justify-between gap-1">
-                  <div className="flex items-center gap-1.5 truncate">
-                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />
-                    <span className="text-[#1F1410]/70 truncate">{cat.name}</span>
-                  </div>
-                  <span className="font-mono font-bold text-[#1F1410] text-[9px]">
-                    {cat.pct}%
-                  </span>
+            {categories.length === 0 ? (
+              <p className="text-[11px] text-[#1F1410]/45 font-body py-4">
+                Aún no hay productos registrados en el menú.
+              </p>
+            ) : (
+              <>
+                {/* SVG Donut dinámico */}
+                <div className="relative w-20 h-20 sm:w-22 sm:h-22 shrink-0">
+                  <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                    {categories.map((cat, idx) => (
+                      <circle
+                        key={idx}
+                        cx="18"
+                        cy="18"
+                        r="14"
+                        fill="transparent"
+                        stroke={cat.color}
+                        strokeWidth="6"
+                        strokeDasharray={`${cat.pct} ${100 - cat.pct}`}
+                        strokeDashoffset={cat.offset}
+                      />
+                    ))}
+                  </svg>
                 </div>
-              ))}
-            </div>
+
+                {/* Leyenda */}
+                <div className="space-y-1 text-[10px] font-body flex-1">
+                  {categories.map((cat, idx) => (
+                    <div key={idx} className="flex items-center justify-between gap-1">
+                      <div className="flex items-center gap-1.5 truncate">
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />
+                        <span className="text-[#1F1410]/70 truncate">{cat.name}</span>
+                      </div>
+                      <span className="font-mono font-bold text-[#1F1410] text-[9px]">
+                        {cat.pct}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         </div>
 

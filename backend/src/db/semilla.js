@@ -42,8 +42,8 @@ async function insertar(tabla, fila) {
   return (await insertarFila(tabla, fila)).id;
 }
 
-export function sembrar() {
-  if (config.esProduccion) throw new Error('Los datos demo están deshabilitados en producción.');
+export function sembrar({ soloCatalogo = false } = {}) {
+  if (config.esProduccion && !soloCatalogo) throw new Error('Los datos demo están deshabilitados en producción.');
   return enTransaccion(async () => {
     const azar = crearAzar(20261002);
     const entero = (min, max) => min + Math.floor(azar() * (max - min + 1));
@@ -134,7 +134,7 @@ export function sembrar() {
     // ----------------------------------------------------------------------
 
     const persona = {};
-    for (const p of [
+    const personalLista = [
       {
         clave: 'sofia',
         nombre: 'Sofía Valenzuela',
@@ -145,49 +145,54 @@ export function sembrar() {
         turno: ['07:30', '16:00'],
         encargado: 1
       },
-      {
-        clave: 'mateo',
-        nombre: 'Mateo Nevárez',
-        puesto: 'Head Barista & Métodos',
-        sucursal: PORRAS,
-        turno: ['07:30', '15:30']
-      },
-      {
-        clave: 'alejandro',
-        nombre: 'Alejandro Morales',
-        email: 'ludoteca@cafemarfil.mx',
-        rol: 'host',
-        puesto: 'Anfitrión de Ludoteca',
-        sucursal: PORRAS,
-        turno: ['10:00', '19:00']
-      },
-      {
-        clave: 'valeria',
-        nombre: 'Valeria Siqueiros',
-        email: 'host@cafemarfil.mx',
-        rol: 'host',
-        puesto: 'Hostess de Recepción',
-        sucursal: PORRAS,
-        turno: ['08:00', '16:30']
-      },
-      {
-        clave: 'erick',
-        nombre: 'Erick Rentería',
-        puesto: 'Cocinero de Línea Caliente',
-        sucursal: PORRAS,
-        turno: ['07:00', '15:30']
-      },
-      {
-        clave: 'camila',
-        nombre: 'Camila Rosales',
-        email: 'calvario@cafemarfil.mx',
-        rol: 'gerente',
-        puesto: 'Supervisora de Piso',
-        sucursal: CALVARIO,
-        turno: ['08:00', '16:30'],
-        encargado: 1
-      }
-    ]) {
+      ...(!soloCatalogo
+        ? [
+            {
+              clave: 'mateo',
+              nombre: 'Mateo Nevárez',
+              puesto: 'Head Barista & Métodos',
+              sucursal: PORRAS,
+              turno: ['07:30', '15:30']
+            },
+            {
+              clave: 'alejandro',
+              nombre: 'Alejandro Morales',
+              email: 'ludoteca@cafemarfil.mx',
+              rol: 'host',
+              puesto: 'Anfitrión de Ludoteca',
+              sucursal: PORRAS,
+              turno: ['10:00', '19:00']
+            },
+            {
+              clave: 'valeria',
+              nombre: 'Valeria Siqueiros',
+              email: 'host@cafemarfil.mx',
+              rol: 'host',
+              puesto: 'Hostess de Recepción',
+              sucursal: PORRAS,
+              turno: ['08:00', '16:30']
+            },
+            {
+              clave: 'erick',
+              nombre: 'Erick Rentería',
+              puesto: 'Cocinero de Línea Caliente',
+              sucursal: PORRAS,
+              turno: ['07:00', '15:30']
+            },
+            {
+              clave: 'camila',
+              nombre: 'Camila Rosales',
+              email: 'calvario@cafemarfil.mx',
+              rol: 'gerente',
+              puesto: 'Supervisora de Piso',
+              sucursal: CALVARIO,
+              turno: ['08:00', '16:30'],
+              encargado: 1
+            }
+          ]
+        : [])
+    ];
+    for (const p of personalLista) {
       persona[p.clave] = await insertar('personal', {
         nombre: p.nombre,
         email: p.email ?? null,
@@ -617,7 +622,7 @@ export function sembrar() {
         alergenos: json(p.alergenos ?? []),
         disponible: p.disponible ?? 1,
         stock_diario: p.stock,
-        vendidos_hoy: p.vendidos,
+        vendidos_hoy: soloCatalogo ? 0 : p.vendidos,
         tiempo_prep_min: p.prep,
         destacado: p.destacado ?? 0,
         creado_en: ahoraISO
@@ -625,10 +630,11 @@ export function sembrar() {
     }
 
     // ----------------------------------------------------------------------
-    // Clientes del Club Marfil (Sofía Navarro es la cuenta demo de la PWA)
+    // Clientes del Club Marfil (solo en modo demo / pruebas)
     // ----------------------------------------------------------------------
 
     const cliente = {};
+    if (!soloCatalogo) {
     for (const c of [
       {
         clave: 'paola',
@@ -759,6 +765,7 @@ export function sembrar() {
         usado_en: b.usado ?? null,
         creado_en: haceDias(25)
       });
+    }
     }
 
     // ----------------------------------------------------------------------
@@ -1021,9 +1028,10 @@ export function sembrar() {
     }
 
     // ----------------------------------------------------------------------
-    // Reservaciones y servicio en sala
+    // Reservaciones y servicio en sala (solo en modo demo / pruebas)
     // ----------------------------------------------------------------------
 
+    if (!soloCatalogo) {
     const foliosUsados = new Set();
     const folioNuevo = () => {
       let folio;
@@ -1420,6 +1428,7 @@ export function sembrar() {
         });
       }
     }
+    }
 
     // ----------------------------------------------------------------------
     // Promociones y canjes de hoy
@@ -1586,13 +1595,15 @@ export function sembrar() {
       });
       for (const sucursal of p.sucursales)
         await insertar('promocion_sucursal', { promocion_id: id, sucursal_id: sucursal });
-      for (let i = 0; i < p.canjes; i += 1) {
-        await insertar('canjes_promocion', {
-          promocion_id: id,
-          sucursal_id: elegir(p.sucursales),
-          personal_id: persona.valeria,
-          creado_en: hace(entero(0, Math.min(minutosDeHoy, 360) - 1))
-        });
+      if (!soloCatalogo) {
+        for (let i = 0; i < p.canjes; i += 1) {
+          await insertar('canjes_promocion', {
+            promocion_id: id,
+            sucursal_id: elegir(p.sucursales),
+            personal_id: persona.valeria,
+            creado_en: hace(entero(0, Math.min(minutosDeHoy, 360) - 1))
+          });
+        }
       }
     }
 
@@ -1691,24 +1702,26 @@ export function sembrar() {
         sucursal_id: PORRAS,
         creado_en: haceDias(200)
       });
-      const pasados = j.enMesa ? j.jugado - 1 : j.jugado;
-      for (let i = 0; i < pasados; i += 1) {
-        const prestado = ahora.getTime() - entero(1, 29) * DIA - entero(0, 600) * MINUTO;
-        await insertar('prestamos_juego', {
-          juego_id: id,
-          mesa_id: mesa[elegir(mesasLudoteca)].id,
-          personal_id: persona.alejandro,
-          prestado_en: new Date(prestado).toISOString(),
-          devuelto_en: new Date(prestado + entero(30, 120) * MINUTO).toISOString()
-        });
-      }
-      if (j.enMesa) {
-        await insertar('prestamos_juego', {
-          juego_id: id,
-          mesa_id: mesa[j.enMesa].id,
-          personal_id: persona.alejandro,
-          prestado_en: hace(j.prestadoHace)
-        });
+      if (!soloCatalogo) {
+        const pasados = j.enMesa ? j.jugado - 1 : j.jugado;
+        for (let i = 0; i < pasados; i += 1) {
+          const prestado = ahora.getTime() - entero(1, 29) * DIA - entero(0, 600) * MINUTO;
+          await insertar('prestamos_juego', {
+            juego_id: id,
+            mesa_id: mesa[elegir(mesasLudoteca)].id,
+            personal_id: persona.alejandro,
+            prestado_en: new Date(prestado).toISOString(),
+            devuelto_en: new Date(prestado + entero(30, 120) * MINUTO).toISOString()
+          });
+        }
+        if (j.enMesa) {
+          await insertar('prestamos_juego', {
+            juego_id: id,
+            mesa_id: mesa[j.enMesa].id,
+            personal_id: persona.alejandro,
+            prestado_en: hace(j.prestadoHace)
+          });
+        }
       }
     }
 
@@ -1716,6 +1729,7 @@ export function sembrar() {
     // Notificaciones de la cuenta demo y bitácora reciente del escáner
     // ----------------------------------------------------------------------
 
+    if (!soloCatalogo) {
     for (const n of [
       {
         titulo: '¡Mesa confirmada en Sucursal Porras!',
@@ -1783,6 +1797,7 @@ export function sembrar() {
         personal_id: persona.valeria,
         creado_en: e.creado
       });
+    }
     }
 
     const resumen = {};
