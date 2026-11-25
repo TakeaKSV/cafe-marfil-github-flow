@@ -5,6 +5,39 @@
 const URL_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 const CLAVE_TOKEN = 'marfil_admin_token';
 
+export const ORIGEN_API = (() => {
+  try {
+    return new URL(URL_BASE).origin;
+  } catch {
+    return '';
+  }
+})();
+
+export function resolverUrlImagen(url) {
+  if (!url) return '/images/Menu/vaso-principal.png';
+  if (url.startsWith('/uploads/') && ORIGEN_API) return `${ORIGEN_API}${url}`;
+  return url;
+}
+
+export async function subirImagenMenu(archivo) {
+  const formData = new FormData();
+  formData.append('imagen', archivo);
+  const token = sesion.token;
+  let respuesta;
+  try {
+    respuesta = await fetch(`${URL_BASE}/uploads/imagen`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData
+    });
+  } catch {
+    throw new ErrorApi('No se pudo conectar con el servidor para subir la imagen.');
+  }
+  const datos = await respuesta.json().catch(() => ({}));
+  if (respuesta.ok) return datos;
+  throw new ErrorApi(datos.error || `Error ${respuesta.status} al subir la imagen.`, respuesta.status);
+}
+
 export class ErrorApi extends Error {
   constructor(mensaje, status = 0, detalles = []) {
     super(mensaje);

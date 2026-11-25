@@ -8,10 +8,13 @@ import { actualizarActividad, crearActividad, listarActividades, obtenerActivida
 import {
   actualizarProducto,
   crearProducto,
+  despublicarProducto,
   eliminarProducto,
   listarCategorias,
   listarProductos,
-  obtenerProducto
+  obtenerProducto,
+  publicarProducto,
+  reordenarProductos
 } from '../servicios/menu.js';
 import {
   actualizarPromocion,
@@ -54,7 +57,8 @@ const filtrosProductos = z.object({
   categoria: zTexto(40).optional(),
   q: zTexto(80).optional(),
   disponibles: zBanderaQuery.optional(),
-  destacados: zBanderaQuery.optional()
+  destacados: zBanderaQuery.optional(),
+  incluirBorradores: zBanderaQuery.optional()
 });
 
 const camposProducto = {
@@ -77,7 +81,9 @@ const camposProducto = {
   disponibleEnCocina: z.boolean(),
   stockDiario: zEntero(),
   tiempoPrepMin: zEntero(0, 240),
-  destacado: z.boolean()
+  destacado: z.boolean(),
+  estado: z.enum(['borrador', 'publicado']),
+  orden: zEntero(0, 10000)
 };
 
 const esquemaCrearProducto = z.object({
@@ -95,22 +101,49 @@ const esquemaCrearProducto = z.object({
   disponibleEnCocina: z.boolean().default(true),
   stockDiario: zEntero().default(30),
   tiempoPrepMin: zEntero(0, 240).default(10),
-  destacado: z.boolean().default(false)
+  destacado: z.boolean().default(false),
+  estado: z.enum(['borrador', 'publicado']).default('publicado'),
+  orden: zEntero(0, 10000).default(0)
 });
 
 const esquemaEditarProducto = z.object({ ...camposProducto, vendidosHoy: zEntero() }).partial();
+const esquemaOrdenProductos = z.object({
+  items: z.array(z.object({ id: zId, orden: zEntero(0, 10000) })).min(1).max(200)
+});
 
 // Lo que cocina y barra pueden cambiar durante el turno sin ser gerencia.
 const CAMPOS_OPERATIVOS = ['disponibleEnCocina', 'stockDiario', 'vendidosHoy'];
 
 router.get('/menu/categorias', async (_req, res) => res.json(await listarCategorias()));
 
-router.get('/menu/productos', async (req, res) => res.json(await listarProductos(leer(filtrosProductos, req.query))));
+router.get('/menu/productos', async (req, res) => {
+  const filtros = leer(filtrosProductos, req.query);
+  if (filtros.incluirBorradores && req.usuario?.tipo !== 'staff') {
+    throw sinPermiso('Solo personal autorizado puede consultar borradores del menú.');
+  }
+  res.json(await listarProductos(filtros));
+});
 
-router.get('/menu/productos/:id', async (req, res) => res.json(await obtenerProducto(req.params.id)));
+router.get('/menu/productos/:id', async (req, res) => {
+  const incluirBorradores = req.usuario?.tipo === 'staff';
+  res.json(await obtenerProducto(req.params.id, { incluirBorradores }));
+});
 
 router.post('/menu/productos', soloGerencia, async (req, res) => {
-  res.status(201).json(await crearProducto(leer(esquemaCrearProducto, req.body)));
+  res.status(201).json(await crearProducto(leer(esquemaCrearProducto, req.body), req.usuario.id));
+});
+
+router.patch('/menu/orden', soloGerencia, async (req, res) => {
+  const { items } = leer(esquemaOrdenProductos, req.body);
+  res.json(await reordenarProductos(items, req.usuario.id));
+});
+
+router.post('/menu/productos/:id/publicar', soloGerencia, async (req, res) => {
+  res.json(await publicarProducto(leer(zId, req.params.id), req.usuario.id));
+});
+
+router.post('/menu/productos/:id/despublicar', soloGerencia, async (req, res) => {
+  res.json(await despublicarProducto(leer(zId, req.params.id), req.usuario.id));
 });
 
 router.patch('/menu/productos/:id', requiereStaff(), async (req, res) => {
@@ -119,7 +152,7 @@ router.patch('/menu/productos/:id', requiereStaff(), async (req, res) => {
   if (!soloOperativo && !esGerencia(req)) {
     throw sinPermiso('Solo gerencia puede editar la ficha del producto (precio, nombre, etc.).');
   }
-  res.json(await actualizarProducto(leer(zId, req.params.id), cambios));
+  res.json(await actualizarProducto(leer(zId, req.params.id), cambios, req.usuario.id));
 });
 
 router.delete('/menu/productos/:id', soloGerencia, async (req, res) => {
