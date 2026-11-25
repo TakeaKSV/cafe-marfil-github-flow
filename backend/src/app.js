@@ -11,19 +11,21 @@ import rutasCatalogo from './rutas/catalogo.js';
 import rutasMi from './rutas/mi.js';
 import rutasReservaciones from './rutas/reservaciones.js';
 import rutasSala from './rutas/sala.js';
+import rutasUploads, { DIR_UPLOADS } from './rutas/uploads.js';
 
 export function crearApp({ bitacora = !config.esProduccion } = {}) {
   const app = express();
   app.disable('x-powered-by');
   app.disable('etag');
   app.set('trust proxy', config.trustProxy);
-  app.use(helmet());
+  app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
   app.use((_req, res, next) => {
     res.set('Cache-Control', 'no-store');
     next();
   });
 
   app.use(cors({ origin: config.origenesCors }));
+  app.use('/uploads', express.static(DIR_UPLOADS, { fallthrough: true, index: false }));
   const limites = crearLimites();
   app.use('/api', limites.general);
   app.use('/api/auth', limites.auth);
@@ -43,6 +45,7 @@ export function crearApp({ bitacora = !config.esProduccion } = {}) {
   app.use('/api/auth', rutasAuth);
   app.use('/api/reservaciones', rutasReservaciones);
   app.use('/api/mi', rutasMi);
+  app.use('/api/uploads', rutasUploads);
   app.use('/api', rutasCatalogo); // sucursales, menu, actividades, promociones
   app.use('/api', rutasSala); // mesas, club, escaner, juegos, personal, metricas
 

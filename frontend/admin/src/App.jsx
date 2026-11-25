@@ -29,8 +29,24 @@ const METRICAS_VACIAS = {
 
 // Campos del producto que se comparan para enviar a la API solo lo que cambió.
 const CAMPOS_PRODUCTO = [
-  'nombre', 'categoriaSlug', 'porcion', 'precio', 'descripcion', 'disponibleEnCocina',
-  'stockDiario', 'tiempoPrepMin', 'imagen', 'badge'
+  'nombre',
+  'nombreCorto',
+  'categoriaSlug',
+  'etiqueta',
+  'porcion',
+  'precio',
+  'calorias',
+  'descripcion',
+  'disponibleEnCocina',
+  'stockDiario',
+  'tiempoPrepMin',
+  'imagen',
+  'colorCard',
+  'badge',
+  'ingredientes',
+  'alergenos',
+  'destacado',
+  'estado'
 ];
 const CAMPOS_NUMERICOS_PRODUCTO = ['precio', 'stockDiario', 'tiempoPrepMin'];
 
@@ -55,6 +71,7 @@ export function App() {
   const [cargandoReservaciones, setCargandoReservaciones] = useState(false);
   const cargaActual = useRef(0);
   const [menuItems, setMenuItems] = useState([]);
+  const [categoriasMenu, setCategoriasMenu] = useState([]);
   const [promociones, setPromociones] = useState([]);
   const [clientesClub, setClientesClub] = useState([]);
   const [juegos, setJuegos] = useState([]);
@@ -122,11 +139,12 @@ export function App() {
     try {
       // La fecha del servidor solo delimita los indicadores y la operación de hoy.
       const nuevasMetricas = await api('/metricas/hoy', { query: { sucursalId } });
-      const [s, m, r, productos, promos, clientes, j, personal, historial] = await Promise.all([
+      const [s, m, r, productos, catsMenu, promos, clientes, j, personal, historial] = await Promise.all([
         api('/sucursales'),
         api('/mesas'),
         cargarReservacionesPanel(api, { hoy: nuevasMetricas.fecha, fecha: fechaReservaciones, sucursalId }),
-        api('/menu/productos'),
+        api('/menu/productos', { query: { incluirBorradores: '1' } }),
+        api('/menu/categorias'),
         api('/promociones'),
         api('/club/clientes'),
         api('/juegos'),
@@ -140,6 +158,7 @@ export function App() {
       setReservaciones(r.reservaciones.map(aReservacion(nuevasMetricas.fecha)));
       setReservacionesHoy(r.reservacionesHoy.map(aReservacion(nuevasMetricas.fecha)));
       setMenuItems(productos);
+      setCategoriasMenu(catsMenu);
       setPromociones(promos);
       setClientesClub(clientes.map(aClienteClub));
       setJuegos(j.map(aJuego));
@@ -282,8 +301,9 @@ export function App() {
     if (!anterior) return Promise.resolve(false);
     const cambios = {};
     for (const campo of CAMPOS_PRODUCTO) {
+      if (actualizado[campo] === undefined) continue;
       const valor = CAMPOS_NUMERICOS_PRODUCTO.includes(campo) ? Number(actualizado[campo]) : actualizado[campo];
-      if (valor !== anterior[campo]) cambios[campo] = valor;
+      if (JSON.stringify(valor) !== JSON.stringify(anterior[campo])) cambios[campo] = valor;
     }
     if (Object.keys(cambios).length === 0) return Promise.resolve(true);
     return ejecutar(() => patch(`/menu/productos/${actualizado.id}`, cambios));
@@ -293,16 +313,29 @@ export function App() {
     ejecutar(() =>
       post('/menu/productos', {
         nombre: nuevo.nombre,
+        nombreCorto: nuevo.nombreCorto || undefined,
         categoriaSlug: nuevo.categoriaSlug,
+        etiqueta: nuevo.etiqueta || undefined,
         porcion: nuevo.porcion || undefined,
         precio: nuevo.precio,
+        calorias: nuevo.calorias ?? undefined,
         descripcion: nuevo.descripcion,
         stockDiario: nuevo.stockDiario,
         tiempoPrepMin: nuevo.tiempoPrepMin,
         imagen: nuevo.imagen || undefined,
-        badge: nuevo.badge || undefined
+        colorCard: nuevo.colorCard || undefined,
+        badge: nuevo.badge || undefined,
+        ingredientes: nuevo.ingredientes || [],
+        alergenos: nuevo.alergenos || [],
+        destacado: Boolean(nuevo.destacado),
+        estado: nuevo.estado || 'publicado'
       })
     );
+
+  const handleDeleteMenuItem = (id) => ejecutar(() => api(`/menu/productos/${id}`, { metodo: 'DELETE' }));
+  const handlePublishMenuItem = (id) => ejecutar(() => post(`/menu/productos/${id}/publicar`));
+  const handleUnpublishMenuItem = (id) => ejecutar(() => post(`/menu/productos/${id}/despublicar`));
+  const handleReorderMenuItems = (items) => ejecutar(() => patch('/menu/orden', { items }));
 
   // ------------------------------------------------------------------------
   // Promociones y Club Marfil
@@ -579,8 +612,14 @@ export function App() {
               {activeTab === 'menu' && (
                 <MenuCatalogModule
                   menuItems={menuItems}
+                  categorias={categoriasMenu}
+                  usuario={usuario}
                   onUpdateMenuItem={handleUpdateMenuItem}
                   onAddMenuItem={handleAddMenuItem}
+                  onDeleteMenuItem={handleDeleteMenuItem}
+                  onPublishMenuItem={handlePublishMenuItem}
+                  onUnpublishMenuItem={handleUnpublishMenuItem}
+                  onReorderMenuItems={handleReorderMenuItems}
                   soundEnabled={soundEnabled}
                 />
               )}

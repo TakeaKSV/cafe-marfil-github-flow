@@ -1,5 +1,19 @@
 // Traducen lo que entrega la API al formato que consumen las pantallas de la PWA.
 
+const ORIGEN_API = (() => {
+  try {
+    return new URL(import.meta.env.VITE_API_URL || 'http://localhost:3000/api').origin;
+  } catch {
+    return '';
+  }
+})();
+
+export function resolverUrlImagen(url) {
+  if (!url) return '/images/Menu/vaso-principal.png';
+  if (url.startsWith('/uploads/') && ORIGEN_API) return `${ORIGEN_API}${url}`;
+  return url;
+}
+
 const sinPrefijo = (nombreSucursal) => (nombreSucursal ?? '').replace('Sucursal ', '');
 
 const fmtDia = new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -63,7 +77,7 @@ export const aProductoDeMenu = (p) => ({
   precioNum: Number(p.precio || 0),
   tamano: p.porcion || 'Porción individual',
   calorias: p.calorias ? `${p.calorias} kcal` : 'Consulta en barra',
-  imagen: p.imagen || '/images/Menu/vaso-principal.png',
+  imagen: resolverUrlImagen(p.imagen),
   colorCard: p.colorCard || '#F5ECE8',
   queTrae: Array.isArray(p.ingredientes) && p.ingredientes.length ? p.ingredientes : [p.descripcion].filter(Boolean),
   alergenos: Array.isArray(p.alergenos) ? p.alergenos : [],

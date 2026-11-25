@@ -27,7 +27,10 @@ function aProducto(fila) {
     stockDiario: fila.stock_diario,
     vendidosHoy: fila.vendidos_hoy,
     tiempoPrepMin: fila.tiempo_prep_min,
-    destacado: fila.destacado === 1
+    destacado: fila.destacado === 1,
+    estado: fila.estado || 'publicado',
+    orden: fila.orden ?? 0,
+    actualizadoEn: fila.actualizado_en ?? null
   };
 }
 
@@ -38,9 +41,11 @@ export async function listarProductos(filtros = {}) {
 }
 
 /** Acepta el id numérico o el slug ('frappe-kinder-bueno'). */
-export async function obtenerProducto(idOSlug) {
+export async function obtenerProducto(idOSlug, { incluirBorradores = false } = {}) {
   const fila = await repo.buscar(idOSlug);
-  if (!fila) throw noEncontrado('No existe ese producto en el menú.');
+  if (!fila || (!incluirBorradores && fila.estado === 'borrador')) {
+    throw noEncontrado('No existe ese producto en el menú.');
+  }
   return aProducto(fila);
 }
 
@@ -50,9 +55,10 @@ async function idDeCategoria(slug) {
   return categoria.id;
 }
 
-export async function crearProducto(datos) {
+export async function crearProducto(datos, personalId = null) {
   const categoriaId = await idDeCategoria(datos.categoriaSlug);
   const slug = await slugLibre(datos.nombre, (s) => repo.slugExiste(s));
+  const ahora = ahoraISO();
   const { id } = await repo.insertarProducto({
     slug,
     nombre: datos.nombre,
@@ -72,23 +78,43 @@ export async function crearProducto(datos) {
     stockDiario: datos.stockDiario,
     tiempoPrepMin: datos.tiempoPrepMin,
     destacado: aBit(datos.destacado),
-    creadoEn: ahoraISO()
+    estado: datos.estado ?? 'publicado',
+    orden: datos.orden ?? 0,
+    actualizadoPor: personalId,
+    actualizadoEn: ahora,
+    creadoEn: ahora
   });
-  return obtenerProducto(id);
+  return obtenerProducto(id, { incluirBorradores: true });
 }
 
-export async function actualizarProducto(id, cambios) {
-  await obtenerProducto(id);
+export async function actualizarProducto(id, cambios, personalId = null) {
+  await obtenerProducto(id, { incluirBorradores: true });
   await repo.actualizarProductos(id, {
     ...cambios,
-    categoriaId: cambios.categoriaSlug ? await idDeCategoria(cambios.categoriaSlug) : undefined
+    categoriaId: cambios.categoriaSlug ? await idDeCategoria(cambios.categoriaSlug) : undefined,
+    actualizadoPor: personalId,
+    actualizadoEn: ahoraISO()
   });
 
-  return obtenerProducto(id);
+  return obtenerProducto(id, { incluirBorradores: true });
+}
+
+export async function publicarProducto(id, personalId = null) {
+  return actualizarProducto(id, { estado: 'publicado' }, personalId);
+}
+
+export async function despublicarProducto(id, personalId = null) {
+  return actualizarProducto(id, { estado: 'borrador' }, personalId);
+}
+
+export async function reordenarProductos(items, personalId = null) {
+  if (!items.length) return [];
+  await repo.reordenar(items, personalId, ahoraISO());
+  return listarProductos({ incluirBorradores: true });
 }
 
 /** Borrado lógico: el producto deja de aparecer pero se conserva su historial. */
 export async function eliminarProducto(id) {
-  await obtenerProducto(id);
+  await obtenerProducto(id, { incluirBorradores: true });
   await repo.desactivar(id);
 }

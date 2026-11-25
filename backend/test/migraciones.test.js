@@ -29,7 +29,8 @@ test('migra una base 1.1.0 con datos sin perderlos y es idempotente', async () =
     antes
   );
   assert.deepEqual(await conexion('reservaciones').orderBy('id'), reservas);
-  assert.equal((await conexion('knex_migrations').count({ n: '*' }).first()).n, 2);
+  assert.equal(await conexion.schema.hasColumn('productos', 'estado'), true);
+  assert.equal((await conexion('knex_migrations').count({ n: '*' }).first()).n, 3);
 });
 
 test('reset exige confirmación exacta y se niega a tocar tablas ajenas', async () => {

@@ -10,6 +10,8 @@
 
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { after, before, test } from 'node:test';
 import jwt from 'jsonwebtoken';
 import { cargarReservacionesPanel } from '../../frontend/admin/src/api/reservaciones.js';
@@ -652,6 +654,99 @@ test('menú: cocina cambia disponibilidad, solo gerencia edita la ficha', async 
   assert.equal((await api('DELETE', `/menu/productos/${nuevo.datos.id}`, { token: sesion.admin })).status, 204);
   assert.equal((await api('GET', `/menu/productos/${nuevo.datos.id}`)).status, 404);
   assert.equal((await api('GET', '/menu/productos')).datos.length, 16);
+});
+
+test('menú: borradores ocultos al público, publicación, reorden y subida de imagen', async () => {
+  const borrador = await api('POST', '/menu/productos', {
+    token: sesion.admin,
+    body: {
+      nombre: 'Waffle Pistache Secreto',
+      categoriaSlug: 'postres',
+      precio: 145,
+      estado: 'borrador',
+      destacado: true
+    }
+  });
+  assert.equal(borrador.status, 201);
+  assert.equal(borrador.datos.estado, 'borrador');
+
+  // El público no puede ver borradores ni pedir incluirBorradores=1.
+  assert.equal((await api('GET', '/menu/productos?incluirBorradores=1')).status, 403);
+  assert.equal((await api('GET', `/menu/productos/${borrador.datos.id}`)).status, 404);
+  const publicoAntes = (await api('GET', '/menu/productos')).datos;
+  assert.equal(publicoAntes.some((p) => p.id === borrador.datos.id), false);
+
+  // El personal sí ve borradores cuando lo solicita.
+  const conBorradores = (await api('GET', '/menu/productos?incluirBorradores=1', { token: sesion.host })).datos;
+  assert.equal(conBorradores.some((p) => p.id === borrador.datos.id && p.estado === 'borrador'), true);
+
+  // Host no puede publicar; admin sí.
+  assert.equal(
+    (await api('POST', `/menu/productos/${borrador.datos.id}/publicar`, { token: sesion.host })).status,
+    403
+  );
+  const publicado = await api('POST', `/menu/productos/${borrador.datos.id}/publicar`, { token: sesion.admin });
+  assert.equal(publicado.status, 200);
+  assert.equal(publicado.datos.estado, 'publicado');
+  assert.equal((await api('GET', `/menu/productos/${borrador.datos.id}`)).status, 200);
+
+  // Despublicar lo regresa a borrador.
+  const despublicado = await api('POST', `/menu/productos/${borrador.datos.id}/despublicar`, { token: sesion.admin });
+  assert.equal(despublicado.status, 200);
+  assert.equal(despublicado.datos.estado, 'borrador');
+  assert.equal((await api('GET', `/menu/productos/${borrador.datos.id}`)).status, 404);
+
+  // Reordenamiento de productos.
+  const kinder = publicoAntes.find((p) => p.slug === 'frappe-kinder-bueno');
+  const reordenado = await api('PATCH', '/menu/orden', {
+    token: sesion.admin,
+    body: { items: [{ id: kinder.id, orden: 5 }, { id: borrador.datos.id, orden: 1 }] }
+  });
+  assert.equal(reordenado.status, 200);
+  assert.equal(reordenado.datos.find((p) => p.id === kinder.id).orden, 5);
+
+  // Limpieza del borrador para mantener el catálogo base.
+  assert.equal((await api('DELETE', `/menu/productos/${borrador.datos.id}`, { token: sesion.admin })).status, 204);
+
+  // Subida de imágenes: validación de permisos, magic bytes y descarga estática.
+  const origen = base.replace(/\/api$/, '');
+  const pngValido = Buffer.from([
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
+    0x49, 0x48, 0x44, 0x52
+  ]);
+
+  const formFalso = new FormData();
+  formFalso.append('imagen', new Blob(['no-es-png-real'], { type: 'image/png' }), 'falso.png');
+  const respFalso = await fetch(`${base}/uploads/imagen`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${sesion.admin}` },
+    body: formFalso
+  });
+  assert.equal(respFalso.status, 400);
+
+  const formHost = new FormData();
+  formHost.append('imagen', new Blob([pngValido], { type: 'image/png' }), 'host.png');
+  const respHost = await fetch(`${base}/uploads/imagen`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${sesion.host}` },
+    body: formHost
+  });
+  assert.equal(respHost.status, 403);
+
+  const formOk = new FormData();
+  formOk.append('imagen', new Blob([pngValido], { type: 'image/png' }), 'ok.png');
+  const respOk = await fetch(`${base}/uploads/imagen`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${sesion.admin}` },
+    body: formOk
+  });
+  assert.equal(respOk.status, 201);
+  const subida = await respOk.json();
+  assert.match(subida.url, /^\/uploads\/.+\.png$/);
+
+  const descargada = await fetch(`${origen}${subida.url}`);
+  assert.equal(descargada.status, 200);
+  await fs.rm(path.resolve(process.cwd(), 'uploads', subida.archivo), { force: true });
 });
 
 test('ludoteca: préstamos, devoluciones y devolución automática al liberar la mesa', async () => {
