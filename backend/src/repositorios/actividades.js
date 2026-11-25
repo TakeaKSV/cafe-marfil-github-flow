@@ -17,15 +17,16 @@ function actividades(hoy) {
         .as('lugares_ocupados')
     );
 }
-export function listar({ sucursalId, categoria, incluirPasadas = false, hoy }) {
-  const query = actividades(hoy).where('a.activa', 1);
+export function listar({ sucursalId, categoria, incluirPasadas = false, incluirInactivas = false, hoy }) {
+  const query = actividades(hoy);
+  if (!incluirInactivas) query.where('a.activa', 1);
   if (!incluirPasadas)
     query.where(function () {
       this.whereNull('a.fecha').orWhere('a.fecha', '>=', hoy);
     });
   if (sucursalId) query.where('a.sucursal_id', sucursalId);
   if (categoria) query.where('a.categoria_slug', categoria);
-  return query.orderBy([{ column: 'a.fecha', order: 'asc', nulls: 'last' }, 'a.hora_inicio', 'a.id']);
+  return query.orderBy([{ column: 'a.activa', order: 'desc' }, { column: 'a.fecha', order: 'asc', nulls: 'last' }, 'a.hora_inicio', 'a.id']);
 }
 export const buscar = (clave, hoy) =>
   actividades(hoy)

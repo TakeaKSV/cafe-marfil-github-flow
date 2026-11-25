@@ -6,6 +6,7 @@ import { ReservationsTableView } from './components/ReservationsTableView';
 import { FloorPlanModule } from './components/FloorPlanModule';
 import { ScannerModule } from './components/ScannerModule';
 import { MenuCatalogModule } from './components/MenuCatalogModule';
+import { ActivitiesModule } from './components/ActivitiesModule';
 import { PromotionsModule } from './components/PromotionsModule';
 import { LudotecaModule } from './components/LudotecaModule';
 import { StaffSettingsModule } from './components/StaffSettingsModule';
@@ -72,6 +73,7 @@ export function App() {
   const cargaActual = useRef(0);
   const [menuItems, setMenuItems] = useState([]);
   const [categoriasMenu, setCategoriasMenu] = useState([]);
+  const [actividades, setActividades] = useState([]);
   const [promociones, setPromociones] = useState([]);
   const [clientesClub, setClientesClub] = useState([]);
   const [juegos, setJuegos] = useState([]);
@@ -139,12 +141,13 @@ export function App() {
     try {
       // La fecha del servidor solo delimita los indicadores y la operación de hoy.
       const nuevasMetricas = await api('/metricas/hoy', { query: { sucursalId } });
-      const [s, m, r, productos, catsMenu, promos, clientes, j, personal, historial] = await Promise.all([
+      const [s, m, r, productos, catsMenu, acts, promos, clientes, j, personal, historial] = await Promise.all([
         api('/sucursales'),
         api('/mesas'),
         cargarReservacionesPanel(api, { hoy: nuevasMetricas.fecha, fecha: fechaReservaciones, sucursalId }),
         api('/menu/productos', { query: { incluirBorradores: '1' } }),
         api('/menu/categorias'),
+        api('/actividades', { query: { incluirPasadas: '1', incluirInactivas: '1' } }),
         api('/promociones'),
         api('/club/clientes'),
         api('/juegos'),
@@ -159,6 +162,7 @@ export function App() {
       setReservacionesHoy(r.reservacionesHoy.map(aReservacion(nuevasMetricas.fecha)));
       setMenuItems(productos);
       setCategoriasMenu(catsMenu);
+      setActividades(acts);
       setPromociones(promos);
       setClientesClub(clientes.map(aClienteClub));
       setJuegos(j.map(aJuego));
@@ -338,6 +342,13 @@ export function App() {
   const handleReorderMenuItems = (items) => ejecutar(() => patch('/menu/orden', { items }));
 
   // ------------------------------------------------------------------------
+  // Actividades
+  // ------------------------------------------------------------------------
+
+  const handleAddActividad = (nueva) => ejecutar(() => post('/actividades', nueva));
+  const handleUpdateActividad = (id, cambios) => ejecutar(() => patch(`/actividades/${id}`, cambios));
+
+  // ------------------------------------------------------------------------
   // Promociones y Club Marfil
   // ------------------------------------------------------------------------
 
@@ -447,6 +458,7 @@ export function App() {
       case 'floorplan': return 'Host Station & Mesas en Vivo';
       case 'scanner': return 'Terminal de Escáner QR & Pases';
       case 'menu': return 'Cocina en Vivo & Catálogo';
+      case 'activities': return 'Actividades & Eventos';
       case 'promotions': return 'Promociones & Cuponera';
       case 'ludoteca': return 'Ludoteca (+60 Juegos)';
       case 'staff': return 'Personal en Turno & Aforos';
@@ -620,6 +632,18 @@ export function App() {
                   onPublishMenuItem={handlePublishMenuItem}
                   onUnpublishMenuItem={handleUnpublishMenuItem}
                   onReorderMenuItems={handleReorderMenuItems}
+                  soundEnabled={soundEnabled}
+                />
+              )}
+
+              {/* 5b. Editor de Actividades & Eventos */}
+              {activeTab === 'activities' && (
+                <ActivitiesModule
+                  actividades={actividades}
+                  sucursales={sucursales}
+                  usuario={usuario}
+                  onAddActividad={handleAddActividad}
+                  onUpdateActividad={handleUpdateActividad}
                   soundEnabled={soundEnabled}
                 />
               )}

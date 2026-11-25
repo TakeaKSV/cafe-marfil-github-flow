@@ -35,6 +35,7 @@ function aActividad(fila) {
     precio: fila.precio,
     precioTexto: fila.precio_texto ?? (fila.es_gratis ? 'Entrada Libre' : precioTexto(fila.precio)),
     esGratis: fila.es_gratis === 1,
+    activa: fila.activa === 1,
     incluye: leerJSON(fila.incluye, []),
     requisitos: fila.requisitos
   };

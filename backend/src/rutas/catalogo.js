@@ -167,7 +167,8 @@ router.delete('/menu/productos/:id', soloGerencia, async (req, res) => {
 const filtrosActividades = z.object({
   sucursalId: zSucursalId.optional(),
   categoria: zTexto(40).optional(),
-  incluirPasadas: zBanderaQuery.optional()
+  incluirPasadas: zBanderaQuery.optional(),
+  incluirInactivas: zBanderaQuery.optional()
 });
 
 const camposActividad = {
@@ -211,7 +212,13 @@ const esquemaCrearActividad = z.object({
 
 const esquemaEditarActividad = z.object({ ...camposActividad, activa: z.boolean() }).partial();
 
-router.get('/actividades', async (req, res) => res.json(await listarActividades(leer(filtrosActividades, req.query))));
+router.get('/actividades', async (req, res) => {
+  const filtros = leer(filtrosActividades, req.query);
+  if (filtros.incluirInactivas && !esStaff(req)) {
+    throw sinPermiso('Solo personal autorizado puede consultar actividades archivadas.');
+  }
+  res.json(await listarActividades(filtros));
+});
 
 router.get('/actividades/:id', async (req, res) => res.json(await obtenerActividad(req.params.id)));
 
