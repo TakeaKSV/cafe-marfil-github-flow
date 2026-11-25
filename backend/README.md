@@ -40,8 +40,15 @@ Cuentas de ejemplo (todas con la contraseña `marfil2026`, solo para desarrollo)
 | `npm start` | Levanta la API sin recarga |
 | `npm test` | Unitarias e integración. Recrean `cafe_marfil_test` y `cafe_marfil_migracion_test` |
 | `npm run db:init` | Crea la base y aplica las migraciones pendientes sin borrar datos |
-| `npm run db:seed` | Carga los datos de ejemplo (solo si la base está vacía) |
+| `npm run db:seed` | Siembra el catálogo base y la cuenta admin inicial (solo si la base está vacía). Usa `npm run db:seed -- --demo` para incluir reservaciones/clientes de ejemplo |
 | `npm run db:reset` | **Borra las tablas de `DB_NAME`**, migra y siembra. Exige `DB_RESET_CONFIRM` igual a `DB_NAME`; nunca en producción |
+
+### Correos transaccionales y verificación (Mailpit / SMTP)
+
+El backend valida que el dominio del correo tenga registros MX reales (rechazando dominios desechables o con error de dedo) y envía correos firmados de verificación, bienvenida, recuperación de contraseña y reservaciones mediante `nodemailer`.
+
+- **Desarrollo local:** levanta Mailpit con `docker run -d --name marfil-mailpit -p 1025:1025 -p 8025:8025 axllent/mailpit` y abre `http://localhost:8025` para inspeccionar cada correo enviado.
+- **Producción:** define `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` y `APP_URL` en `backend/.env`.
 
 Los datos de ejemplo son relativos al momento en que se siembran: "hoy" siempre tiene mesas
 ocupadas, reservaciones en curso y actividades en los próximos días. Si la demo se ve vieja,
