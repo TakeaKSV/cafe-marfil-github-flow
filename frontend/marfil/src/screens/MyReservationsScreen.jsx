@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Calendar,
   Clock,
@@ -149,6 +150,12 @@ export default function MyReservationsScreen({
                     </div>
                   </div>
 
+                  {res.juegoNombre && (
+                    <div className="p-3 rounded-md bg-[#FAF7F5] text-xs font-mono text-[#1F1410] border border-stone-300 font-semibold">
+                      🎲 Juego apartado: <strong className="text-[#E12927]">{res.juegoNombre}</strong>
+                    </div>
+                  )}
+
                   {res.notas && (
                     <div className="p-3.5 rounded-md bg-[#FCEAE9] text-xs font-body text-[#1F1410] border-l-4 border-l-[#E12927] border-2 border-[#E12927]/30 font-medium">
                       <strong>Nota especial:</strong> {res.notas}
@@ -221,8 +228,8 @@ export default function MyReservationsScreen({
       )}
 
       {/* Modal de Cancelación */}
-      {reservationToCancel && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      {reservationToCancel && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-[#1F1410]/70 backdrop-blur-md">
           <div className="bg-white rounded-lg max-w-md w-full p-6 sm:p-8 flex flex-col items-center text-center gap-4 shadow-2xl border-2 border-stone-400 animate-mh-rise">
             <div className="w-14 h-14 rounded-md bg-[#FCEAE9] text-[#E12927] flex items-center justify-center shadow-xs border-2 border-[#E12927]/40">
               <AlertTriangle size={28} />
@@ -246,7 +253,8 @@ export default function MyReservationsScreen({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

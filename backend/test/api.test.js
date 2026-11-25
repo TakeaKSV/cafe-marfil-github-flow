@@ -317,17 +317,30 @@ test('reservación desde la PWA exige sesión y permite gestión con el token de
       comensal: 'Ana Invitada',
       telefono: '618-777-0001',
       sucursalId: 'calvario',
-      fecha: MANANA,
+      fecha: sumarDias(MANANA, 1),
       hora: '6:00 PM',
       personas: 4,
       mesaId: mesaId['calvario/M04']
     }
   });
   assert.equal(creada.status, 201);
-  assert.equal(creada.datos.mesaId, null, 'un cliente no puede asignarse mesa');
+  assert.ok(creada.datos.mesaId, 'asigna automáticamente una mesa disponible para evitar colisiones');
   assert.equal(creada.datos.origen, 'app');
   assert.equal(creada.datos.tipoNombre, 'Mesa con Juegos de Mesa');
   const { tokenQR, folio } = creada.datos;
+
+  // Un mismo cliente no puede duplicar reserva empalmada en el mismo horario.
+  const duplicada = await api('POST', '/reservaciones', {
+    token: sesion.cliente,
+    body: {
+      tipo: 'mesa',
+      sucursalId: 'calvario',
+      fecha: sumarDias(MANANA, 1),
+      hora: '6:30 PM',
+      personas: 2
+    }
+  });
+  assert.equal(duplicada.status, 409);
 
   // El folio no basta para consultar desde fuera; se necesita el token secreto.
   assert.equal((await api('GET', `/reservaciones/${folio}`)).status, 401);

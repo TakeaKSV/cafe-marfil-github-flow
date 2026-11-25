@@ -33,6 +33,7 @@ export const ReservationsTableView = ({
   onUpdateReservacion, 
   onAddReservacion,
   promociones,
+  juegos = [],
   sucursales,
   selectedSucursal,
   soundEnabled,
@@ -66,6 +67,7 @@ export const ReservationsTableView = ({
     personas: 2,
     tipo: 'brunch',
     tipoNombre: 'Desayuno & Brunch',
+    juegoId: '',
     notas: ''
   });
 
@@ -154,7 +156,8 @@ export const ReservationsTableView = ({
         ...newRes,
         comensal: comensalCompleto,
         telefono: newRes.telefono.trim(),
-        personas: Number(newRes.personas)
+        personas: Number(newRes.personas),
+        juegoId: newRes.juegoId ? Number(newRes.juegoId) : undefined
       });
     } finally {
       setGuardando(false);
@@ -174,6 +177,7 @@ export const ReservationsTableView = ({
       personas: 2,
       tipo: 'brunch',
       tipoNombre: 'Desayuno & Brunch',
+      juegoId: '',
       notas: ''
     });
   };
@@ -664,6 +668,12 @@ export const ReservationsTableView = ({
                 <span className="text-[#1F1410]/60">Sucursal:</span>
                 <span className="font-semibold text-[11px] truncate max-w-[150px]">{qrModalItem.sucursalNombre}</span>
               </div>
+              {qrModalItem.juegoNombre && (
+                <div className="flex justify-between pt-1 border-t border-[#1F1410]/5">
+                  <span className="text-[#1F1410]/60">Juego apartado:</span>
+                  <strong className="text-[#E12927]">{qrModalItem.juegoNombre}</strong>
+                </div>
+              )}
             </div>
 
             <button
@@ -872,6 +882,26 @@ export const ReservationsTableView = ({
                   </select>
                 </div>
               </div>
+
+              {juegos.length > 0 && (
+                <div>
+                  <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1.5">
+                    Juego de Mesa Apartado (Opcional)
+                  </label>
+                  <select
+                    value={newRes.juegoId}
+                    onChange={(e) => setNewRes({ ...newRes, juegoId: e.target.value })}
+                    className="w-full px-3 py-2.5 text-xs border border-[#1F1410]/15 rounded-xl focus:border-[#E12927] focus:outline-hidden bg-white cursor-pointer"
+                  >
+                    <option value="">Sin juego apartado</option>
+                    {juegos.map((j) => (
+                      <option key={j.id} value={j.id}>
+                        {j.nombre} · {j.categoria} ({j.jugadores})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="pt-4 border-t border-[#1F1410]/8 flex justify-end gap-3">
                 <button

@@ -21,6 +21,8 @@ import { alExpirarSesion, api, sesion } from './api/cliente';
 import { aClienteClub, aEscaneo, aJuego, aPersona, aReservacion, aSucursal } from './api/adaptadores';
 import { cargarReservacionesPanel } from './api/reservaciones';
 import { esAdmin, esGerencia, puedeVerTab } from './utils/permisos';
+import { playSound } from './utils/audioFeedback';
+import { BellRing, X } from 'lucide-react';
 
 const SEGUNDOS_ENTRE_RECARGAS = 30;
 
@@ -89,6 +91,8 @@ export function App() {
   const [staff, setStaff] = useState([]);
   const [invitaciones, setInvitaciones] = useState([]);
   const [escaneos, setEscaneos] = useState([]);
+  const [alertasSala, setAlertasSala] = useState([]);
+  const alertasVistasRef = useRef(new Set());
   const [metricas, setMetricas] = useState(METRICAS_VACIAS);
 
   // ------------------------------------------------------------------------
@@ -145,7 +149,7 @@ export function App() {
       const nuevasMetricas = await api('/metricas/hoy', { query: { sucursalId } });
       const esAdminActual = esAdmin(usuario);
       const esGerenciaActual = esGerencia(usuario);
-      const [s, m, r, productos, catsMenu, acts, promos, clientes, j, personal, invs, historial] = await Promise.all([
+      const [s, m, r, productos, catsMenu, acts, promos, clientes, j, personal, invs, historial, listaAlertasSala] = await Promise.all([
         api('/sucursales'),
         api('/mesas'),
         cargarReservacionesPanel(api, { hoy: nuevasMetricas.fecha, fecha: fechaReservaciones, sucursalId }),
@@ -157,7 +161,8 @@ export function App() {
         api('/juegos'),
         esAdminActual ? api('/personal') : Promise.resolve([]),
         esAdminActual ? api('/personal/invitaciones').catch(() => []) : Promise.resolve([]),
-        api('/escaner/historial', { query: { limite: 30 } })
+        api('/escaner/historial', { query: { limite: 30 } }),
+        api('/alertas-sala', { query: { sucursalId } }).catch(() => [])
       ]);
       if (carga !== cargaActual.current) return;
       setMetricas(nuevasMetricas);
@@ -174,6 +179,12 @@ export function App() {
       setStaff(personal.map(aPersona));
       setInvitaciones(Array.isArray(invs) ? invs : []);
       setEscaneos(historial.map(aEscaneo));
+      const alertasArr = Array.isArray(listaAlertasSala) ? listaAlertasSala : [];
+      if (alertasArr.some((a) => !alertasVistasRef.current.has(a.id))) {
+        if (alertasVistasRef.current.size > 0 && soundEnabled) playSound('alert');
+        for (const a of alertasArr) alertasVistasRef.current.add(a.id);
+      }
+      setAlertasSala(alertasArr);
       setDatosListos(true);
     } catch (err) {
       if (carga !== cargaActual.current) return;
@@ -306,6 +317,7 @@ export function App() {
         personas: nueva.personas,
         comensal: nueva.comensal,
         telefono: nueva.telefono,
+        juegoId: nueva.juegoId || undefined,
         notas: nueva.notas
       })
     );
@@ -524,6 +536,12 @@ export function App() {
   const handleUpdateEmpleado = (id, cambios) =>
     ejecutar(() => patch(`/personal/${id}`, cambios), 'Horario y permisos del empleado actualizados.');
 
+  const handleEnviarAlertaSala = (datos) =>
+    ejecutar(() => post('/alertas-sala', datos), 'Alerta transmitida a toda la sala.');
+
+  const handleDescartarAlertaSala = (id) =>
+    ejecutar(() => post(`/alertas-sala/${id}/descartar`), 'Alerta de sala marcada como atendida.');
+
   const avisoFlotante = <AlertToastStack alertas={alertas} onDismiss={cerrarAlerta} />;
 
   if (invitacionToken) {
@@ -625,6 +643,35 @@ export function App() {
             usuario={usuario}
           />
 
+          {/* Banner en vivo de Alertas a Toda la Sala */}
+          {alertasSala.length > 0 && (
+            <div className="bg-[#1F1410] border-b-2 border-[#E12927] px-4 sm:px-6 py-2.5 flex flex-col gap-1.5 shrink-0 z-20">
+              {alertasSala.slice(0, 2).map((alerta) => (
+                <div key={alerta.id} className="flex items-center justify-between gap-3 text-white text-xs">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E12927] font-mono text-[10px] font-bold uppercase shrink-0 animate-pulse">
+                      <BellRing className="w-3 h-3" />
+                      Alerta Sala
+                    </span>
+                    <span className="font-semibold truncate">{alerta.mensaje}</span>
+                    <span className="hidden md:inline text-[10px] font-mono text-white/60 shrink-0">
+                      — {alerta.creadoPorNombre}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleDescartarAlertaSala(alerta.id)}
+                    title="Marcar alerta como atendida"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/10 hover:bg-[#E12927] text-white text-[10px] font-mono font-bold cursor-pointer transition-colors shrink-0"
+                  >
+                    <X className="w-3 h-3" />
+                    Atendida
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Canvas Principal con scroll independiente o fit completo */}
           <main className={`flex-1 min-h-0 ${
             activeTab === 'dashboard'
@@ -663,6 +710,7 @@ export function App() {
                   onUpdateReservacion={handleUpdateReservacion}
                   onAddReservacion={handleAddReservacion}
                   promociones={promociones}
+                  juegos={juegos}
                   sucursales={sucursales}
                   selectedSucursal={selectedSucursal}
                   soundEnabled={soundEnabled}
@@ -762,6 +810,7 @@ export function App() {
                   onInvitarEmpleado={handleInvitarEmpleado}
                   onCancelarInvitacion={handleCancelarInvitacion}
                   onUpdateEmpleado={handleUpdateEmpleado}
+                  onEnviarAlertaSala={handleEnviarAlertaSala}
                   soundEnabled={soundEnabled}
                 />
               )}

@@ -125,12 +125,13 @@ export default function App() {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
 
-  // 4. Catálogo público (sucursales, actividades, promociones y menú)
+  // 4. Catálogo público (sucursales, actividades, promociones, menú y juegos)
   const [sucursales, setSucursales] = useState([]);
   const [actividades, setActividades] = useState([]);
   const [promociones, setPromociones] = useState([]);
   const [productos, setProductos] = useState([]);
   const [secciones, setSecciones] = useState([]);
+  const [juegosCatalogo, setJuegosCatalogo] = useState([]);
   const [catalogoListo, setCatalogoListo] = useState(false);
   const [errorCatalogo, setErrorCatalogo] = useState('');
 
@@ -146,17 +147,19 @@ export default function App() {
 
   const cargarCatalogo = useCallback(async () => {
     setErrorCatalogo('');
-    const [s, a, p, listaProductos] = await Promise.all([
+    const [s, a, p, listaProductos, listaJuegos] = await Promise.all([
       api('/sucursales'),
       api('/actividades'),
       api('/promociones'),
-      api('/menu/productos')
+      api('/menu/productos'),
+      api('/juegos/catalogo').catch(() => [])
     ]);
     setSucursales(s);
     setActividades(a.map(aActividad));
     setPromociones(p.map(aPromocion));
     setProductos(listaProductos);
     setSecciones(aSeccionesDeMenu(listaProductos));
+    setJuegosCatalogo(Array.isArray(listaJuegos) ? listaJuegos : []);
     setCatalogoListo(true);
   }, []);
 
@@ -379,6 +382,7 @@ export default function App() {
           comensal: nueva.nombreCliente,
           telefono: nueva.telefonoCliente,
           email: nueva.correoCliente || undefined,
+          juegoId: nueva.juegoId || undefined,
           notas: nueva.notas || undefined
         }
       });
@@ -600,6 +604,7 @@ export default function App() {
             <ReservationWizard
               sucursales={sucursales}
               actividades={actividades}
+              juegos={juegosCatalogo}
               initialData={reservationWizardInitialData}
               contacto={perfil}
               onCancel={() => navigateTo('inicio')}

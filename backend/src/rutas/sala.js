@@ -4,7 +4,10 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { requiereStaff } from '../middleware/auth.js';
+import * as repoAlertasSala from '../repositorios/alertasSala.js';
 import { historialEscaneos } from '../servicios/bitacora.js';
+import { ahoraISO } from '../utils/fechas.js';
+import { noEncontrado } from '../utils/errores.js';
 import {
   canjearBeneficio,
   canjearRecompensa,
@@ -37,7 +40,8 @@ import {
   crearPersona,
   invitarPersona,
   listarInvitacionesPendientes,
-  listarPersonal
+  listarPersonal,
+  obtenerPersona
 } from '../servicios/personal.js';
 import {
   leer,
@@ -53,7 +57,7 @@ import {
 } from '../utils/validar.js';
 
 const router = Router();
-router.use(['/mesas', '/club', '/escaner', '/juegos', '/personal', '/metricas'], requiereStaff());
+router.use(['/mesas', '/club', '/escaner', '/juegos', '/personal', '/metricas', '/alertas-sala'], requiereStaff());
 
 const soloGerencia = requiereStaff('admin', 'gerente');
 const soloAdmin = requiereStaff('admin');
@@ -285,6 +289,50 @@ router.post('/personal', soloAdmin, async (req, res) => {
 
 router.patch('/personal/:id', soloAdmin, async (req, res) => {
   res.json(await actualizarPersona(leer(zId, req.params.id), leer(esquemaEditarPersona, req.body)));
+});
+
+// --------------------------------------------------------------------------
+// Alertas a toda la sala
+// --------------------------------------------------------------------------
+
+const esquemaAlertaSala = z.object({
+  mensaje: zTexto(280),
+  sucursalId: zSucursalId.nullable().optional()
+});
+
+const aAlertaSala = (fila) => ({
+  id: fila.id,
+  mensaje: fila.mensaje,
+  sucursalId: fila.sucursal_id ?? null,
+  creadoPorId: fila.creado_por_id ?? null,
+  creadoPorNombre: fila.creado_por_nombre,
+  creadoEn: fila.creado_en
+});
+
+router.get('/alertas-sala', async (req, res) => {
+  const { sucursalId } = leer(filtroSucursal, req.query);
+  res.json((await repoAlertasSala.listarActivas({ sucursalId })).map(aAlertaSala));
+});
+
+router.post('/alertas-sala', soloGerencia, async (req, res) => {
+  const datos = leer(esquemaAlertaSala, req.body);
+  const autor = await obtenerPersona(req.usuario.id);
+  const { id } = await repoAlertasSala.crear({
+    mensaje: datos.mensaje,
+    sucursalId: datos.sucursalId ?? null,
+    creadoPorId: autor.id,
+    creadoPorNombre: autor.nombre,
+    creadoEn: ahoraISO()
+  });
+  res.status(201).json(aAlertaSala(await repoAlertasSala.porId(id)));
+});
+
+router.post('/alertas-sala/:id/descartar', async (req, res) => {
+  const id = leer(zId, req.params.id);
+  const existente = await repoAlertasSala.porId(id);
+  if (!existente) throw noEncontrado('No existe esa alerta de sala.');
+  await repoAlertasSala.descartar(id);
+  res.json({ ok: true, id });
 });
 
 // --------------------------------------------------------------------------

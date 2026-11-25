@@ -26,6 +26,24 @@ const ROLES_OPCIONES = [
 
 const horaCorta = (h) => (h ? String(h).slice(0, 5) : '');
 
+function separarNombrePersona(person) {
+  if (person.nombres || person.apellidoPaterno) {
+    return {
+      nombres: person.nombres || '',
+      apellidoPaterno: person.apellidoPaterno || '',
+      apellidoMaterno: person.apellidoMaterno || ''
+    };
+  }
+  const partes = String(person.nombre || '').trim().split(/\s+/).filter(Boolean);
+  if (partes.length <= 1) return { nombres: partes[0] || '', apellidoPaterno: '', apellidoMaterno: '' };
+  if (partes.length === 2) return { nombres: partes[0], apellidoPaterno: partes[1], apellidoMaterno: '' };
+  return {
+    nombres: partes.slice(0, -2).join(' '),
+    apellidoPaterno: partes[partes.length - 2],
+    apellidoMaterno: partes[partes.length - 1]
+  };
+}
+
 export const StaffSettingsModule = ({
   staff = [],
   sucursales = [],
@@ -34,13 +52,16 @@ export const StaffSettingsModule = ({
   onInvitarEmpleado,
   onCancelarInvitacion,
   onUpdateEmpleado,
+  onEnviarAlertaSala,
   soundEnabled
 }) => {
   const esAdmin = usuario?.rol === 'admin';
 
   const [broadcastMessage, setBroadcastMessage] = useState('');
+  const [broadcastSucursal, setBroadcastSucursal] = useState('');
   const [broadcastError, setBroadcastError] = useState('');
   const [broadcastSent, setBroadcastSent] = useState(false);
+  const [enviandoBroadcast, setEnviandoBroadcast] = useState(false);
 
   // Modal invitar empleado (el admin define turno, rol, puesto y sucursal)
   const [modalInvitar, setModalInvitar] = useState(false);
@@ -55,9 +76,12 @@ export const StaffSettingsModule = ({
   const [invErrors, setInvErrors] = useState({});
   const [enviandoInv, setEnviandoInv] = useState(false);
 
-  // Modal editar empleado existente (horarios y acceso al panel)
+  // Modal editar empleado existente (datos personales, horarios y acceso al panel)
   const [editando, setEditando] = useState(null);
   const [editForm, setEditForm] = useState({
+    nombres: '',
+    apellidoPaterno: '',
+    apellidoMaterno: '',
     puesto: '',
     rol: 'host',
     sucursalId: '',
@@ -68,21 +92,34 @@ export const StaffSettingsModule = ({
   const [editErrors, setEditErrors] = useState({});
   const [guardandoEdit, setGuardandoEdit] = useState(false);
 
-  const handleSendBroadcast = (e) => {
+  const handleSendBroadcast = async (e) => {
     e.preventDefault();
     const err = reglas.texto(broadcastMessage, { min: 5, max: 240, etiqueta: 'El mensaje' });
-    if (err) {
-      setBroadcastError(err);
-      if (soundEnabled) playSound('alert');
+    if (err || enviandoBroadcast) {
+      if (err) {
+        setBroadcastError(err);
+        if (soundEnabled) playSound('alert');
+      }
       return;
     }
     setBroadcastError('');
-    setBroadcastSent(true);
-    if (soundEnabled) playSound('alert');
-    setTimeout(() => {
-      setBroadcastSent(false);
-      setBroadcastMessage('');
-    }, 4000);
+    setEnviandoBroadcast(true);
+    try {
+      const ok = onEnviarAlertaSala
+        ? await onEnviarAlertaSala({
+            mensaje: broadcastMessage.trim(),
+            sucursalId: broadcastSucursal || null
+          })
+        : false;
+      if (ok) {
+        setBroadcastSent(true);
+        setBroadcastMessage('');
+        if (soundEnabled) playSound('alert');
+        setTimeout(() => setBroadcastSent(false), 4000);
+      }
+    } finally {
+      setEnviandoBroadcast(false);
+    }
   };
 
   const abrirModalInvitar = () => {
@@ -100,8 +137,12 @@ export const StaffSettingsModule = ({
   };
 
   const abrirModalEditar = (person) => {
+    const partes = separarNombrePersona(person);
     setEditando(person);
     setEditForm({
+      nombres: partes.nombres,
+      apellidoPaterno: partes.apellidoPaterno,
+      apellidoMaterno: partes.apellidoMaterno,
       puesto: person.puesto || person.rol || '',
       rol: person.rolAcceso || 'staff',
       sucursalId: person.sucursalId || sucursales[0]?.id || '',
@@ -147,6 +188,9 @@ export const StaffSettingsModule = ({
     e.preventDefault();
     if (!editando || guardandoEdit) return;
     const errs = {
+      nombres: reglas.nombrePersona(editForm.nombres, { min: 2, max: 80 }),
+      apellidoPaterno: reglas.nombrePersona(editForm.apellidoPaterno, { min: 2, max: 60 }),
+      apellidoMaterno: reglas.nombrePersona(editForm.apellidoMaterno, { min: 2, max: 60, opcional: true }),
       puesto: reglas.texto(editForm.puesto, { min: 2, max: 80, etiqueta: 'El puesto' })
     };
     setEditErrors(errs);
@@ -157,6 +201,9 @@ export const StaffSettingsModule = ({
     setGuardandoEdit(true);
     try {
       const ok = await onUpdateEmpleado(editando.id, {
+        nombres: editForm.nombres.trim(),
+        apellidoPaterno: editForm.apellidoPaterno.trim(),
+        apellidoMaterno: editForm.apellidoMaterno.trim(),
         puesto: editForm.puesto.trim(),
         rol: editForm.rol,
         sucursalId: editForm.sucursalId || null,
@@ -404,7 +451,18 @@ export const StaffSettingsModule = ({
               Envía un anuncio inmediato a las pantallas de comandera, recepción y cocina en piso.
             </p>
 
-            <form onSubmit={handleSendBroadcast} noValidate className="space-y-2">
+            <form onSubmit={handleSendBroadcast} noValidate className="space-y-2.5">
+              <select
+                value={broadcastSucursal}
+                onChange={(e) => setBroadcastSucursal(e.target.value)}
+                className="w-full px-3.5 py-2 text-xs border border-[#1F1410]/20 rounded-xl bg-white focus:outline-hidden focus:border-[#E12927]"
+              >
+                <option value="">Todas las sucursales</option>
+                {sucursales.map((s) => (
+                  <option key={s.id} value={s.id}>{s.nombre}</option>
+                ))}
+              </select>
+
               <input
                 type="text"
                 maxLength={240}
@@ -427,9 +485,10 @@ export const StaffSettingsModule = ({
 
               <button
                 type="submit"
-                className="w-full py-2.5 bg-[#1F1410] hover:bg-[#E12927] text-white text-xs font-mono font-bold rounded-full cursor-pointer transition-colors"
+                disabled={enviandoBroadcast}
+                className="w-full py-2.5 bg-[#1F1410] hover:bg-[#E12927] disabled:opacity-50 text-white text-xs font-mono font-bold rounded-full cursor-pointer transition-colors"
               >
-                Transmitir Alerta a Sala
+                {enviandoBroadcast ? 'Transmitiendo...' : 'Transmitir Alerta a Sala'}
               </button>
             </form>
 
@@ -610,7 +669,55 @@ export const StaffSettingsModule = ({
                 </button>
               </div>
 
-              <form onSubmit={handleGuardarEdicion} noValidate className="space-y-4">
+              <form onSubmit={handleGuardarEdicion} noValidate className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
+                <div>
+                  <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1">Nombre(s) *</label>
+                  <input
+                    type="text"
+                    value={editForm.nombres}
+                    onChange={(e) => {
+                      setEditForm({ ...editForm, nombres: e.target.value });
+                      setEditErrors((p) => ({ ...p, nombres: null }));
+                    }}
+                    className="w-full px-3.5 py-2 text-xs border border-[#1F1410]/15 rounded-xl focus:outline-hidden focus:border-[#E12927]"
+                  />
+                  {editErrors.nombres && <p className="text-xs font-semibold text-[#E12927] mt-1">{editErrors.nombres}</p>}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1">Apellido Paterno *</label>
+                    <input
+                      type="text"
+                      value={editForm.apellidoPaterno}
+                      onChange={(e) => {
+                        setEditForm({ ...editForm, apellidoPaterno: e.target.value });
+                        setEditErrors((p) => ({ ...p, apellidoPaterno: null }));
+                      }}
+                      className="w-full px-3.5 py-2 text-xs border border-[#1F1410]/15 rounded-xl focus:outline-hidden focus:border-[#E12927]"
+                    />
+                    {editErrors.apellidoPaterno && (
+                      <p className="text-xs font-semibold text-[#E12927] mt-1">{editErrors.apellidoPaterno}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1">Apellido Materno</label>
+                    <input
+                      type="text"
+                      value={editForm.apellidoMaterno}
+                      onChange={(e) => {
+                        setEditForm({ ...editForm, apellidoMaterno: e.target.value });
+                        setEditErrors((p) => ({ ...p, apellidoMaterno: null }));
+                      }}
+                      placeholder="Opcional"
+                      className="w-full px-3.5 py-2 text-xs border border-[#1F1410]/15 rounded-xl focus:outline-hidden focus:border-[#E12927]"
+                    />
+                    {editErrors.apellidoMaterno && (
+                      <p className="text-xs font-semibold text-[#E12927] mt-1">{editErrors.apellidoMaterno}</p>
+                    )}
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1">
                     Acceso al panel administrativo *

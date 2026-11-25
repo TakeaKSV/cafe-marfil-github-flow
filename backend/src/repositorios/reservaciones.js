@@ -6,12 +6,14 @@ function reservaciones() {
     .join('sucursales as s', 's.id', 'r.sucursal_id')
     .leftJoin('mesas as m', 'm.id', 'r.mesa_id')
     .leftJoin('actividades as a', 'a.id', 'r.actividad_id')
+    .leftJoin('juegos as j', 'j.id', 'r.juego_id')
     .select(
       'r.*',
       's.nombre as sucursal_nombre',
       'm.numero as mesa_numero',
       'a.nombre as actividad_nombre',
       'a.precio as actividad_precio',
+      'j.nombre as juego_nombre',
       consulta('servicios_mesa as sv')
         .select('sv.ticket_total')
         .whereColumn('sv.reservacion_id', 'r.id')
@@ -47,6 +49,7 @@ export const insertarReservacion = (datos) =>
     sucursal_id: datos.sucursalId,
     mesa_id: datos.mesaId,
     actividad_id: datos.actividadId,
+    juego_id: datos.juegoId ?? null,
     tipo: datos.tipo,
     tipo_nombre: datos.tipoNombre,
     fecha: datos.fecha,
@@ -64,6 +67,7 @@ const CAMPOS_RESERVACIONES = {
   hora: 'hora',
   personas: 'personas',
   mesaId: 'mesa_id',
+  juegoId: 'juego_id',
   notas: 'notas',
   tipoNombre: 'tipo_nombre',
   comensal: 'nombre_contacto',
@@ -95,6 +99,32 @@ export const reservasDeMesa = (mesaId, fecha, excluirId) =>
     .where({ mesa_id: mesaId, fecha })
     .whereNot('id', excluirId)
     .whereIn('estado', ['confirmada', 'en_curso']);
+
+export const mesasDisponiblesSucursal = (sucursalId, personas, bloquear = false) => {
+  const q = consulta('mesas')
+    .select('id', 'numero', 'capacidad')
+    .where({ sucursal_id: sucursalId, activa: 1 })
+    .where('capacidad', '>=', personas)
+    .orderBy('capacidad', 'asc')
+    .orderBy('id', 'asc');
+  return bloquear ? q.forUpdate() : q;
+};
+
+export const reservasActivasSucursalFecha = (sucursalId, fecha, excluirId = 0) =>
+  consulta('reservaciones')
+    .select('id', 'folio', 'mesa_id', 'hora', 'personas', 'cliente_id')
+    .where({ sucursal_id: sucursalId, fecha })
+    .whereNot('id', excluirId)
+    .whereIn('estado', ['confirmada', 'en_curso']);
+
+export const reservasDeClienteFecha = (clienteId, fecha, excluirId = 0) =>
+  consulta('reservaciones')
+    .select('id', 'folio', 'hora', 'sucursal_id')
+    .where({ cliente_id: clienteId, fecha })
+    .whereNot('id', excluirId)
+    .whereIn('estado', ['confirmada', 'en_curso']);
+
+export const juegoPorId = (id) => consulta('juegos').select('id', 'nombre').where({ id }).first();
 
 export const contacto = (id) => consulta('clientes').select('nombre', 'telefono', 'email').where({ id }).first();
 

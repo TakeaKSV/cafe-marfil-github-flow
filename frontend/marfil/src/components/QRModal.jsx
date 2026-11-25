@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import QRCode from 'qrcode';
 import { X, Check, Copy, Download, Sparkles } from 'lucide-react';
 import { sounds } from '../utils/audio';
@@ -36,8 +37,8 @@ export default function QRModal({ isOpen, onClose, titulo, subtitulo, codigo, vi
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={onClose}>
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-[#1F1410]/70 backdrop-blur-md" onClick={onClose}>
       <div
         className="relative bg-white rounded-lg max-w-sm w-full p-6 sm:p-7 flex flex-col items-center text-center gap-4 shadow-2xl border-2 border-stone-400 animate-mh-rise"
         onClick={(e) => e.stopPropagation()}
@@ -98,6 +99,7 @@ export default function QRModal({ isOpen, onClose, titulo, subtitulo, codigo, vi
           {instruccion || 'Muestra este código al barista en caja al momento de pagar tu orden.'}
         </p>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

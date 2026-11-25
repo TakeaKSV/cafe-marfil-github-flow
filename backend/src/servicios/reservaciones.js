@@ -67,6 +67,8 @@ function aReservacion(fila) {
       fila.tipo_nombre ?? (fila.actividad_nombre ? `Actividad: ${fila.actividad_nombre}` : NOMBRES_TIPO[fila.tipo]),
     actividadId: fila.actividad_id,
     actividadNombre: fila.actividad_nombre,
+    juegoId: fila.juego_id ?? null,
+    juegoNombre: fila.juego_nombre ?? null,
     estado: fila.estado,
     esHistorica: ['asistida', 'cancelada', 'no_show'].includes(fila.estado) || fila.fecha < hoyLocal(),
     notas: fila.notas,
@@ -142,6 +144,52 @@ async function validarMesa({ mesaId, sucursalId, fecha, hora, personas }, exclui
   }
 }
 
+/** Busca la mejor mesa libre (capacidad >= personas) sin colisión de horario en esa sucursal y fecha. */
+async function buscarMesaLibre({ sucursalId, fecha, hora, personas }, excluirReservacionId = 0, bloquear = true) {
+  const candidatas = await repo.mesasDisponiblesSucursal(sucursalId, personas, bloquear);
+  if (!candidatas.length) return { hayCapacidad: false, mesa: null };
+  const activas = await repo.reservasActivasSucursalFecha(sucursalId, fecha, excluirReservacionId);
+  const minutos = minutosDelDia(hora);
+  for (const mesa of candidatas) {
+    const ocupada = activas.some(
+      (r) => r.mesa_id === mesa.id && Math.abs(minutosDelDia(r.hora) - minutos) < config.minutosEntreReservasMismaMesa
+    );
+    if (!ocupada) return { hayCapacidad: true, mesa };
+  }
+  return { hayCapacidad: true, mesa: null };
+}
+
+/** Devuelve los horarios disponibles y ocupados para una sucursal, fecha y tamaño de grupo. */
+export async function consultarDisponibilidad({ sucursalId, fecha, personas = 2 }) {
+  await exigirSucursal(sucursalId);
+  const candidatas = await repo.mesasDisponiblesSucursal(sucursalId, personas, false);
+  const activas = await repo.reservasActivasSucursalFecha(sucursalId, fecha, 0);
+  const turnos = [
+    '08:30',
+    '09:30',
+    '10:30',
+    '11:00',
+    '12:00',
+    '13:30',
+    '15:00',
+    '16:30',
+    '18:00',
+    '19:30',
+    '20:30'
+  ];
+  return turnos.map((hora) => {
+    const minutos = minutosDelDia(hora);
+    const mesasLibres = candidatas.filter(
+      (mesa) =>
+        !activas.some(
+          (r) =>
+            r.mesa_id === mesa.id && Math.abs(minutosDelDia(r.hora) - minutos) < config.minutosEntreReservasMismaMesa
+        )
+    ).length;
+    return { hora, horaTexto: horaTexto(hora), disponible: mesasLibres > 0, mesasLibres };
+  });
+}
+
 /** Bloquea la actividad mientras se revisa el cupo: dos reservas simultáneas no pueden sobrevenderla. */
 async function validarCupo({ id }, fecha, personas, excluirReservacionId = 0) {
   await bloquearFila('actividades', id);
@@ -196,9 +244,45 @@ export async function crearReservacion(datos, { clienteId = null, personalId = n
     if (fecha < hoyLocal()) throw solicitudInvalida('La fecha de la reservación ya pasó.');
     if (actividad) await validarCupo(actividad, fecha, datos.personas);
 
-    // Solo el personal asigna mesa; en la PWA el host la asigna al llegar.
-    const mesaId = personalId ? (datos.mesaId ?? null) : null;
-    if (mesaId) await validarMesa({ mesaId, sucursalId, fecha, hora, personas: datos.personas });
+    if (datos.juegoId) {
+      const juego = await repo.juegoPorId(datos.juegoId);
+      if (!juego) throw noEncontrado('El juego de mesa seleccionado no existe en la ludoteca.');
+    }
+
+    // Evita que un cliente genere dos reservaciones empalmadas el mismo día/horario.
+    if (clienteId && !personalId) {
+      const propias = await repo.reservasDeClienteFecha(clienteId, fecha);
+      const empalmada = propias.find(
+        (r) => Math.abs(minutosDelDia(r.hora) - minutosDelDia(hora)) < config.minutosEntreReservasMismaMesa
+      );
+      if (empalmada) {
+        throw conflicto(
+          `Ya tienes una reservación activa ese día a las ${horaTexto(empalmada.hora)} (folio ${empalmada.folio}).`
+        );
+      }
+    }
+
+    // Asignación y control de colisiones de mesa (día, hora y capacidad).
+    let mesaId = personalId ? (datos.mesaId ?? null) : null;
+    if (mesaId) {
+      await validarMesa({ mesaId, sucursalId, fecha, hora, personas: datos.personas });
+    } else if (datos.tipo !== 'actividad') {
+      const { hayCapacidad, mesa } = await buscarMesaLibre({
+        sucursalId,
+        fecha,
+        hora,
+        personas: datos.personas
+      });
+      if (!hayCapacidad) {
+        throw conflicto(`No contamos con una mesa individual para ${datos.personas} personas en esta sucursal.`);
+      }
+      if (!mesa) {
+        throw conflicto(
+          `No hay mesas disponibles para ${datos.personas} persona(s) el ${fechaEnFrase(fecha)} a las ${horaTexto(hora)}. Elige otro horario o sucursal.`
+        );
+      }
+      mesaId = mesa.id;
+    }
 
     const cliente = clienteId ? await repo.contacto(clienteId) : null;
     const comensal = datos.comensal ?? cliente?.nombre;
@@ -217,6 +301,7 @@ export async function crearReservacion(datos, { clienteId = null, personalId = n
       sucursalId,
       mesaId,
       actividadId: actividad?.id ?? null,
+      juegoId: datos.juegoId ?? null,
       tipo: datos.tipo,
       tipoNombre: datos.tipoNombre ?? null,
       fecha,

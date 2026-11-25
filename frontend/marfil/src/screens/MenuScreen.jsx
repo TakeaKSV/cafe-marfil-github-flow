@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ChevronLeft,
   ChevronRight,
@@ -376,9 +377,9 @@ export default function MenuScreen({
       {/* ====================================================================
           3. DETALLE DEL PRODUCTO: SIDEBAR LATERAL (DESKTOP) & BOTTOM SHEET (MÓVIL)
           ==================================================================== */}
-      {selectedProduct && (
+      {selectedProduct && createPortal(
         <div
-          className="fixed inset-0 z-50 flex items-end md:items-stretch md:justify-end bg-black/60 backdrop-blur-[2px] transition-opacity animate-in fade-in duration-200 will-change-opacity"
+          className="fixed inset-0 z-[9999] flex items-end md:items-stretch md:justify-end bg-[#1F1410]/65 backdrop-blur-md transition-opacity animate-in fade-in duration-200 will-change-opacity"
           onClick={handleCloseModal}
           role="dialog"
           aria-modal="true"
@@ -648,7 +649,8 @@ export default function MenuScreen({
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

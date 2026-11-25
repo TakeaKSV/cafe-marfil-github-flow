@@ -24,6 +24,7 @@ import {
   obtenerPromocion
 } from '../servicios/promociones.js';
 import { listarSucursales, obtenerSucursal } from '../servicios/sucursales.js';
+import { listarJuegos } from '../servicios/juegos.js';
 import { noEncontrado, sinPermiso } from '../utils/errores.js';
 import {
   leer,
@@ -48,6 +49,7 @@ const zSucursalId = zTexto(60);
 
 router.get('/sucursales', async (_req, res) => res.json(await listarSucursales()));
 router.get('/sucursales/:id', async (req, res) => res.json(await obtenerSucursal(req.params.id)));
+router.get('/juegos/catalogo', async (_req, res) => res.json(await listarJuegos({})));
 
 // --------------------------------------------------------------------------
 // Menú

@@ -208,6 +208,9 @@ export const aReservacion = (r) => ({
   telefonoCliente: r.telefono,
   correoCliente: r.email ?? '',
   notas: r.notas ?? '',
+  juegoId: r.juegoId ?? null,
+  juegoNombre: r.juegoNombre ?? null,
+  mesaAsignada: r.mesaAsignada ?? null,
   estado: ESTADOS_RESERVACION[r.estado],
   qrCode: r.tokenQR,
   esHistorica: r.esHistorica

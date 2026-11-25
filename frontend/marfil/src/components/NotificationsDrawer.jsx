@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { X, CheckCheck, Calendar, Gift, Sparkles, Tag, ChevronRight, Bell } from 'lucide-react';
 import { sounds } from '../utils/audio';
 
@@ -24,8 +25,8 @@ export default function NotificationsDrawer({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm" onClick={onClose}>
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex justify-end bg-[#1F1410]/65 backdrop-blur-md" onClick={onClose}>
       <aside
         className="w-full max-w-md h-full bg-white flex flex-col shadow-2xl border-l-2 border-stone-300 animate-mh-rise"
         onClick={(e) => e.stopPropagation()}
@@ -107,6 +108,7 @@ export default function NotificationsDrawer({
           )}
         </div>
       </aside>
-    </div>
+    </div>,
+    document.body
   );
 }

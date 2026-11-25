@@ -18,6 +18,24 @@ import {
 import { sounds } from '../utils/audio';
 import { reglas, useFormulario } from '../utils/validacion';
 
+function separarNombreFallback(perfil) {
+  if (perfil.nombres || perfil.apellidoPaterno) {
+    return {
+      nombres: perfil.nombres || '',
+      apellidoPaterno: perfil.apellidoPaterno || '',
+      apellidoMaterno: perfil.apellidoMaterno || ''
+    };
+  }
+  const partes = String(perfil.nombre || '').trim().split(/\s+/).filter(Boolean);
+  if (partes.length <= 1) return { nombres: partes[0] || '', apellidoPaterno: '', apellidoMaterno: '' };
+  if (partes.length === 2) return { nombres: partes[0], apellidoPaterno: partes[1], apellidoMaterno: '' };
+  return {
+    nombres: partes.slice(0, -2).join(' '),
+    apellidoPaterno: partes[partes.length - 2],
+    apellidoMaterno: partes[partes.length - 1]
+  };
+}
+
 export default function ProfileScreen({
   perfil,
   onUpdatePerfil,
@@ -35,11 +53,12 @@ export default function ProfileScreen({
   const [bebida] = useState(perfil.preferencias?.bebidaFavorita || 'Flat White 12oz');
   const [experiencia] = useState(perfil.preferencias?.experienciaFavorita || 'Noche de Juegos');
 
+  const inicialesNombre = separarNombreFallback(perfil);
   const form = useFormulario(
     {
-      nombres: perfil.nombres || perfil.nombre?.split(' ')[0] || '',
-      apellidoPaterno: perfil.apellidoPaterno || '',
-      apellidoMaterno: perfil.apellidoMaterno || '',
+      nombres: inicialesNombre.nombres,
+      apellidoPaterno: inicialesNombre.apellidoPaterno,
+      apellidoMaterno: inicialesNombre.apellidoMaterno,
       telefono: perfil.telefono || '',
       correo: perfil.correo || ''
     },
@@ -130,6 +149,17 @@ export default function ProfileScreen({
                 className="w-10 h-10 rounded-md border-2 border-stone-300 bg-white flex items-center justify-center text-[#1F1410] hover:bg-[#FCEAE9] hover:border-[#E12927] active:scale-95 transition-all cursor-pointer shadow-xs"
                 onClick={() => {
                   sounds.playClick();
+                  if (!isEditing) {
+                    const p = separarNombreFallback(perfil);
+                    form.resetear({
+                      nombres: p.nombres,
+                      apellidoPaterno: p.apellidoPaterno,
+                      apellidoMaterno: p.apellidoMaterno,
+                      telefono: perfil.telefono || '',
+                      correo: perfil.correo || ''
+                    });
+                    setErrorGeneral('');
+                  }
                   setIsEditing(!isEditing);
                 }}
                 title={isEditing ? 'Cancelar edición' : 'Editar información'}

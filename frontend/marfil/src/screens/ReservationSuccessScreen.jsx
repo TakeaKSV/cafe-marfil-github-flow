@@ -100,6 +100,12 @@ export default function ReservationSuccessScreen({
             <span className="block font-mono text-[10px] font-bold text-[#8E7A74] uppercase tracking-wider mb-0.5">COMENSALES</span>
             <strong className="text-[#1F1410]">{reservation.personas} personas</strong>
           </div>
+          {reservation.juegoNombre && (
+            <div className="sm:col-span-2 pt-2 border-t border-stone-200">
+              <span className="block font-mono text-[10px] font-bold text-[#E12927] uppercase tracking-wider mb-0.5">JUEGO DE MESA APARTADO</span>
+              <strong className="text-[#1F1410]">{reservation.juegoNombre}</strong>
+            </div>
+          )}
         </div>
 
         {/* Acciones Finales HeroUI Buttons */}
