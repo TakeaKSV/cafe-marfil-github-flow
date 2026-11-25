@@ -52,14 +52,14 @@ export const ReservationsTableView = ({
   const [guardando, setGuardando] = useState(false);
 
   // Formulario nueva reserva
+  const sucursalPorDefecto = selectedSucursal === 'todas' ? (sucursales[0]?.id || '') : selectedSucursal;
   const [newRes, setNewRes] = useState({
     comensal: '',
     telefono: '',
     fechaISO: hoy,
-    sucursalId: selectedSucursal === 'todas' ? 'porras-matriz' : selectedSucursal,
+    sucursalId: sucursalPorDefecto,
     hora: '10:30 AM',
     personas: 2,
-    mesaAsignada: 'M03',
     tipo: 'brunch',
     tipoNombre: 'Desayuno & Brunch',
     notas: ''
@@ -156,10 +156,9 @@ export const ReservationsTableView = ({
       comensal: '',
       telefono: '',
       fechaISO: hoy,
-      sucursalId: 'porras-matriz',
+      sucursalId: sucursalPorDefecto,
       hora: '10:30 AM',
       personas: 2,
-      mesaAsignada: 'M03',
       tipo: 'brunch',
       tipoNombre: 'Desayuno & Brunch',
       notas: ''

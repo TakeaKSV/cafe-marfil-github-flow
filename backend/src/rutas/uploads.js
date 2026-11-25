@@ -70,6 +70,10 @@ router.post(
 
     const carpeta = normalizarCarpeta(req.query.carpeta || req.body?.carpeta);
 
+    if (carpeta === 'menu' && (archivo.mimetype !== 'image/png' || extReal !== 'png')) {
+      throw solicitudInvalida('Para el menú solo se permiten imágenes en formato PNG.');
+    }
+
     if (cloudinaryConfigurado()) {
       const subida = await subirACloudinary({
         buffer: archivo.buffer,

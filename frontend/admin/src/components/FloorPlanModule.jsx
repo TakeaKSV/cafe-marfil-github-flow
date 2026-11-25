@@ -11,7 +11,6 @@ import {
   X, 
   Sparkles,
   UserPlus,
-  MoreVertical,
   Maximize2,
   Minimize2,
   RotateCcw,
@@ -222,18 +221,6 @@ export const FloorPlanModule = ({
               </div>
             )}
           </div>
-
-          {/* Menú de más opciones */}
-          <button 
-            onClick={() => {
-              if (soundEnabled) playSound('toggle');
-              alert('Opciones de sala: Reorganizar plano, reiniciar ocupación o imprimir comanda general.');
-            }}
-            className="w-8 h-8 rounded-full bg-white border border-[#1F1410]/10 flex items-center justify-center text-[#1F1410]/60 hover:text-[#1F1410] hover:bg-[#FAF7F5] cursor-pointer shadow-2xs"
-            title="Más opciones"
-          >
-            <MoreVertical className="w-3.5 h-3.5" />
-          </button>
 
           {/* Selector de Plano en Español */}
           <div className="relative">

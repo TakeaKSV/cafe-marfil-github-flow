@@ -38,15 +38,6 @@ const COLORES_PRESET = [
   '#E6CA8E'
 ];
 
-const IMAGENES_PRESET = [
-  { label: 'Vaso Principal', url: '/images/Menu/vaso-principal.png' },
-  { label: 'Vaso Café', url: '/images/Menu/vaso-cafe.png' },
-  { label: 'Vaso Morado', url: '/images/Menu/vaso-morado.png' },
-  { label: 'Hamburguesa', url: '/images/Menu/Hamburguesa.png' },
-  { label: 'Desayunos', url: '/images/desayunos_marfil.jpg' },
-  { label: 'Fresas Dubái', url: '/images/marfil_dubai_pistache.jpg' }
-];
-
 const CATEGORIAS_BASE = [
   { slug: 'salado', nombre: 'Brunch & Cocina Salada' },
   { slug: 'frappes', nombre: 'Frappés de Confitería' },
@@ -189,8 +180,8 @@ export const MenuCatalogModule = ({
     const archivo = e.target.files?.[0];
     e.target.value = '';
     if (!archivo) return;
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(archivo.type)) {
-      setErrores((prev) => ({ ...prev, imagen: 'Solo se permiten imágenes JPG, PNG o WebP.' }));
+    if (archivo.type !== 'image/png') {
+      setErrores((prev) => ({ ...prev, imagen: 'Solo se permiten imágenes en formato PNG.' }));
       return;
     }
     if (archivo.size > 2 * 1024 * 1024) {
@@ -415,41 +406,24 @@ export const MenuCatalogModule = ({
               {errores.descripcion && <p className="text-xs text-[#E12927] font-semibold mt-1">{errores.descripcion}</p>}
             </div>
 
-            {/* 5. Foto (Subida a la nube + presets rápidos) */}
-            <div className="p-4 rounded-xl bg-[#FAF7F5] border border-[#1F1410]/10 space-y-3">
+            {/* 5. Foto (Solo PNG, subida a la nube) */}
+            <div className="p-4 rounded-xl bg-[#FAF7F5] border border-[#1F1410]/10 space-y-2.5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <span className="block text-xs font-mono font-bold text-[#1F1410]">Fotografía del platillo</span>
-                  <span className="text-[11px] text-[#1F1410]/60">JPG, PNG o WebP (máx. 2 MB) · subida a la nube</span>
+                  <span className="text-[11px] text-[#1F1410]/60">Solo formato PNG (máx. 2 MB) · subida a la nube</span>
                 </div>
                 <label className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#1F1410] hover:bg-[#E12927] text-white text-xs font-mono font-bold cursor-pointer transition-colors">
                   <Upload className="w-3.5 h-3.5" />
-                  {subiendoImagen ? 'Subiendo...' : 'Subir foto'}
+                  {subiendoImagen ? 'Subiendo...' : 'Subir PNG'}
                   <input
                     type="file"
-                    accept="image/jpeg,image/png,image/webp"
+                    accept="image/png"
                     onChange={handleSubirImagen}
                     className="hidden"
                     disabled={subiendoImagen}
                   />
                 </label>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                {IMAGENES_PRESET.map((img) => (
-                  <button
-                    key={img.url}
-                    type="button"
-                    onClick={() => actualizarCampo('imagen', img.url)}
-                    className={`px-2.5 py-1 rounded-full text-[11px] font-mono border cursor-pointer transition-colors ${
-                      form.imagen === img.url
-                        ? 'bg-[#E12927] text-white border-[#E12927]'
-                        : 'bg-white text-[#1F1410]/75 border-[#1F1410]/15 hover:border-[#E12927]'
-                    }`}
-                  >
-                    {img.label}
-                  </button>
-                ))}
               </div>
               {errores.imagen && <p className="text-xs text-[#E12927] font-semibold">{errores.imagen}</p>}
             </div>

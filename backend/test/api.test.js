@@ -729,6 +729,17 @@ test('menú: borradores ocultos al público, publicación, reorden y subida de i
   });
   assert.equal(respFalso.status, 400);
 
+  // El menú solo acepta PNG (rechaza JPG válido en carpeta=menu).
+  const jpgValido = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01]);
+  const formJpgMenu = new FormData();
+  formJpgMenu.append('imagen', new Blob([jpgValido], { type: 'image/jpeg' }), 'foto.jpg');
+  const respJpgMenu = await fetch(`${base}/uploads/imagen?carpeta=menu`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${sesion.admin}` },
+    body: formJpgMenu
+  });
+  assert.equal(respJpgMenu.status, 400);
+
   const formHost = new FormData();
   formHost.append('imagen', new Blob([pngValido], { type: 'image/png' }), 'host.png');
   const respHost = await fetch(`${base}/uploads/imagen`, {
