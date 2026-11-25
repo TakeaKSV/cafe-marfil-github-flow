@@ -1,7 +1,7 @@
 // Registros que otros servicios escriben como efecto secundario:
 // la bitácora del escáner de caja y las notificaciones de la PWA.
 
-import { db } from '../db/conexion.js';
+import * as repo from '../repositorios/bitacora.js';
 import { ahoraISO, horaLocal, horaTexto } from '../utils/fechas.js';
 
 const ETIQUETAS_ESCANEO = {
@@ -13,20 +13,19 @@ const ETIQUETAS_ESCANEO = {
 };
 
 export async function registrarEscaneo({ codigo, tipo, descripcion, resultado, exito = true, personalId = null }) {
-  await db.ejecutar(
-    `INSERT INTO escaneos (codigo, tipo, descripcion, resultado, exito, personal_id, creado_en)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [codigo.slice(0, 80), tipo, descripcion.slice(0, 255), resultado.slice(0, 160), exito, personalId, ahoraISO()]
-  );
+  await repo.insertarEscaneo({
+    codigo: codigo.slice(0, 80),
+    tipo: tipo,
+    descripcion: descripcion.slice(0, 255),
+    resultado: resultado.slice(0, 160),
+    exito: exito,
+    personalId: personalId,
+    creadoEn: ahoraISO()
+  });
 }
 
 export async function historialEscaneos({ limite = 30 } = {}) {
-  const filas = await db.todos(
-    `SELECT e.*, p.nombre AS personal_nombre
-     FROM escaneos e LEFT JOIN personal p ON p.id = e.personal_id
-     ORDER BY e.id DESC LIMIT ?`,
-    [limite]
-  );
+  const filas = await repo.historial(limite);
   return filas.map((fila) => ({
     id: fila.id,
     codigo: fila.codigo,
@@ -43,9 +42,12 @@ export async function historialEscaneos({ limite = 30 } = {}) {
 
 export async function crearNotificacion(clienteId, { titulo, mensaje, tipo, screenDestino = null }) {
   if (!clienteId) return;
-  await db.ejecutar(
-    `INSERT INTO notificaciones (cliente_id, titulo, mensaje, tipo, screen_destino, creado_en)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [clienteId, titulo, mensaje.slice(0, 500), tipo, screenDestino, ahoraISO()]
-  );
+  await repo.insertarNotificacion({
+    clienteId: clienteId,
+    titulo: titulo,
+    mensaje: mensaje.slice(0, 500),
+    tipo: tipo,
+    screenDestino: screenDestino,
+    creadoEn: ahoraISO()
+  });
 }

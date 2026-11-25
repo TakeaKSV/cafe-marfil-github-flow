@@ -1,5 +1,8 @@
 import cors from 'cors';
 import express from 'express';
+import helmet from 'helmet';
+import { crearLimites } from './middleware/limites.js';
+import { verificarBase } from './db/mantenimiento.js';
 import { config } from './config.js';
 import { identificar } from './middleware/auth.js';
 import { manejarErrores, registrarPeticiones, rutaNoEncontrada } from './middleware/errores.js';
@@ -12,12 +15,29 @@ import rutasSala from './rutas/sala.js';
 export function crearApp({ bitacora = !config.esProduccion } = {}) {
   const app = express();
   app.disable('x-powered-by');
+  app.disable('etag');
+  app.set('trust proxy', config.trustProxy);
+  app.use(helmet());
+  app.use((_req, res, next) => {
+    res.set('Cache-Control', 'no-store');
+    next();
+  });
 
   app.use(cors({ origin: config.origenesCors }));
+  const limites = crearLimites();
+  app.use('/api', limites.general);
+  app.use('/api/auth', limites.auth);
+  app.use('/api/reservaciones', (req, res, next) =>
+    req.method === 'POST' ? limites.escritura(req, res, next) : next()
+  );
   app.use(express.json({ limit: '100kb' }));
   if (bitacora) app.use(registrarPeticiones);
 
   app.get('/api/health', (_req, res) => res.json({ ok: true, servicio: 'cafe-marfil-api' }));
+  app.get('/api/ready', async (_req, res) => {
+    await verificarBase();
+    res.json({ ok: true });
+  });
 
   app.use('/api', identificar);
   app.use('/api/auth', rutasAuth);

@@ -11,14 +11,22 @@
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { after, before, test } from 'node:test';
+import jwt from 'jsonwebtoken';
 
+process.env.NODE_ENV = 'test';
 process.env.DB_NAME = 'cafe_marfil_test';
+process.env.DB_RESET_CONFIRM = process.env.DB_NAME;
+process.env.AUTH_RATE_LIMIT_MAX = '1000';
+process.env.PUBLIC_WRITE_RATE_LIMIT_MAX = '1000';
+process.env.RATE_LIMIT_MAX = '100000';
 process.env.JWT_SECRET = 'secreto-solo-para-pruebas';
 
-const { borrarTodo, cerrarConexion, prepararBase } = await import('../src/db/conexion.js');
+const { cerrarConexion } = await import('../src/db/conexion.js');
+const { borrarTodo, prepararBase } = await import('../src/db/mantenimiento.js');
 const { crearApp } = await import('../src/app.js');
 const { PASSWORD_DEMO, sembrar } = await import('../src/db/semilla.js');
 const { hoyLocal, sumarDias } = await import('../src/utils/fechas.js');
+const { config } = await import('../src/config.js');
 
 const HOY = hoyLocal();
 const MANANA = sumarDias(HOY, 1);
@@ -65,8 +73,8 @@ before(async () => {
 });
 
 after(async () => {
-  servidor.closeAllConnections();
-  servidor.close();
+  servidor?.closeAllConnections();
+  servidor?.close();
   await cerrarConexion();
 });
 
@@ -110,11 +118,15 @@ test('el catálogo se puede leer sin iniciar sesión', async () => {
 // ---------------------------------------------------------------------------
 
 test('autenticación: credenciales, sesión y permisos por tipo de usuario', async () => {
-  const mala = await api('POST', '/auth/staff/login', { body: { email: 'admin@cafemarfil.mx', password: 'incorrecta' } });
+  const mala = await api('POST', '/auth/staff/login', {
+    body: { email: 'admin@cafemarfil.mx', password: 'incorrecta' }
+  });
   assert.equal(mala.status, 401);
 
   // Un cliente no puede entrar por el login del panel aunque su contraseña sea válida.
-  const cruzada = await api('POST', '/auth/staff/login', { body: { email: 'sofia.navarro@gmail.com', password: PASSWORD_DEMO } });
+  const cruzada = await api('POST', '/auth/staff/login', {
+    body: { email: 'sofia.navarro@gmail.com', password: PASSWORD_DEMO }
+  });
   assert.equal(cruzada.status, 401);
 
   const yo = await api('GET', '/auth/me', { token: sesion.admin });
@@ -130,7 +142,12 @@ test('autenticación: credenciales, sesión y permisos por tipo de usuario', asy
 });
 
 test('registro de clientes en la PWA', async () => {
-  const nuevo = { nombre: 'Renata Ibarra', email: 'Renata@Example.com', password: 'cafeconleche', telefono: '618-000-1122' };
+  const nuevo = {
+    nombre: 'Renata Ibarra',
+    email: 'Renata@Example.com',
+    password: 'cafeconleche',
+    telefono: '618-000-1122'
+  };
   const alta = await api('POST', '/auth/clientes/registro', { body: nuevo });
   assert.equal(alta.status, 201);
   assert.equal(alta.datos.cliente.email, 'renata@example.com', 'el correo se guarda en minúsculas');
@@ -142,7 +159,9 @@ test('registro de clientes en la PWA', async () => {
 
   assert.equal((await api('POST', '/auth/clientes/registro', { body: nuevo })).status, 409, 'correo repetido');
 
-  const corta = await api('POST', '/auth/clientes/registro', { body: { ...nuevo, email: 'otra@example.com', password: '123' } });
+  const corta = await api('POST', '/auth/clientes/registro', {
+    body: { ...nuevo, email: 'otra@example.com', password: '123' }
+  });
   assert.equal(corta.status, 400);
   assert.equal(corta.datos.detalles[0].campo, 'password');
 });
@@ -153,7 +172,15 @@ test('registro de clientes en la PWA', async () => {
 
 test('ciclo completo de una reservación registrada por el host', async () => {
   const m03 = mesaId['porras-matriz/M03'];
-  const datos = { comensal: 'Prueba Host', telefono: '618-555-0000', sucursalId: 'porras-matriz', fecha: HOY, hora: '9:00 PM', personas: 3, mesaId: m03 };
+  const datos = {
+    comensal: 'Prueba Host',
+    telefono: '618-555-0000',
+    sucursalId: 'porras-matriz',
+    fecha: HOY,
+    hora: '9:00 PM',
+    personas: 3,
+    mesaId: m03
+  };
 
   const creada = await api('POST', '/reservaciones', { token: sesion.host, body: datos });
   assert.equal(creada.status, 201);
@@ -176,7 +203,10 @@ test('ciclo completo de una reservación registrada por el host', async () => {
   assert.equal(walkIn.status, 409);
 
   // Editar mientras sigue confirmada.
-  const editada = await api('PATCH', `/reservaciones/${folio}`, { token: sesion.host, body: { personas: 4, notas: 'Traen pastel' } });
+  const editada = await api('PATCH', `/reservaciones/${folio}`, {
+    token: sesion.host,
+    body: { personas: 4, notas: 'Traen pastel' }
+  });
   assert.equal(editada.datos.personas, 4);
   const excedida = await api('PATCH', `/reservaciones/${folio}`, { token: sesion.host, body: { personas: 5 } });
   assert.equal(excedida.status, 409, 'la mesa M03 es para 4');
@@ -185,14 +215,23 @@ test('ciclo completo de una reservación registrada por el host', async () => {
   const checkIn = await api('POST', `/reservaciones/${folio}/check-in`, { token: sesion.host, body: {} });
   assert.equal(checkIn.datos.estado, 'en_curso');
   mesa = (await api('GET', `/mesas/${m03}`, { token: sesion.host })).datos;
-  assert.deepEqual([mesa.estado, mesa.comensal, mesa.personas, mesa.reservaFolio], ['ocupada', 'Prueba Host', 4, folio]);
+  assert.deepEqual(
+    [mesa.estado, mesa.comensal, mesa.personas, mesa.reservaFolio],
+    ['ocupada', 'Prueba Host', 4, folio]
+  );
   assert.equal(mesa.ticketAprox, 4 * 180, 'sin ticket se estima por persona');
 
   assert.equal((await api('POST', `/reservaciones/${folio}/check-in`, { token: sesion.host, body: {} })).status, 409);
-  assert.equal((await api('PATCH', `/reservaciones/${folio}`, { token: sesion.host, body: { personas: 2 } })).status, 409);
+  assert.equal(
+    (await api('PATCH', `/reservaciones/${folio}`, { token: sesion.host, body: { personas: 2 } })).status,
+    409
+  );
 
   // Completar: se cierra el servicio con su ticket y la mesa pasa a limpieza.
-  const completada = await api('POST', `/reservaciones/${folio}/completar`, { token: sesion.host, body: { ticketTotal: 890 } });
+  const completada = await api('POST', `/reservaciones/${folio}/completar`, {
+    token: sesion.host,
+    body: { ticketTotal: 890 }
+  });
   assert.equal(completada.datos.estado, 'asistida');
   assert.equal(completada.datos.totalEstimado, 890);
   mesa = (await api('GET', `/mesas/${m03}`, { token: sesion.host })).datos;
@@ -208,7 +247,10 @@ test('walk-in: sentar, cobrar y liberar una mesa', async () => {
   const grande = await api('POST', `/mesas/${m07}/walk-in`, { token: sesion.host, body: { personas: 9 } });
   assert.equal(grande.status, 409, 'M07 es para 4 personas');
 
-  const sentado = await api('POST', `/mesas/${m07}/walk-in`, { token: sesion.host, body: { comensal: 'Pareja sin reserva', personas: 2 } });
+  const sentado = await api('POST', `/mesas/${m07}/walk-in`, {
+    token: sesion.host,
+    body: { comensal: 'Pareja sin reserva', personas: 2 }
+  });
   assert.equal(sentado.status, 201);
   assert.equal(sentado.datos.estado, 'ocupada');
   assert.equal(sentado.datos.mesero, 'Valeria Siqueiros', 'queda registrado quién lo sentó');
@@ -224,17 +266,35 @@ test('walk-in: sentar, cobrar y liberar una mesa', async () => {
 });
 
 test('reservación de invitado desde la PWA y gestión con el token del QR', async () => {
-  const invalida = await api('POST', '/reservaciones', { body: { sucursalId: 'porras-matriz', fecha: '02/10/2026', hora: '25:00', personas: 0 } });
+  const invalida = await api('POST', '/reservaciones', {
+    body: { sucursalId: 'porras-matriz', fecha: '02/10/2026', hora: '25:00', personas: 0 }
+  });
   assert.equal(invalida.status, 400);
   assert.deepEqual(invalida.datos.detalles.map((d) => d.campo).sort(), ['fecha', 'hora', 'personas']);
 
   const pasada = await api('POST', '/reservaciones', {
-    body: { comensal: 'Ana', telefono: '618', sucursalId: 'calvario', fecha: sumarDias(HOY, -1), hora: '10:00', personas: 2 }
+    body: {
+      comensal: 'Ana',
+      telefono: '618',
+      sucursalId: 'calvario',
+      fecha: sumarDias(HOY, -1),
+      hora: '10:00',
+      personas: 2
+    }
   });
   assert.equal(pasada.status, 400);
 
   const creada = await api('POST', '/reservaciones', {
-    body: { tipo: 'juegos', comensal: 'Ana Invitada', telefono: '618-777-0001', sucursalId: 'calvario', fecha: MANANA, hora: '6:00 PM', personas: 4, mesaId: mesaId['calvario/M04'] }
+    body: {
+      tipo: 'juegos',
+      comensal: 'Ana Invitada',
+      telefono: '618-777-0001',
+      sucursalId: 'calvario',
+      fecha: MANANA,
+      hora: '6:00 PM',
+      personas: 4,
+      mesaId: mesaId['calvario/M04']
+    }
   });
   assert.equal(creada.status, 201);
   assert.equal(creada.datos.mesaId, null, 'un invitado no puede asignarse mesa');
@@ -258,7 +318,15 @@ test('reservar una actividad respeta su fecha, su sucursal y su cupo', async () 
   assert.equal(antes.lugaresDisponibles, 4);
 
   const creada = await api('POST', '/reservaciones', {
-    body: { tipo: 'actividad', actividadId: 'glow-paint', comensal: 'Grupo Neón', telefono: '618-321-0000', personas: 3, fecha: MANANA, sucursalId: 'porras-matriz' }
+    body: {
+      tipo: 'actividad',
+      actividadId: 'glow-paint',
+      comensal: 'Grupo Neón',
+      telefono: '618-321-0000',
+      personas: 3,
+      fecha: MANANA,
+      sucursalId: 'porras-matriz'
+    }
   });
   assert.equal(creada.status, 201);
   assert.equal(creada.datos.fecha, antes.fecha, 'manda la fecha de la actividad');
@@ -275,10 +343,15 @@ test('reservar una actividad respeta su fecha, su sucursal y su cupo', async () 
   assert.equal((await api('GET', '/actividades/glow-paint')).datos.lugaresDisponibles, 1);
 
   // No se puede hacer check-in hoy de algo que es para otro día.
-  const anticipado = await api('POST', `/reservaciones/${creada.datos.folio}/check-in`, { token: sesion.host, body: {} });
+  const anticipado = await api('POST', `/reservaciones/${creada.datos.folio}/check-in`, {
+    token: sesion.host,
+    body: {}
+  });
   assert.equal(anticipado.status, 409);
 
-  const faltaActividad = await api('POST', '/reservaciones', { body: { tipo: 'actividad', comensal: 'X', telefono: '1', personas: 1 } });
+  const faltaActividad = await api('POST', '/reservaciones', {
+    body: { tipo: 'actividad', comensal: 'X', telefono: '1', personas: 1 }
+  });
   assert.equal(faltaActividad.status, 400);
 });
 
@@ -291,14 +364,27 @@ test('mi cuenta: perfil, reservaciones, beneficios y notificaciones', async () =
 
   const perfil = await api('GET', '/mi/perfil', { token });
   assert.deepEqual(
-    [perfil.datos.primerNombre, perfil.datos.sellosActuales, perfil.datos.sellosMeta, perfil.datos.puntos, perfil.datos.nivel],
+    [
+      perfil.datos.primerNombre,
+      perfil.datos.sellosActuales,
+      perfil.datos.sellosMeta,
+      perfil.datos.puntos,
+      perfil.datos.nivel
+    ],
     ['Sofía', 6, 8, 380, 'Café Lover']
   );
 
-  const editado = await api('PATCH', '/mi/perfil', { token, body: { telefono: '618-999-8888', preferencias: { lechePreferida: 'Leche de almendra' } } });
+  const editado = await api('PATCH', '/mi/perfil', {
+    token,
+    body: { telefono: '618-999-8888', preferencias: { lechePreferida: 'Leche de almendra' } }
+  });
   assert.equal(editado.datos.telefono, '618-999-8888');
   assert.equal(editado.datos.preferencias.lechePreferida, 'Leche de almendra');
-  assert.equal(editado.datos.preferencias.frappeFavorito, 'Frappé Kinder Bueno 16oz', 'las demás preferencias se conservan');
+  assert.equal(
+    editado.datos.preferencias.frappeFavorito,
+    'Frappé Kinder Bueno 16oz',
+    'las demás preferencias se conservan'
+  );
 
   const beneficios = (await api('GET', '/mi/beneficios', { token })).datos;
   assert.deepEqual(beneficios.map((b) => b.estado).sort(), ['bloqueado', 'disponible', 'disponible', 'usado']);
@@ -308,7 +394,10 @@ test('mi cuenta: perfil, reservaciones, beneficios y notificaciones', async () =
   assert.equal(notificacionesAntes.filter((n) => !n.leida).length, 2);
 
   // Reservar con sesión: toma nombre y teléfono del perfil y queda ligada a la cuenta.
-  const creada = await api('POST', '/reservaciones', { token, body: { sucursalId: 'calvario', fecha: MANANA, hora: '11:00', personas: 2 } });
+  const creada = await api('POST', '/reservaciones', {
+    token,
+    body: { sucursalId: 'calvario', fecha: MANANA, hora: '11:00', personas: 2 }
+  });
   assert.equal(creada.status, 201);
   assert.equal(creada.datos.comensal, 'Sofía Navarro Morales');
   assert.equal(creada.datos.telefono, '618-999-8888');
@@ -342,7 +431,10 @@ test('pasaporte de sellos: completar, canjear la recompensa y reiniciar', async 
 
   const sello = await api('POST', `/club/clientes/${paola}/sello`, { token, body: {} });
   assert.equal(sello.datos.pasaporteCompletado, true);
-  assert.deepEqual([sello.datos.cliente.sellosActuales, sello.datos.cliente.puntos, sello.datos.cliente.visitasTotales], [8, 470, 24]);
+  assert.deepEqual(
+    [sello.datos.cliente.sellosActuales, sello.datos.cliente.puntos, sello.datos.cliente.visitasTotales],
+    [8, 470, 24]
+  );
   assert.equal(sello.datos.cliente.recompensaDisponible, true);
   assert.equal(sello.datos.cliente.recompensaNombre, 'Copa Doble de Fresas Estilo Dubái GRATIS');
 
@@ -361,7 +453,10 @@ test('pasaporte de sellos: completar, canjear la recompensa y reiniciar', async 
   assert.equal(beneficio.datos.beneficio.estado, 'usado');
   assert.equal((await api('POST', '/club/beneficios/MF-FRAPPE-992/canjear', { token })).status, 409);
 
-  const alta = await api('POST', '/club/clientes', { token, body: { nombre: 'Cliente de Caja', telefono: '618-101-0101' } });
+  const alta = await api('POST', '/club/clientes', {
+    token,
+    body: { nombre: 'Cliente de Caja', telefono: '618-101-0101' }
+  });
   assert.equal(alta.status, 201);
   assert.equal(alta.datos.tieneCuenta, false);
   const busqueda = await api('GET', '/club/clientes?q=Caja', { token });
@@ -372,20 +467,32 @@ test('cupones: canje, sucursal válida, límite diario y promociones pausadas', 
   const ludoteca = (await api('GET', '/promociones/MF-PROMO-LUDOTECA', { token: sesion.host })).datos;
   assert.equal(ludoteca.canjesHoy, 6);
 
-  const canje = await api('POST', `/promociones/${ludoteca.id}/canjear`, { token: sesion.host, body: { codigoCliente: 'MF-CLUB-33109' } });
+  const canje = await api('POST', `/promociones/${ludoteca.id}/canjear`, {
+    token: sesion.host,
+    body: { codigoCliente: 'MF-CLUB-33109' }
+  });
   assert.equal(canje.datos.canjesHoy, 7);
 
-  const otraSucursal = await api('POST', `/promociones/${ludoteca.id}/canjear`, { token: sesion.host, body: { sucursalId: 'calvario' } });
+  const otraSucursal = await api('POST', `/promociones/${ludoteca.id}/canjear`, {
+    token: sesion.host,
+    body: { sucursalId: 'calvario' }
+  });
   assert.equal(otraSucursal.status, 409);
 
   // Solo gerencia edita promociones.
-  assert.equal((await api('PATCH', `/promociones/${ludoteca.id}`, { token: sesion.host, body: { limiteDiario: 7 } })).status, 403);
+  assert.equal(
+    (await api('PATCH', `/promociones/${ludoteca.id}`, { token: sesion.host, body: { limiteDiario: 7 } })).status,
+    403
+  );
   await api('PATCH', `/promociones/${ludoteca.id}`, { token: sesion.admin, body: { limiteDiario: 7 } });
   const agotado = await api('POST', `/promociones/${ludoteca.id}/canjear`, { token: sesion.host, body: {} });
   assert.equal(agotado.status, 409);
   assert.match(agotado.datos.error, /límite de 7 canjes/);
 
-  const pausada = await api('PATCH', `/promociones/${ludoteca.id}`, { token: sesion.admin, body: { estado: 'pausado' } });
+  const pausada = await api('PATCH', `/promociones/${ludoteca.id}`, {
+    token: sesion.admin,
+    body: { estado: 'pausado' }
+  });
   assert.equal(pausada.datos.estado, 'pausado');
   assert.equal((await api('GET', '/promociones')).datos.length, 6, 'el cliente no ve las pausadas');
   assert.equal((await api('GET', '/promociones', { token: sesion.host })).datos.length, 7);
@@ -393,12 +500,22 @@ test('cupones: canje, sucursal válida, límite diario y promociones pausadas', 
 
   const nueva = await api('POST', '/promociones', {
     token: sesion.admin,
-    body: { codigo: 'mf-promo-test', titulo: 'Promo de prueba', categoria: 'Pruebas', descuentoBadge: '10% OFF', beneficio: '10% en todo', vigencia: 'Esta semana' }
+    body: {
+      codigo: 'mf-promo-test',
+      titulo: 'Promo de prueba',
+      categoria: 'Pruebas',
+      descuentoBadge: '10% OFF',
+      beneficio: '10% en todo',
+      vigencia: 'Esta semana'
+    }
   });
   assert.equal(nueva.status, 201);
   assert.equal(nueva.datos.codigo, 'MF-PROMO-TEST');
   assert.deepEqual(nueva.datos.sucursales.sort(), ['calvario', 'porras-matriz'], 'por defecto aplica en todas');
-  const repetida = await api('POST', '/promociones', { token: sesion.admin, body: { codigo: 'MF-PROMO-TEST', titulo: 'x', categoria: 'x', descuentoBadge: 'x', beneficio: 'x', vigencia: 'x' } });
+  const repetida = await api('POST', '/promociones', {
+    token: sesion.admin,
+    body: { codigo: 'MF-PROMO-TEST', titulo: 'x', categoria: 'x', descuentoBadge: 'x', beneficio: 'x', vigencia: 'x' }
+  });
   assert.equal(repetida.status, 409);
 });
 
@@ -437,20 +554,41 @@ test('escáner: identifica el tipo de código y lleva bitácora', async () => {
 test('menú: cocina cambia disponibilidad, solo gerencia edita la ficha', async () => {
   const kinder = (await api('GET', '/menu/productos/frappe-kinder-bueno')).datos;
 
-  const agotado = await api('PATCH', `/menu/productos/${kinder.id}`, { token: sesion.host, body: { disponibleEnCocina: false } });
+  const agotado = await api('PATCH', `/menu/productos/${kinder.id}`, {
+    token: sesion.host,
+    body: { disponibleEnCocina: false }
+  });
   assert.equal(agotado.datos.disponibleEnCocina, false);
-  assert.equal((await api('PATCH', `/menu/productos/${kinder.id}`, { token: sesion.host, body: { precio: 1 } })).status, 403);
-  assert.equal((await api('PATCH', `/menu/productos/${kinder.id}`, { body: { disponibleEnCocina: true } })).status, 401);
+  assert.equal(
+    (await api('PATCH', `/menu/productos/${kinder.id}`, { token: sesion.host, body: { precio: 1 } })).status,
+    403
+  );
+  assert.equal(
+    (await api('PATCH', `/menu/productos/${kinder.id}`, { body: { disponibleEnCocina: true } })).status,
+    401
+  );
 
-  const precio = await api('PATCH', `/menu/productos/${kinder.id}`, { token: sesion.admin, body: { precio: 105, disponibleEnCocina: true } });
-  assert.deepEqual([precio.datos.precio, precio.datos.precioStr, precio.datos.disponibleEnCocina], [105, '$105 MXN', true]);
+  const precio = await api('PATCH', `/menu/productos/${kinder.id}`, {
+    token: sesion.admin,
+    body: { precio: 105, disponibleEnCocina: true }
+  });
+  assert.deepEqual(
+    [precio.datos.precio, precio.datos.precioStr, precio.datos.disponibleEnCocina],
+    [105, '$105 MXN', true]
+  );
 
-  const nuevo = await api('POST', '/menu/productos', { token: sesion.admin, body: { nombre: 'Soda Italiana de Frutos Rojos', categoriaSlug: 'frappes', precio: 68 } });
+  const nuevo = await api('POST', '/menu/productos', {
+    token: sesion.admin,
+    body: { nombre: 'Soda Italiana de Frutos Rojos', categoriaSlug: 'frappes', precio: 68 }
+  });
   assert.equal(nuevo.status, 201);
   assert.equal(nuevo.datos.slug, 'soda-italiana-de-frutos-rojos');
   assert.deepEqual([nuevo.datos.stockDiario, nuevo.datos.vendidosHoy, nuevo.datos.badge], [30, 0, null]);
 
-  const categoriaMala = await api('POST', '/menu/productos', { token: sesion.admin, body: { nombre: 'X', categoriaSlug: 'no-existe', precio: 1 } });
+  const categoriaMala = await api('POST', '/menu/productos', {
+    token: sesion.admin,
+    body: { nombre: 'X', categoriaSlug: 'no-existe', precio: 1 }
+  });
   assert.equal(categoriaMala.status, 400);
 
   assert.equal((await api('DELETE', `/menu/productos/${nuevo.datos.id}`, { token: sesion.admin })).status, 204);
@@ -467,14 +605,44 @@ test('ludoteca: préstamos, devoluciones y devolución automática al liberar la
   const carcassonne = juegos.find((j) => j.nombre === 'Carcassonne');
   assert.deepEqual([carcassonne.estado, carcassonne.vecesJugadoMes], ['disponible', 39]);
 
-  const prestado = await api('POST', `/juegos/${carcassonne.id}/prestar`, { token, body: { mesaId: mesaId['porras-matriz/L03'] } });
-  assert.deepEqual([prestado.datos.estado, prestado.datos.mesaActual, prestado.datos.vecesJugadoMes], ['en_mesa', 'L03', 40]);
-  assert.equal((await api('POST', `/juegos/${carcassonne.id}/prestar`, { token, body: { mesaId: mesaId['porras-matriz/L03'] } })).status, 409);
+  // Un préstamo requiere un servicio de mesa abierto.
+  assert.equal(
+    (await api('POST', `/juegos/${carcassonne.id}/prestar`, { token, body: { mesaId: mesaId['porras-matriz/L03'] } }))
+      .status,
+    409
+  );
+  assert.equal(
+    (
+      await api('POST', `/mesas/${mesaId['porras-matriz/L03']}/walk-in`, {
+        token,
+        body: { personas: 2, comensal: 'Grupo Ludoteca' }
+      })
+    ).status,
+    201
+  );
+
+  const prestado = await api('POST', `/juegos/${carcassonne.id}/prestar`, {
+    token,
+    body: { mesaId: mesaId['porras-matriz/L03'] }
+  });
+  assert.deepEqual(
+    [prestado.datos.estado, prestado.datos.mesaActual, prestado.datos.vecesJugadoMes],
+    ['en_mesa', 'L03 (Grupo Ludoteca)', 40]
+  );
+  assert.equal(
+    (await api('POST', `/juegos/${carcassonne.id}/prestar`, { token, body: { mesaId: mesaId['porras-matriz/L03'] } }))
+      .status,
+    409
+  );
   assert.equal((await api('POST', `/juegos/${carcassonne.id}/devolver`, { token })).datos.estado, 'disponible');
   assert.equal((await api('POST', `/juegos/${carcassonne.id}/devolver`, { token })).status, 409);
 
   // Un juego de Porras no se puede prestar a una mesa de Calvario.
-  assert.equal((await api('POST', `/juegos/${carcassonne.id}/prestar`, { token, body: { mesaId: mesaId['calvario/M04'] } })).status, 409);
+  assert.equal(
+    (await api('POST', `/juegos/${carcassonne.id}/prestar`, { token, body: { mesaId: mesaId['calvario/M04'] } }))
+      .status,
+    409
+  );
 
   // Catan está en L01 con la reservación MF-RES-66231: al completarla regresa solo.
   const catan = juegos.find((j) => j.nombre.startsWith('Catan'));
@@ -483,10 +651,38 @@ test('ludoteca: préstamos, devoluciones y devolución automática al liberar la
   const catanDespues = (await api('GET', '/juegos?q=Catan', { token })).datos[0];
   assert.equal(catanDespues.estado, 'disponible');
 
-  const marcado = await api('PATCH', `/juegos/${carcassonne.id}`, { token, body: { reposicionRequerida: true, piezasEstado: 'Faltan 3 losetas' } });
+  const marcado = await api('PATCH', `/juegos/${carcassonne.id}`, {
+    token,
+    body: { reposicionRequerida: true, piezasEstado: 'Faltan 3 losetas' }
+  });
   assert.equal(marcado.datos.reposicionRequerida, true);
-  assert.equal((await api('POST', '/juegos', { token, body: { nombre: 'Azul', categoria: 'Abstracto', jugadores: '2 - 4 jugadores', duracion: '40 min', dificultad: 'Fácil', sucursalId: 'porras-matriz' } })).status, 403);
-  const azul = await api('POST', '/juegos', { token: sesion.admin, body: { nombre: 'Azul', categoria: 'Abstracto', jugadores: '2 - 4 jugadores', duracion: '40 min', dificultad: 'Fácil', sucursalId: 'porras-matriz' } });
+  assert.equal(
+    (
+      await api('POST', '/juegos', {
+        token,
+        body: {
+          nombre: 'Azul',
+          categoria: 'Abstracto',
+          jugadores: '2 - 4 jugadores',
+          duracion: '40 min',
+          dificultad: 'Fácil',
+          sucursalId: 'porras-matriz'
+        }
+      })
+    ).status,
+    403
+  );
+  const azul = await api('POST', '/juegos', {
+    token: sesion.admin,
+    body: {
+      nombre: 'Azul',
+      categoria: 'Abstracto',
+      jugadores: '2 - 4 jugadores',
+      duracion: '40 min',
+      dificultad: 'Fácil',
+      sucursalId: 'porras-matriz'
+    }
+  });
   assert.equal(azul.status, 201);
   assert.equal(azul.datos.vecesJugadoMes, 0);
 });
@@ -496,21 +692,41 @@ test('equipo: solo el admin da de alta, y una baja corta la sesión al instante'
   assert.equal(personal.length, 6);
   assert.equal(personal.find((p) => p.nombre === 'Erick Rentería').tieneAcceso, false);
 
-  const nuevoHost = { nombre: 'Nuevo Host', puesto: 'Host de Fin de Semana', rol: 'host', sucursalId: 'calvario', turnoInicio: '4:00 PM', turnoFin: '23:00' };
+  const nuevoHost = {
+    nombre: 'Nuevo Host',
+    puesto: 'Host de Fin de Semana',
+    rol: 'host',
+    sucursalId: 'calvario',
+    turnoInicio: '4:00 PM',
+    turnoFin: '23:00'
+  };
   assert.equal((await api('POST', '/personal', { token: sesion.host, body: nuevoHost })).status, 403);
-  assert.equal((await api('POST', '/personal', { token: sesion.admin, body: nuevoHost })).status, 400, 'un rol con acceso exige correo y contraseña');
+  assert.equal(
+    (await api('POST', '/personal', { token: sesion.admin, body: nuevoHost })).status,
+    400,
+    'un rol con acceso exige correo y contraseña'
+  );
 
-  const alta = await api('POST', '/personal', { token: sesion.admin, body: { ...nuevoHost, email: 'finde@cafemarfil.mx', password: 'turno-de-finde' } });
+  const alta = await api('POST', '/personal', {
+    token: sesion.admin,
+    body: { ...nuevoHost, email: 'finde@cafemarfil.mx', password: 'turno-de-finde' }
+  });
   assert.equal(alta.status, 201);
   assert.equal(alta.datos.turno, '16:00 - 23:00');
 
-  const acceso = await api('POST', '/auth/staff/login', { body: { email: 'finde@cafemarfil.mx', password: 'turno-de-finde' } });
+  const acceso = await api('POST', '/auth/staff/login', {
+    body: { email: 'finde@cafemarfil.mx', password: 'turno-de-finde' }
+  });
   assert.equal(acceso.status, 200);
   assert.equal((await api('GET', '/mesas', { token: acceso.datos.token })).status, 200);
 
   await api('PATCH', `/personal/${alta.datos.id}`, { token: sesion.admin, body: { estado: 'inactivo' } });
   assert.equal((await api('GET', '/mesas', { token: acceso.datos.token })).status, 401);
-  assert.equal((await api('POST', '/auth/staff/login', { body: { email: 'finde@cafemarfil.mx', password: 'turno-de-finde' } })).status, 401);
+  assert.equal(
+    (await api('POST', '/auth/staff/login', { body: { email: 'finde@cafemarfil.mx', password: 'turno-de-finde' } }))
+      .status,
+    401
+  );
 });
 
 test('métricas del día para el dashboard', async () => {
@@ -533,4 +749,225 @@ test('métricas del día para el dashboard', async () => {
   assert.equal(calvario.aforoMax, 48);
   assert.ok(calvario.comensalesHoy > 0 && calvario.comensalesHoy < todas.comensalesHoy);
   assert.ok(calvario.ventasHoy < todas.ventasHoy);
+});
+
+test('JWT: rechaza algoritmo, emisor, audiencia y claims incorrectos', async () => {
+  const opciones = { subject: '1', issuer: config.jwtEmisor, audience: config.jwtAudiencia, expiresIn: '1h' };
+  const payload = { tipo: 'staff', version: 0 };
+  const variantes = [
+    jwt.sign(payload, config.jwtSecret, { ...opciones, algorithm: 'HS384' }),
+    jwt.sign(payload, config.jwtSecret, { ...opciones, issuer: 'ajeno' }),
+    jwt.sign(payload, config.jwtSecret, { ...opciones, audience: 'ajena' }),
+    jwt.sign(payload, config.jwtSecret, { ...opciones, subject: 'NaN' }),
+    jwt.sign(payload, config.jwtSecret, { ...opciones, expiresIn: -1 }),
+    jwt.sign({ tipo: 'staff' }, config.jwtSecret, opciones),
+    jwt.sign(payload, config.jwtSecret, { subject: '1', issuer: config.jwtEmisor, audience: config.jwtAudiencia })
+  ];
+  for (const token of variantes) assert.equal((await api('GET', '/mesas', { token })).status, 401);
+  const malformada = await fetch(base + '/mesas', { headers: { Authorization: `Bearer ${sesion.admin} sobrante` } });
+  assert.equal(malformada.status, 401);
+});
+
+test('cambios de contraseña y rol revocan todas las sesiones anteriores', async () => {
+  const datos = {
+    nombre: 'Seguridad Sesiones',
+    puesto: 'Host',
+    rol: 'host',
+    email: 'sesiones@example.com',
+    password: 'original-segura'
+  };
+  const alta = await api('POST', '/personal', { token: sesion.admin, body: datos });
+  assert.equal(alta.status, 201);
+  const entrar = (password) => api('POST', '/auth/staff/login', { body: { email: datos.email, password } });
+  const anterior = (await entrar(datos.password)).datos.token;
+  assert.equal(
+    (await api('PATCH', `/personal/${alta.datos.id}`, { token: sesion.admin, body: { password: 'nueva-segura-2026' } }))
+      .status,
+    200
+  );
+  assert.equal((await api('GET', '/mesas', { token: anterior })).status, 401);
+  assert.equal((await entrar(datos.password)).status, 401);
+  const vigente = (await entrar('nueva-segura-2026')).datos.token;
+  assert.equal((await api('GET', '/mesas', { token: vigente })).status, 200);
+  assert.equal(
+    (await api('PATCH', `/personal/${alta.datos.id}`, { token: sesion.admin, body: { rol: 'staff' } })).status,
+    200
+  );
+  assert.equal((await api('GET', '/mesas', { token: vigente })).status, 401);
+  assert.equal((await entrar('nueva-segura-2026')).status, 401);
+  assert.equal(
+    (await api('PATCH', `/personal/${alta.datos.id}`, { token: sesion.admin, body: { rol: 'host' } })).status,
+    200
+  );
+  assert.equal((await api('GET', '/mesas', { token: vigente })).status, 401, 'restaurar el rol no revive un token');
+});
+
+test('rechaza habilitar acceso a personal sin credenciales', async () => {
+  const equipo = (await api('GET', '/personal', { token: sesion.admin })).datos;
+  const sinAcceso = equipo.find((p) => !p.tieneAcceso);
+  assert.ok(sinAcceso);
+  const respuesta = await api('PATCH', `/personal/${sinAcceso.id}`, { token: sesion.admin, body: { rol: 'admin' } });
+  assert.equal(respuesta.status, 400);
+});
+
+test('inyección SQL: búsquedas y slugs se tratan como datos', async () => {
+  const ataque = "' OR 1=1; DROP TABLE clientes; --";
+  for (const ruta of ['/menu/productos', '/club/clientes', '/juegos', '/reservaciones']) {
+    const respuesta = await api('GET', `${ruta}?q=${encodeURIComponent(ataque)}`, { token: sesion.admin });
+    assert.equal(respuesta.status, 200);
+    assert.deepEqual(respuesta.datos, []);
+  }
+  assert.equal((await api('GET', '/menu/productos/' + encodeURIComponent(ataque))).status, 404);
+  assert.equal((await api('GET', '/mi/perfil', { token: sesion.cliente })).status, 200);
+});
+
+test('dos clientes no acceden a reservaciones ni notificaciones ajenas', async () => {
+  const alta = await api('POST', '/auth/clientes/registro', {
+    body: { nombre: 'Otro Cliente', email: 'otro-seguridad@example.com', password: 'segura-de-prueba' }
+  });
+  assert.equal(alta.status, 201);
+  const propia = await api('POST', '/reservaciones', {
+    token: sesion.cliente,
+    body: { sucursalId: 'calvario', fecha: MANANA, hora: '10:00', personas: 2 }
+  });
+  assert.equal(propia.status, 201);
+  const token = alta.datos.token;
+  assert.equal((await api('POST', `/mi/reservaciones/${propia.datos.folio}/cancelar`, { token })).status, 404);
+  const avisos = (await api('GET', '/mi/notificaciones', { token: sesion.cliente })).datos;
+  assert.equal((await api('POST', `/mi/notificaciones/${avisos[0].id}/leer`, { token })).status, 404);
+  const listado = await api('GET', '/mi/reservaciones', { token });
+  assert.deepEqual(listado.datos, []);
+  assert.equal(
+    (await api('GET', `/reservaciones/${propia.datos.folio}`, { token: sesion.admin })).datos.estado,
+    'confirmada'
+  );
+});
+
+test('último cupo: solo una de dos reservaciones simultáneas se confirma', async () => {
+  const actividad = await api('POST', '/actividades', {
+    token: sesion.admin,
+    body: {
+      nombre: 'Cupo concurrente',
+      categoria: 'Taller',
+      categoriaSlug: 'taller',
+      sucursalId: 'calvario',
+      resumen: 'Prueba de concurrencia',
+      fecha: MANANA,
+      horaInicio: '12:00',
+      cupoTotal: 1
+    }
+  });
+  assert.equal(actividad.status, 201);
+  const reservar = (nombre) =>
+    api('POST', '/reservaciones', {
+      body: {
+        tipo: 'actividad',
+        actividadId: actividad.datos.id,
+        personas: 1,
+        comensal: nombre,
+        telefono: '6180000000'
+      }
+    });
+  const resultados = await Promise.all([reservar('Primero'), reservar('Segundo')]);
+  assert.deepEqual(resultados.map((r) => r.status).sort(), [201, 409]);
+  const actual = (await api('GET', `/actividades/${actividad.datos.id}`)).datos;
+  assert.equal(actual.lugaresOcupados, 1);
+  assert.equal(actual.lugaresDisponibles, 0);
+  assert.equal(
+    (
+      await api('PATCH', `/actividades/${actividad.datos.id}`, {
+        token: sesion.admin,
+        body: { fecha: sumarDias(MANANA, 1) }
+      })
+    ).status,
+    409
+  );
+});
+
+test('el cupo de una actividad no se reduce por debajo de las reservas', async () => {
+  const actividad = (await api('GET', '/actividades/glow-paint')).datos;
+  assert.equal(
+    (await api('PATCH', `/actividades/${actividad.id}`, { token: sesion.admin, body: { cupoTotal: 1 } })).status,
+    409
+  );
+});
+
+test('último cupón: dos cajas no rebasan el límite diario', async () => {
+  const alta = await api('POST', '/promociones', {
+    token: sesion.admin,
+    body: {
+      codigo: 'MF-PROMO-RACE',
+      titulo: 'Concurrente',
+      categoria: 'Prueba',
+      descuentoBadge: '10%',
+      beneficio: '10%',
+      vigencia: 'Hoy',
+      limiteDiario: 1
+    }
+  });
+  assert.equal(alta.status, 201);
+  const canjear = () => api('POST', `/promociones/${alta.datos.id}/canjear`, { token: sesion.host, body: {} });
+  const resultados = await Promise.all([canjear(), canjear()]);
+  assert.deepEqual(resultados.map((r) => r.status).sort(), [200, 409]);
+  assert.equal((await api('GET', `/promociones/${alta.datos.id}`, { token: sesion.admin })).datos.canjesHoy, 1);
+});
+
+test('los beneficios se canjean una sola vez bajo concurrencia', async () => {
+  const beneficios = (await api('GET', '/mi/beneficios', { token: sesion.cliente })).datos;
+  const beneficio = beneficios.find((b) => b.estado === 'disponible');
+  assert.ok(beneficio);
+  const canjear = () => api('POST', `/club/beneficios/${beneficio.codigo}/canjear`, { token: sesion.host });
+  assert.deepEqual((await Promise.all([canjear(), canjear()])).map((r) => r.status).sort(), [200, 409]);
+});
+
+test('dos sellos simultáneos no pierden puntos ni duplican la recompensa', async () => {
+  const equipo = await api('POST', '/club/clientes', { token: sesion.host, body: { nombre: 'Sellos concurrentes' } });
+  const codigo = equipo.datos.codigoCliente;
+  const sumar = () => api('POST', `/club/clientes/${codigo}/sello`, { token: sesion.host, body: {} });
+  for (let n = 0; n < 7; n += 1) assert.equal((await sumar()).status, 200);
+  const respuestas = await Promise.all([sumar(), sumar()]);
+  assert.ok(respuestas.every((r) => r.status === 200));
+  assert.equal(respuestas.filter((r) => r.datos.pasaporteCompletado).length, 1);
+  const actual = (await api('GET', `/club/clientes/${codigo}`, { token: sesion.host })).datos;
+  assert.deepEqual([actual.sellosActuales, actual.puntos, actual.visitasTotales], [8, 450, 9]);
+});
+
+test('dos walk-in simultáneos no ocupan dos veces una mesa', async () => {
+  const mesas = (await api('GET', '/mesas', { token: sesion.host })).datos;
+  const mesa = mesas.find((m) => m.estado === 'libre');
+  assert.ok(mesa);
+  const ocupar = () => api('POST', `/mesas/${mesa.id}/walk-in`, { token: sesion.host, body: { personas: 1 } });
+  assert.deepEqual((await Promise.all([ocupar(), ocupar()])).map((r) => r.status).sort(), [201, 409]);
+  assert.equal((await api('GET', `/mesas/${mesa.id}`, { token: sesion.host })).datos.estado, 'ocupada');
+});
+
+test('una edición inválida de mesa revierte también el ticket', async () => {
+  const mesas = (await api('GET', '/mesas', { token: sesion.host })).datos;
+  const mesa = mesas.find((m) => m.estado === 'ocupada');
+  const otraZona = mesas.find((m) => m.sucursalId !== mesa.sucursalId && m.zonaId).zonaId;
+  const respuesta = await api('PATCH', `/mesas/${mesa.id}`, {
+    token: sesion.host,
+    body: { ticketTotal: 9999, zonaId: otraZona }
+  });
+  assert.equal(respuesta.status, 409);
+  const despues = (await api('GET', `/mesas/${mesa.id}`, { token: sesion.host })).datos;
+  assert.equal(despues.ticketAprox, mesa.ticketAprox);
+  assert.equal(despues.zonaId, mesa.zonaId);
+});
+
+test('una promoción con sucursal inválida revierte toda su creación', async () => {
+  const alta = await api('POST', '/promociones', {
+    token: sesion.admin,
+    body: {
+      codigo: 'MF-PROMO-ROLLBACK',
+      titulo: 'Rollback',
+      categoria: 'Prueba',
+      descuentoBadge: '10%',
+      beneficio: '10%',
+      vigencia: 'Hoy',
+      sucursales: ['porras-matriz', 'inexistente']
+    }
+  });
+  assert.equal(alta.status, 404);
+  assert.equal((await api('GET', '/promociones/MF-PROMO-ROLLBACK', { token: sesion.admin })).status, 404);
 });

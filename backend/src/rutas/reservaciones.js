@@ -2,12 +2,17 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { esStaff, requiereStaff } from '../middleware/auth.js';
 import {
-  actualizarReservacion, cancelarReservacion, completarReservacion, crearReservacion, hacerCheckIn,
-  listarReservaciones, marcarNoShow, obtenerReservacion, obtenerReservacionPorToken
+  actualizarReservacion,
+  cancelarReservacion,
+  completarReservacion,
+  crearReservacion,
+  hacerCheckIn,
+  listarReservaciones,
+  marcarNoShow,
+  obtenerReservacion,
+  obtenerReservacionPorToken
 } from '../servicios/reservaciones.js';
-import {
-  leer, zEmail, zEntero, zFecha, zHora, zId, zPrecio, zTexto, zTextoOpcional
-} from '../utils/validar.js';
+import { leer, zEmail, zEntero, zFecha, zHora, zId, zPrecio, zTexto, zTextoOpcional } from '../utils/validar.js';
 
 const router = Router();
 

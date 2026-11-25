@@ -5,23 +5,22 @@ API REST que da servicio a las dos aplicaciones del monorepo:
 - **Panel admin** (`frontend/admin`): reservaciones, mesas en vivo, escáner de caja, menú, promociones, ludoteca, equipo y métricas.
 - **PWA de clientes** (`frontend/marfil`): menú, actividades, promociones, reservaciones, perfil, beneficios y notificaciones.
 
-**Stack:** Node.js + Express 5 · MySQL 8 (`mysql2`) · JWT + bcrypt · validación con zod.
+**Stack:** Node.js + Express 5 · MySQL 8 · repositorios con Knex (`mysql2`) · JWT + bcrypt · Zod · Helmet · express-rate-limit.
 
 ## Puesta en marcha
 
 Requiere Node.js 20.19 o superior (lo mismo que piden los frontends) y un servidor **MySQL 8** encendido.
 
 ```bash
+npm ci                    # desde la raíz: un único lockfile para los tres workspaces
 cd backend
-npm install
 cp .env.example .env     # en PowerShell: Copy-Item .env.example .env
 #  -> edita .env con los datos de tu MySQL (DB_HOST, DB_PORT, DB_USER, DB_PASSWORD)
 npm run db:seed          # crea la base cafe_marfil, sus tablas y carga los datos de ejemplo
 npm run dev              # API en http://localhost:3000/api (se reinicia al guardar)
 ```
 
-No hace falta crear la base a mano: si `DB_NAME` no existe, se crea sola. Luego puedes verla en phpMyAdmin o
-cualquier cliente de MySQL.
+`db:init`/`db:seed` crean `DB_NAME` si falta y aplican migraciones versionadas. La API solamente verifica el esquema al arrancar; no crea tablas. Para producción, ejecuta las migraciones con una cuenta de despliegue y arranca la API con otra cuenta que tenga únicamente `SELECT`, `INSERT`, `UPDATE` y `DELETE` sobre esa base.
 
 Cuentas de ejemplo (todas con la contraseña `marfil2026`, solo para desarrollo):
 
@@ -39,41 +38,85 @@ Cuentas de ejemplo (todas con la contraseña `marfil2026`, solo para desarrollo)
 | --- | --- |
 | `npm run dev` | Levanta la API y la reinicia con cada cambio |
 | `npm start` | Levanta la API sin recarga |
-| `npm test` | Pruebas de integración. Usan una base aparte, `cafe_marfil_test`, en el mismo servidor MySQL: no tocan la de desarrollo |
-| `npm run db:init` | Crea la base y las tablas que falten, sin tocar los datos |
+| `npm test` | Unitarias e integración. Recrean `cafe_marfil_test` y `cafe_marfil_migracion_test` |
+| `npm run db:init` | Crea la base y aplica las migraciones pendientes sin borrar datos |
 | `npm run db:seed` | Carga los datos de ejemplo (solo si la base está vacía) |
-| `npm run db:reset` | **Borra las tablas de `DB_NAME`**, las recrea y vuelve a cargar los datos de ejemplo. Se niega si la base contiene tablas ajenas al proyecto |
+| `npm run db:reset` | **Borra las tablas de `DB_NAME`**, migra y siembra. Exige `DB_RESET_CONFIRM` igual a `DB_NAME`; nunca en producción |
 
 Los datos de ejemplo son relativos al momento en que se siembran: "hoy" siempre tiene mesas
 ocupadas, reservaciones en curso y actividades en los próximos días. Si la demo se ve vieja,
-`npm run db:reset` la refresca.
+`db:reset` con confirmación explícita la refresca.
 
 ## Estructura
 
 ```text
 backend/
 ├── src/
-│   ├── server.js            # arranque (listen)
-│   ├── app.js               # arma la app de Express: middlewares y rutas
-│   ├── config.js            # variables de entorno y reglas del negocio
+│   ├── server.js            # arranque, verificación y cierre ordenado
+│   ├── app.js               # seguridad HTTP y montaje de rutas
+│   ├── config.js            # configuración validada al iniciar
 │   ├── db/
-│   │   ├── schema.sql       # ← definición de la base de datos
-│   │   ├── conexion.js      # pool de MySQL, transacciones y conversión de fechas
-│   │   ├── semilla.js       # datos de ejemplo
-│   │   └── init.js          # comandos db:init / db:seed / db:reset
-│   ├── rutas/               # capa HTTP: valida la entrada, revisa permisos, responde
-│   ├── servicios/           # reglas de negocio + SQL (una por módulo)
-│   ├── middleware/          # autenticación y manejo de errores
-│   └── utils/               # fechas, códigos, validación, errores
-└── test/api.test.js         # recorre los flujos principales de punta a punta
+│   │   ├── conexion.js      # pool Knex y unidad de trabajo
+│   │   ├── mantenimiento.js # migración/reset: solo comandos explícitos
+│   │   ├── migraciones/     # historial de cambios del esquema
+│   │   ├── semilla.js       # datos demo; prohibidos en producción
+│   │   └── init.js          # comandos db:*
+│   ├── rutas/               # validación y permisos HTTP
+│   ├── servicios/           # reglas de negocio y transacciones
+│   ├── repositorios/        # consultas, joins y mapas de escritura con Knex
+│   ├── middleware/          # autenticación, límites y errores
+│   └── utils/               # fechas, contraseñas, códigos y validación
+└── test/                    # integración MySQL, migraciones y pruebas unitarias
 ```
 
-Una petición recorre: `rutas/` (valida con zod y revisa el rol) → `servicios/` (aplica las reglas y
-ejecuta el SQL dentro de una transacción) → respuesta JSON.
+Una petición recorre `rutas → servicios → repositorios`. Los repositorios reciben valores y usan el constructor de consultas; no se concatenan instrucciones SQL en rutas ni servicios. El SQL explícito se conserva exclusivamente como snapshot de la migración inicial y para crear la base mediante un identificador escapado por el driver.
+
+Las transacciones usan una conexión compartida por operación con `AsyncLocalStorage`, aislamiento `READ COMMITTED` y bloqueos por fila. Los servicios de una misma operación participan en el mismo commit/rollback. Esto evita leer un estado anterior después de esperar a otra transacción. ESLint impide introducir el driver en servicios y consultas SQL directas en repositorios.
+
+## Actualizar de 1.1.0 a 1.2.0
+
+1. Conserva un respaldo de MySQL y detén temporalmente la API anterior.
+2. Ejecuta `npm ci` desde la raíz del monorepo.
+3. Con las credenciales de migración, ejecuta `npm run db:init --workspace backend`. La migración inicial adopta las tablas existentes y la segunda agrega `session_version`; ninguna borra datos.
+4. Configura el usuario de ejecución con permisos DML, `NODE_ENV=production`, un `JWT_SECRET` aleatorio de al menos 32 bytes y los orígenes HTTPS exactos en `CORS_ORIGIN`.
+5. Arranca con `npm start --workspace backend` y verifica `/api/ready`.
+
+Los tokens de sesión de 1.1.0 dejan de ser válidos: los usuarios deben iniciar sesión de nuevo. Los códigos de reservaciones existentes se conservan; los nuevos pases tienen 128 bits aleatorios. Las migraciones no ofrecen rollback destructivo automático; para revertir un despliegue usa el respaldo y la versión correspondiente de la aplicación.
+
+## Controles de seguridad
+
+- JWT verifica HS256, emisor, audiencia, expiración, sujeto y versión de sesión. Los cambios de contraseña, correo, rol o estado del personal revocan las sesiones anteriores; cambiar a `staff` elimina el acceso inmediatamente.
+- Contraseñas nuevas con bcrypt de costo 12; límite de **72 bytes UTF-8** para impedir truncamientos. Un correo inexistente también realiza comparación de hash.
+- Helmet, respuestas `no-store`, CORS con orígenes exactos y límite JSON de 100 KB. Errores de cuerpo inválido, tamaño y saturación responden 400, 413 y 429.
+- Límites por IP: 600 peticiones generales, 20 a autenticación y 30 escrituras públicas de reservaciones cada 15 minutos. Configurables en `.env`. `TRUST_PROXY` acepta solo la lista explícita de proxies propios; no uses confianza global.
+- Los límites se guardan en memoria por proceso. **Para varias réplicas o workers configura un almacén compartido o límites en el gateway** antes de escalar; los contadores actuales se reinician con el proceso.
+- Los logs HTTP usan patrones de ruta, sin tokens QR ni query strings; los errores internos no registran consultas, parámetros ni hashes.
+- `db:seed` y `db:reset` se rechazan en producción. El reset exige `DB_RESET_CONFIRM=DB_NAME` y se niega si encuentra tablas ajenas.
+- El personal opera ambas sucursales según su rol. No existe aislamiento de sucursal por usuario en esta versión. La cuenta del cliente solo puede modificar sus propios datos.
+
+Referencias: [seguridad de Express](https://expressjs.com/advanced/best-practice-security/), [transacciones de Knex](https://knexjs.org/guide/transactions), [almacenes de express-rate-limit](https://express-rate-limit.mintlify.app/reference/stores), [validación JWT](https://github.com/auth0/node-jsonwebtoken).
+
+## Validación reproducible
+
+Desde la raíz, `npm ci`, `npm run lint`, `npm test` y `npm run build`. `npm run test:unit` no necesita MySQL. `npm run format:check --workspace backend` valida formato y `npm audit --omit=dev --audit-level=moderate` revisa avisos de dependencias de ejecución.
+
+Para pruebas de integración aisladas en PowerShell:
+
+```powershell
+docker compose -f compose.test.yml up -d --wait
+$env:DB_HOST = '127.0.0.1'
+$env:DB_PORT = '13306'
+$env:DB_USER = 'root'
+$env:DB_PASSWORD = 'marfil-test-only'
+npm test
+docker compose -f compose.test.yml down
+```
+
+Las pruebas recrean exclusivamente `cafe_marfil_test` y `cafe_marfil_migracion_test`. No las ejecutes contra un servidor de producción. Cubren contratos de la PWA/admin, permisos, JWT alterados, contraseñas UTF-8, inyección SQL, revocación, acceso entre clientes, límites HTTP, concurrencia de reservas/canjes/sellos/mesas, rollback y actualización de una base 1.1.0 con datos. GitHub Actions repite lint, formato, pruebas MySQL, auditoría y ambos builds en pushes y PRs.
 
 ## Modelo de datos
 
-La definición completa, con comentarios, está en [`src/db/schema.sql`](src/db/schema.sql).
+La definición completa, con comentarios, está en [`src/db/migraciones/001_inicial.sql`](src/db/migraciones/001_inicial.sql) y las migraciones posteriores.
 
 ```mermaid
 erDiagram
@@ -250,7 +293,7 @@ Cuerpo de `POST /reservaciones`:
 | GET | `/juegos` | Ludoteca. Filtros: `sucursalId`, `q`, `estado` (`disponible`, `en_mesa`, `reposicion`) |
 | POST / DELETE | `/juegos`, `/juegos/:id` | 🔑 Alta y baja de juegos |
 | PATCH | `/juegos/:id` | Editar ficha o marcar `reposicionRequerida` |
-| POST | `/juegos/:id/prestar`, `/juegos/:id/devolver` | Préstamo a una mesa (`mesaId`) y devolución |
+| POST | `/juegos/:id/prestar`, `/juegos/:id/devolver` | Préstamo a una mesa ocupada (`mesaId`) y devolución; bloquea juegos que requieren reposición |
 | GET | `/personal` | Equipo. Filtros: `sucursalId`, `estado` |
 | POST / PATCH | `/personal`, `/personal/:id` | 👑 Alta y edición (baja = `estado: "inactivo"`) |
 | GET | `/metricas/hoy` | Indicadores del día. Filtros: `sucursalId`, `fecha` |
@@ -324,4 +367,4 @@ Nombres de campo que cambian respecto a los mocks:
   (hero, platillos destacados, textos) sigue fijo en el código.
 - **Escanear beneficios.** La API ya identifica y canjea códigos de beneficio (`MF-BEN-...`), pero la pantalla del
   escáner aún no los muestra.
-- Recuperación de contraseña, verificación de correo y límite de intentos de login.
+- Recuperación de contraseña y verificación de correo. El límite de intentos ya está implementado en 1.2.0.

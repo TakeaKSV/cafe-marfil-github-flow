@@ -103,7 +103,5 @@ export async function resolverCodigo(codigoCrudo, personalId = null) {
     exito: false,
     personalId
   });
-  throw noEncontrado(
-    'El código no corresponde a ninguna reservación, cupón, pasaporte ni beneficio de Café Marfil.'
-  );
+  throw noEncontrado('El código no corresponde a ninguna reservación, cupón, pasaporte ni beneficio de Café Marfil.');
 }

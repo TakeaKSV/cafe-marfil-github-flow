@@ -4,7 +4,11 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { requiereCliente } from '../middleware/auth.js';
 import {
-  actualizarPerfil, listarBeneficios, listarNotificaciones, marcarNotificacionesLeidas, obtenerCliente
+  actualizarPerfil,
+  listarBeneficios,
+  listarNotificaciones,
+  marcarNotificacionesLeidas,
+  obtenerCliente
 } from '../servicios/clientes.js';
 import { cancelarReservacion, listarReservaciones } from '../servicios/reservaciones.js';
 import { leer, zEmail, zId, zTexto } from '../utils/validar.js';

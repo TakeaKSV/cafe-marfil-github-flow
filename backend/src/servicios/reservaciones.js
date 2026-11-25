@@ -9,11 +9,12 @@
 //   no_show     no llegó
 
 import { config } from '../config.js';
-import { bloquearFila, db, enTransaccion } from '../db/conexion.js';
+import { bloquearFila, enTransaccion } from '../db/conexion.js';
+import * as repo from '../repositorios/reservaciones.js';
 import { codigoUnico, generarFolio, generarTokenQR } from '../utils/codigos.js';
 import { conflicto, noEncontrado, solicitudInvalida } from '../utils/errores.js';
 import { ahoraISO, fechaEnFrase, fechaTexto, horaTexto, hoyLocal, minutosDelDia } from '../utils/fechas.js';
-import { armarUpdate } from '../utils/sql.js';
+
 import { lugaresOcupados, obtenerActividad } from './actividades.js';
 import { crearNotificacion, registrarEscaneo } from './bitacora.js';
 import { abrirServicio, cerrarServicio } from './mesas.js';
@@ -33,16 +34,6 @@ const NOMBRES_ESTADO = {
   cancelada: 'cancelada',
   no_show: 'marcada como no-show'
 };
-
-const SQL_RESERVACIONES = `
-  SELECT r.*, s.nombre AS sucursal_nombre, m.numero AS mesa_numero,
-         a.nombre AS actividad_nombre, a.precio AS actividad_precio,
-         (SELECT sv.ticket_total FROM servicios_mesa sv
-           WHERE sv.reservacion_id = r.id ORDER BY sv.id DESC LIMIT 1) AS ticket_total
-  FROM reservaciones r
-  JOIN sucursales s ON s.id = r.sucursal_id
-  LEFT JOIN mesas m ON m.id = r.mesa_id
-  LEFT JOIN actividades a ON a.id = r.actividad_id`;
 
 /** Consumo: el ticket real si ya existe; si no, una estimación por persona. */
 function totalEstimado(fila) {
@@ -88,29 +79,12 @@ function aReservacion(fila) {
 // Consultas
 // --------------------------------------------------------------------------
 
-export async function listarReservaciones({ sucursalId, fecha, desde, hasta, estado, q, clienteId } = {}) {
-  const filtros = [];
-  const valores = {};
-  const agregar = (condicion, nombre, valor) => {
-    filtros.push(condicion);
-    valores[nombre] = valor;
-  };
-  if (sucursalId) agregar('r.sucursal_id = :sucursalId', 'sucursalId', sucursalId);
-  if (fecha) agregar('r.fecha = :fecha', 'fecha', fecha);
-  if (desde) agregar('r.fecha >= :desde', 'desde', desde);
-  if (hasta) agregar('r.fecha <= :hasta', 'hasta', hasta);
-  if (estado) agregar('r.estado = :estado', 'estado', estado);
-  if (clienteId) agregar('r.cliente_id = :clienteId', 'clienteId', clienteId);
-  if (q) {
-    agregar('(r.folio LIKE :q OR r.nombre_contacto LIKE :q OR r.telefono_contacto LIKE :q)', 'q', `%${q}%`);
-  }
-  const where = filtros.length ? `WHERE ${filtros.join(' AND ')}` : '';
-  const filas = await db.todos(`${SQL_RESERVACIONES} ${where} ORDER BY r.fecha DESC, r.hora, r.id LIMIT 500`, valores);
-  return filas.map(aReservacion);
+export async function listarReservaciones(filtros = {}) {
+  return (await repo.listar(filtros)).map(aReservacion);
 }
 
 async function filaPorFolio(folio) {
-  const fila = await db.uno(`${SQL_RESERVACIONES} WHERE r.folio = ?`, [String(folio).trim().toUpperCase()]);
+  const fila = await repo.porFolio(String(folio).trim().toUpperCase());
   if (!fila) throw noEncontrado(`No existe una reservación con el folio ${folio}.`);
   return fila;
 }
@@ -127,12 +101,12 @@ export const obtenerReservacion = async (folio) => aReservacion(await filaPorFol
 /** Busca por folio o por el token del QR. Devuelve null si no hay coincidencia. */
 export async function buscarReservacionPorCodigo(codigo) {
   const clave = String(codigo).trim().toUpperCase();
-  const fila = await db.uno(`${SQL_RESERVACIONES} WHERE r.folio = :clave OR r.token_qr = :clave`, { clave });
+  const fila = await repo.porCodigo({ clave });
   return fila ? aReservacion(fila) : null;
 }
 
 export async function obtenerReservacionPorToken(token) {
-  const fila = await db.uno(`${SQL_RESERVACIONES} WHERE r.token_qr = ?`, [String(token).trim().toUpperCase()]);
+  const fila = await repo.porToken(String(token).trim().toUpperCase());
   if (!fila) throw noEncontrado('No encontramos esa reservación.');
   return aReservacion(fila);
 }
@@ -149,29 +123,31 @@ function exigirEstado(fila, esperado, accion) {
 
 /** La mesa debe ser de la sucursal, tener capacidad y no chocar con otra reservación cercana. */
 async function validarMesa({ mesaId, sucursalId, fecha, hora, personas }, excluirReservacionId = 0) {
-  const mesa = await db.uno('SELECT numero, sucursal_id, capacidad FROM mesas WHERE id = ? AND activa = 1 FOR UPDATE', [mesaId]);
+  const mesa = await repo.mesaBloqueada(mesaId);
   if (!mesa) throw noEncontrado('No existe esa mesa.');
   if (mesa.sucursal_id !== sucursalId) throw conflicto(`La mesa ${mesa.numero} no pertenece a esa sucursal.`);
   if (personas > mesa.capacidad) {
     throw conflicto(`La mesa ${mesa.numero} es para ${mesa.capacidad} personas y el grupo es de ${personas}.`);
   }
 
-  const mismaFecha = await db.todos(
-    `SELECT folio, hora FROM reservaciones
-     WHERE mesa_id = ? AND fecha = ? AND id <> ? AND estado IN ('confirmada', 'en_curso')`,
-    [mesaId, fecha, excluirReservacionId]
-  );
+  const mismaFecha = await repo.reservasDeMesa(mesaId, fecha, excluirReservacionId);
   const choque = mismaFecha.find(
     (otra) => Math.abs(minutosDelDia(otra.hora) - minutosDelDia(hora)) < config.minutosEntreReservasMismaMesa
   );
   if (choque) {
-    throw conflicto(`La mesa ${mesa.numero} ya está reservada a las ${horaTexto(choque.hora)} (folio ${choque.folio}).`);
+    throw conflicto(
+      `La mesa ${mesa.numero} ya está reservada a las ${horaTexto(choque.hora)} (folio ${choque.folio}).`
+    );
   }
 }
 
 /** Bloquea la actividad mientras se revisa el cupo: dos reservas simultáneas no pueden sobrevenderla. */
-async function validarCupo({ id, nombre, cupoTotal }, fecha, personas, excluirReservacionId = 0) {
+async function validarCupo({ id }, fecha, personas, excluirReservacionId = 0) {
   await bloquearFila('actividades', id);
+  const actual = await repo.actividad(id);
+  if (!actual?.activa) throw conflicto('La actividad ya no está disponible.');
+  if (actual.fecha && actual.fecha !== fecha) throw conflicto('La fecha de la actividad cambió. Vuelve a consultarla.');
+  const { nombre, cupoTotal } = actual;
   const libres = cupoTotal - (await lugaresOcupados(id, fecha, excluirReservacionId));
   if (personas > libres) {
     throw conflicto(
@@ -200,6 +176,8 @@ export function crearReservacion(datos, { clienteId = null, personalId = null } 
     if (datos.tipo === 'actividad') {
       if (!datos.actividadId) throw solicitudInvalida('Indica la actividad que deseas reservar (actividadId).');
       actividad = await obtenerActividad(datos.actividadId);
+      await bloquearFila('actividades', actividad.id);
+      actividad = await obtenerActividad(actividad.id);
       sucursalId = actividad.sucursalId;
       // Una actividad con fecha fija manda sobre lo que haya elegido el cliente.
       if (actividad.fecha) {
@@ -221,41 +199,33 @@ export function crearReservacion(datos, { clienteId = null, personalId = null } 
     const mesaId = personalId ? (datos.mesaId ?? null) : null;
     if (mesaId) await validarMesa({ mesaId, sucursalId, fecha, hora, personas: datos.personas });
 
-    const cliente = clienteId ? await db.uno('SELECT nombre, telefono, email FROM clientes WHERE id = ?', [clienteId]) : null;
+    const cliente = clienteId ? await repo.contacto(clienteId) : null;
     const comensal = datos.comensal ?? cliente?.nombre;
     const telefono = datos.telefono ?? cliente?.telefono;
     if (!comensal || !telefono) throw solicitudInvalida('Indica nombre (comensal) y teléfono de contacto.');
 
-    const folio = await codigoUnico(generarFolio, (f) => db.uno('SELECT 1 FROM reservaciones WHERE folio = ?', [f]));
+    const folio = await codigoUnico(generarFolio, (f) => repo.folioExiste(f));
 
-    await db.ejecutar(
-      `INSERT INTO reservaciones
-         (folio, token_qr, cliente_id, nombre_contacto, telefono_contacto, email_contacto, sucursal_id, mesa_id,
-          actividad_id, tipo, tipo_nombre, fecha, hora, personas, notas, origen, registrada_por, creado_en, actualizado_en)
-       VALUES
-         (:folio, :tokenQR, :clienteId, :comensal, :telefono, :email, :sucursalId, :mesaId,
-          :actividadId, :tipo, :tipoNombre, :fecha, :hora, :personas, :notas, :origen, :personalId, :ahora, :ahora)`,
-      {
-        folio,
-        tokenQR: generarTokenQR(),
-        clienteId,
-        comensal,
-        telefono,
-        email: datos.email ?? cliente?.email ?? null,
-        sucursalId,
-        mesaId,
-        actividadId: actividad?.id ?? null,
-        tipo: datos.tipo,
-        tipoNombre: datos.tipoNombre ?? null,
-        fecha,
-        hora,
-        personas: datos.personas,
-        notas: datos.notas || null,
-        origen: personalId ? 'host' : 'app',
-        personalId,
-        ahora: ahoraISO()
-      }
-    );
+    await repo.insertarReservacion({
+      folio,
+      tokenQR: generarTokenQR(),
+      clienteId,
+      comensal,
+      telefono,
+      email: datos.email ?? cliente?.email ?? null,
+      sucursalId,
+      mesaId,
+      actividadId: actividad?.id ?? null,
+      tipo: datos.tipo,
+      tipoNombre: datos.tipoNombre ?? null,
+      fecha,
+      hora,
+      personas: datos.personas,
+      notas: datos.notas || null,
+      origen: personalId ? 'host' : 'app',
+      personalId,
+      ahora: ahoraISO()
+    });
 
     const creada = await obtenerReservacion(folio);
     await crearNotificacion(clienteId, {
@@ -283,32 +253,18 @@ export function actualizarReservacion(folio, cambios) {
     if (cambios.fecha && cambios.fecha < hoyLocal()) throw solicitudInvalida('La nueva fecha ya pasó.');
 
     if (fila.actividad_id) {
-      const actividad = await db.uno('SELECT id, nombre, fecha, cupo_total AS cupoTotal FROM actividades WHERE id = ?', [
-        fila.actividad_id
-      ]);
+      const actividad = await repo.actividad(fila.actividad_id);
       if (actividad.fecha && nueva.fecha !== actividad.fecha) {
-        throw conflicto(`"${actividad.nombre}" tiene fecha fija (${fechaEnFrase(actividad.fecha)}); no se puede mover.`);
+        throw conflicto(
+          `"${actividad.nombre}" tiene fecha fija (${fechaEnFrase(actividad.fecha)}); no se puede mover.`
+        );
       }
       await validarCupo(actividad, nueva.fecha, nueva.personas, fila.id);
     }
     if (nueva.mesaId) await validarMesa({ ...nueva, sucursalId: fila.sucursal_id }, fila.id);
 
-    const update = armarUpdate(
-      { ...cambios, actualizadoEn: ahoraISO() },
-      {
-        fecha: 'fecha',
-        hora: 'hora',
-        personas: 'personas',
-        mesaId: 'mesa_id',
-        notas: 'notas',
-        tipoNombre: 'tipo_nombre',
-        comensal: 'nombre_contacto',
-        telefono: 'telefono_contacto',
-        email: 'email_contacto',
-        actualizadoEn: 'actualizado_en'
-      }
-    );
-    await db.ejecutar(`UPDATE reservaciones SET ${update.sets} WHERE id = :id`, { ...update.valores, id: fila.id });
+    await repo.actualizarReservaciones(fila.id, { ...cambios, actualizadoEn: ahoraISO() });
+
     return obtenerReservacion(fila.folio);
   });
 }
@@ -318,7 +274,7 @@ export function actualizarReservacion(folio, cambios) {
 // --------------------------------------------------------------------------
 
 function cambiarEstado(id, estado) {
-  return db.ejecutar('UPDATE reservaciones SET estado = ?, actualizado_en = ? WHERE id = ?', [estado, ahoraISO(), id]);
+  return repo.cambiarEstado(estado, ahoraISO(), id);
 }
 
 /**
@@ -337,7 +293,17 @@ export function hacerCheckIn(folio, { mesaId } = {}, personalId = null) {
     const mesaFinal = mesaId ?? fila.mesa_id;
     let numeroMesa = null;
     if (mesaFinal) {
-      const mesa = await db.uno('SELECT numero, sucursal_id FROM mesas WHERE id = ? AND activa = 1', [mesaFinal]);
+      await validarMesa(
+        {
+          mesaId: mesaFinal,
+          sucursalId: fila.sucursal_id,
+          fecha: fila.fecha,
+          hora: fila.hora,
+          personas: fila.personas
+        },
+        fila.id
+      );
+      const mesa = await repo.mesa(mesaFinal);
       if (!mesa) throw noEncontrado('No existe esa mesa.');
       if (mesa.sucursal_id !== fila.sucursal_id) {
         throw conflicto(`La mesa ${mesa.numero} no pertenece a la sucursal de la reservación.`);
@@ -353,11 +319,7 @@ export function hacerCheckIn(folio, { mesaId } = {}, personalId = null) {
       numeroMesa = mesa.numero;
     }
 
-    await db.ejecutar("UPDATE reservaciones SET estado = 'en_curso', mesa_id = ?, actualizado_en = ? WHERE id = ?", [
-      mesaFinal,
-      ahoraISO(),
-      fila.id
-    ]);
+    await repo.iniciar(mesaFinal, ahoraISO(), fila.id);
     await registrarEscaneo({
       codigo: fila.folio,
       tipo: 'reservacion',
@@ -375,8 +337,9 @@ export function completarReservacion(folio, { ticketTotal } = {}) {
     const fila = await filaPorFolioBloqueada(folio);
     exigirEstado(fila, 'en_curso', 'completar');
 
-    const servicio = await db.uno('SELECT mesa_id FROM servicios_mesa WHERE reservacion_id = ? AND fin IS NULL', [fila.id]);
-    if (servicio) await cerrarServicio(servicio.mesa_id, { ticketTotal }); // también marca la reservación como asistida
+    const servicio = await repo.servicioAbierto(fila.id);
+    if (servicio)
+      await cerrarServicio(servicio.mesa_id, { ticketTotal }); // también marca la reservación como asistida
     else await cambiarEstado(fila.id, 'asistida');
 
     return obtenerReservacion(fila.folio);
