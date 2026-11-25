@@ -252,7 +252,7 @@ export const MenuCatalogModule = ({
       nombre: reglas.texto(form.nombre, { min: 3, max: 120, etiqueta: 'El nombre' }),
       precio: reglas.precio(form.precio, { min: 1, max: 10000 }),
       descripcion: reglas.texto(form.descripcion, { min: 5, max: 600, etiqueta: 'La descripción' }),
-      imagen: form.imagen ? reglas.urlImagen(form.imagen, { opcional: true }) : null,
+      imagen: form.imagen ? reglas.rutaImagen(form.imagen, { opcional: true }) : null,
       stockDiario: reglas.entero(form.stockDiario, { min: 0, max: 5000, etiqueta: 'El stock diario' }),
       tiempoPrepMin: reglas.entero(form.tiempoPrepMin, { min: 0, max: 240, etiqueta: 'El tiempo de preparación' })
     };
