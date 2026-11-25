@@ -43,6 +43,16 @@ export default function App() {
   });
   const [reenviandoVerif, setReenviandoVerif] = useState(false);
 
+  // Sistema de alertas flotantes (éxito, error, advertencia, info)
+  const {
+    alertas,
+    cerrarAlerta,
+    exito: mostrarExito,
+    error: mostrarError,
+    advertencia: mostrarAdvertencia,
+    info: mostrarInfo
+  } = useAlertas();
+
   // 1. Estado de Pantalla Activa con soporte para URL /hero, /menu, ?verificar o ?restablecer
   const [activeScreen, setActiveScreen] = useState(() => {
     const params = new URLSearchParams(window.location.search);
@@ -132,8 +142,6 @@ export default function App() {
   const [isNotifDrawerOpen, setIsNotifDrawerOpen] = useState(false);
   const perfil = cliente ? aPerfil(cliente) : null;
 
-  // Sistema de alertas flotantes (éxito, error, advertencia, info)
-  const { alertas, cerrarAlerta, exito: mostrarExito, error: mostrarError, advertencia: mostrarAdvertencia, info: mostrarInfo } = useAlertas();
   const [cargandoCuenta, setCargandoCuenta] = useState(false);
 
   const cargarCatalogo = useCallback(async () => {
