@@ -21,92 +21,12 @@ import {
   Phone
 } from 'lucide-react';
 import HeroSection from '../components/HeroSection';
-import {
-  SUCURSALES,
-  ACTIVIDADES,
-  PROMOCIONES,
-  PLATILLOS_ESTRELLA,
-  BENEFICIOS_USUARIO
-} from '../data/marfilData';
+import { aProductoDeMenu } from '../api/adaptadores';
 import { sounds } from '../utils/audio';
 
 /**
- * Catálogo Editorial "Tendencias Marfil" inspirado en lookbook cosmético de autor
- */
-export const TENDENCIAS_CATALOGO = [
-  {
-    id: 'frappe-moka',
-    nombre: 'MOKA AVELLANA',
-    nombreCompleto: 'Frappé Moka Avellana & Caramelo',
-    subtitulo: 'ESPRESSO CHIAPAS & CACAO BELGA',
-    codigo: 'M5890 · 16 OZ',
-    precio: '$ 98,00',
-    precioNum: 98,
-    imagen: '/images/Menu/vaso-cafe.png'
-  },
-  {
-    id: 'frappe-fresa-dubai',
-    nombre: 'FRESA DUBÁI',
-    nombreCompleto: 'Frappé Fresa Estilo Dubái con Pistache & Kataifi',
-    subtitulo: 'PISTACHE SICILIANO & KATAIFI',
-    codigo: 'M2504 · EDICIÓN',
-    precio: '$ 145,00',
-    precioNum: 145,
-    imagen: '/images/Menu/vaso-principal.png'
-  },
-  {
-    id: 'frappe-kinder-bueno',
-    nombre: 'KINDER BUENO',
-    nombreCompleto: 'Frappé de Confitería Kinder Bueno',
-    subtitulo: 'AVELLANA & OBLEA CROCANTE',
-    codigo: 'A3456 · 16 OZ',
-    precio: '$ 115,00',
-    precioNum: 115,
-    imagen: '/images/Menu/vaso-cafe.png'
-  },
-  {
-    id: 'frappe-velvet-lavanda',
-    nombre: 'VELVET LAVANDA',
-    nombreCompleto: 'Frappé Velvet Lavanda & Frutos del Bosque',
-    subtitulo: 'INFUSIÓN FLORAL & MORAS',
-    codigo: 'L4792 · 16 OZ',
-    precio: '$ 105,00',
-    precioNum: 105,
-    imagen: '/images/Menu/vaso-morado.png'
-  },
-  {
-    id: 'frappe-mazapan',
-    nombre: 'MAZAPÁN ARTESANAL',
-    nombreCompleto: 'Frappé Tradicional de Mazapán con Leche Condensada',
-    subtitulo: 'CACAHUATE TOSTADO & CANELA',
-    codigo: 'V5412 · 16 OZ',
-    precio: '$ 95,00',
-    precioNum: 95,
-    imagen: '/images/Menu/vaso-principal.png'
-  },
-  {
-    id: 'burger-doble-marfil',
-    nombre: 'BURGER MARFIL',
-    nombreCompleto: 'Hamburguesa Doble Carne Marfil con Asadero Duranguense',
-    subtitulo: 'ASADERO LOCAL & BRIOCHE',
-    codigo: 'F6762 · PLATO FUERTE',
-    precio: '$ 185,00',
-    precioNum: 185,
-    imagen: '/images/Menu/Hamburguesa.png'
-  }
-];
-
-/**
  * Pantalla Principal (HomeScreen / Landing Page) de Café Marfil Durango.
- * Conecta visualmente con todas las secciones de la plataforma:
- * 1. Hero 3D Coffee & Co.
- * 2. Menú de Acceso Rápido a Secciones
- * 3. Platillos y Frappés Estrella (ADN Gastronómico)
- * 4. Actividades & Noches de Ludoteca
- * 5. Promociones & Combos Semanales
- * 6. Reserva tu Mesa o Evento (Wizard)
- * 7. Pasaporte de Sellos y Club Marfil
- * 8. Nuestras 2 Sucursales en Durango
+ * Conecta visualmente con todas las secciones de la plataforma usando datos reales de la API.
  */
 export default function HomeScreen({
   onOrderNow,
@@ -114,12 +34,31 @@ export default function HomeScreen({
   onSelectProduct,
   onSelectActivity,
   onSelectPromo,
-  actividades = ACTIVIDADES,
-  promociones = PROMOCIONES,
-  sucursales = SUCURSALES // llegan de la API; el dato simulado queda solo como respaldo
+  productos = [],
+  actividades = [],
+  promociones = [],
+  sucursales = []
 }) {
-  const [activeSucursalId, setActiveSucursalId] = React.useState('porras-matriz');
-  const activeSucursal = sucursales.find((s) => s.id === activeSucursalId) || sucursales[0];
+  const [activeSucursalId, setActiveSucursalId] = React.useState(sucursales[0]?.id || '');
+  const activeSucursal = sucursales.find((s) => s.id === activeSucursalId) || sucursales[0] || null;
+
+  // Destacados desde la API (si hay marcados como destacado se priorizan; si no, los primeros 6 disponibles)
+  const tendencias = React.useMemo(() => {
+    const disponibles = productos.filter((p) => p.disponibleEnCocina !== false);
+    const destacados = disponibles.filter((p) => p.destacado);
+    const origen = destacados.length >= 2 ? destacados : disponibles;
+    return origen.slice(0, 6).map((p) => {
+      const adaptado = aProductoDeMenu(p);
+      return {
+        ...adaptado,
+        subtitulo: (p.etiqueta || p.categoria || 'ESPECIALIDAD MARFIL').toUpperCase(),
+        codigo: `${p.badge || 'MARFIL'} · ${p.porcion || 'INDIVIDUAL'}`.toUpperCase()
+      };
+    });
+  }, [productos]);
+
+  const colIzquierda = tendencias.filter((_, idx) => idx % 2 === 0);
+  const colDerecha = tendencias.filter((_, idx) => idx % 2 === 1);
 
   const handleHeroOrder = (drink) => {
     sounds.playClick();
@@ -171,7 +110,7 @@ export default function HomeScreen({
       {/* ====================================================================
           1. HERO PRINCIPAL INTERACTIVO "COFFEE & CO."
           ==================================================================== */}
-      <HeroSection onOrderNow={handleHeroOrder} />
+      <HeroSection productos={productos} onOrderNow={handleHeroOrder} />
 
 
       {/* ====================================================================
@@ -182,199 +121,102 @@ export default function HomeScreen({
           {/* Sutil resplandor o gradiente editorial de fondo */}
           <div className="absolute top-0 right-0 w-96 h-96 bg-white/40 rounded-full blur-3xl pointer-events-none" />
 
-          {/* Grid de 2 Columnas Principal (idéntico al poster/catálogo de referencia) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-14 relative z-10">
-            {/* COLUMNA IZQUIERDA */}
-            <div className="flex flex-col gap-8 sm:gap-12">
-              {/* CABECERA EDITORIAL (TOP LEFT CON LÍNEA DIVISORIA) */}
-              <div>
-                <h2 className="font-display text-3xl sm:text-5xl lg:text-6xl font-black text-[#1F1410] tracking-tight uppercase leading-none">
-                  TENDENCIAS
-                </h2>
-                <div className="w-36 sm:w-56 h-[2px] bg-[#1F1410]/70 my-3" />
-                <p className="font-mono text-[11px] sm:text-xs font-bold text-[#1F1410]/80 uppercase tracking-wider leading-relaxed max-w-xs">
-                  SABORES DE AUTOR & INDULGENCIA CON INGREDIENTES SELECTOS
-                </p>
+          {tendencias.length === 0 ? (
+            <div className="py-12 text-center relative z-10">
+              <h2 className="font-display text-3xl sm:text-5xl font-black text-[#1F1410] tracking-tight uppercase leading-none">
+                TENDENCIAS
+              </h2>
+              <p className="font-body text-sm text-stone-500 mt-4">
+                Aún no hay productos destacados publicados en el menú.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-14 relative z-10">
+              {/* COLUMNA IZQUIERDA */}
+              <div className="flex flex-col gap-8 sm:gap-12">
+                <div>
+                  <h2 className="font-display text-3xl sm:text-5xl lg:text-6xl font-black text-[#1F1410] tracking-tight uppercase leading-none">
+                    TENDENCIAS
+                  </h2>
+                  <div className="w-36 sm:w-56 h-[2px] bg-[#1F1410]/70 my-3" />
+                  <p className="font-mono text-[11px] sm:text-xs font-bold text-[#1F1410]/80 uppercase tracking-wider leading-relaxed max-w-xs">
+                    SABORES DE AUTOR & INDULGENCIA CON INGREDIENTES SELECTOS
+                  </p>
+                </div>
+
+                {colIzquierda.map((item, idx) => {
+                  const invertido = idx % 2 === 1;
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => handleItemClick(item)}
+                      className={`flex items-center ${invertido ? 'justify-between flex-row-reverse' : ''} gap-4 sm:gap-6 group cursor-pointer p-2.5 rounded-2xl hover:bg-white/50 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] select-none`}
+                    >
+                      <div className="relative w-28 sm:w-36 h-36 sm:h-44 shrink-0 flex items-center justify-center">
+                        <img
+                          src={item.imagen}
+                          alt={item.nombre}
+                          className="w-full h-full object-contain filter drop-shadow-[0_12px_18px_rgba(31,20,16,0.22)] group-hover:scale-105 transition-transform duration-300"
+                        />
+                      </div>
+
+                      <div className="flex flex-col text-left">
+                        <h3 className="font-display font-black text-base sm:text-lg text-[#1F1410] tracking-tight uppercase leading-tight group-hover:text-[#E12927] transition-colors">
+                          {item.nombre}
+                        </h3>
+                        <span className="font-mono text-[10px] sm:text-[11px] font-bold text-stone-600 uppercase tracking-wider leading-snug mt-0.5">
+                          {item.subtitulo}
+                        </span>
+                        <span className="font-mono text-[9px] sm:text-[10px] font-semibold text-stone-500 tracking-wider mt-0.5">
+                          {item.codigo}
+                        </span>
+                        <span className="font-mono font-black text-base sm:text-xl text-[#1F1410] mt-1.5 tracking-tight group-hover:text-[#E12927] transition-colors">
+                          {item.precio}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
 
-              {/* ITEM 1: MOKA AVELLANA (Imagen izquierda, texto derecha) */}
-              <div
-                onClick={() => handleItemClick(TENDENCIAS_CATALOGO[0])}
-                className="flex items-center gap-4 sm:gap-6 group cursor-pointer p-2.5 rounded-2xl hover:bg-white/50 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] select-none"
-              >
-                <div className="relative w-28 sm:w-36 h-36 sm:h-44 shrink-0 flex items-center justify-center">
-                  <img
-                    src={TENDENCIAS_CATALOGO[0].imagen}
-                    alt={TENDENCIAS_CATALOGO[0].nombre}
-                    className="w-full h-full object-contain filter drop-shadow-[0_12px_18px_rgba(31,20,16,0.22)] group-hover:scale-105 transition-transform duration-300"
-                  />
-                </div>
+              {/* COLUMNA DERECHA */}
+              <div className="flex flex-col gap-8 sm:gap-12 pt-2 md:pt-4">
+                {colDerecha.map((item, idx) => {
+                  const invertido = idx > 0;
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => handleItemClick(item)}
+                      className={`flex items-center ${invertido ? 'justify-between flex-row-reverse' : ''} gap-4 sm:gap-6 group cursor-pointer p-2.5 rounded-2xl hover:bg-white/50 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] select-none`}
+                    >
+                      <div className="relative w-32 sm:w-40 h-44 sm:h-52 shrink-0 flex items-center justify-center">
+                        <img
+                          src={item.imagen}
+                          alt={item.nombre}
+                          className="w-full h-full object-contain filter drop-shadow-[0_14px_22px_rgba(31,20,16,0.22)] group-hover:scale-105 transition-transform duration-300"
+                        />
+                      </div>
 
-                <div className="flex flex-col text-left">
-                  <h3 className="font-display font-black text-base sm:text-lg text-[#1F1410] tracking-tight uppercase leading-tight group-hover:text-[#E12927] transition-colors">
-                    {TENDENCIAS_CATALOGO[0].nombre}
-                  </h3>
-                  <span className="font-mono text-[10px] sm:text-[11px] font-bold text-stone-600 uppercase tracking-wider leading-snug mt-0.5">
-                    {TENDENCIAS_CATALOGO[0].subtitulo}
-                  </span>
-                  <span className="font-mono text-[9px] sm:text-[10px] font-semibold text-stone-500 tracking-wider mt-0.5">
-                    {TENDENCIAS_CATALOGO[0].codigo}
-                  </span>
-                  <span className="font-mono font-black text-base sm:text-xl text-[#1F1410] mt-1.5 tracking-tight group-hover:text-[#E12927] transition-colors">
-                    {TENDENCIAS_CATALOGO[0].precio}
-                  </span>
-                </div>
-              </div>
-
-              {/* ITEM 3: KINDER BUENO (Texto izquierda, imagen derecha) */}
-              <div
-                onClick={() => handleItemClick(TENDENCIAS_CATALOGO[2])}
-                className="flex items-center justify-between gap-4 sm:gap-6 group cursor-pointer p-2.5 rounded-2xl hover:bg-white/50 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] select-none"
-              >
-                <div className="flex flex-col text-left">
-                  <h3 className="font-display font-black text-base sm:text-lg text-[#1F1410] tracking-tight uppercase leading-tight group-hover:text-[#E12927] transition-colors">
-                    {TENDENCIAS_CATALOGO[2].nombre}
-                  </h3>
-                  <span className="font-mono text-[10px] sm:text-[11px] font-bold text-stone-600 uppercase tracking-wider leading-snug mt-0.5">
-                    {TENDENCIAS_CATALOGO[2].subtitulo}
-                  </span>
-                  <span className="font-mono text-[9px] sm:text-[10px] font-semibold text-stone-500 tracking-wider mt-0.5">
-                    {TENDENCIAS_CATALOGO[2].codigo}
-                  </span>
-                  <span className="font-mono font-black text-base sm:text-xl text-[#1F1410] mt-1.5 tracking-tight group-hover:text-[#E12927] transition-colors">
-                    {TENDENCIAS_CATALOGO[2].precio}
-                  </span>
-                </div>
-
-                <div className="relative w-28 sm:w-36 h-36 sm:h-44 shrink-0 flex items-center justify-center">
-                  <img
-                    src={TENDENCIAS_CATALOGO[2].imagen}
-                    alt={TENDENCIAS_CATALOGO[2].nombre}
-                    className="w-full h-full object-contain filter drop-shadow-[0_12px_18px_rgba(31,20,16,0.22)] group-hover:scale-105 transition-transform duration-300"
-                  />
-                </div>
-              </div>
-
-              {/* ITEM 5: MAZAPÁN ARTESANAL (Imagen izquierda, texto derecha) */}
-              <div
-                onClick={() => handleItemClick(TENDENCIAS_CATALOGO[4])}
-                className="flex items-center gap-4 sm:gap-6 group cursor-pointer p-2.5 rounded-2xl hover:bg-white/50 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] select-none"
-              >
-                <div className="relative w-28 sm:w-36 h-36 sm:h-44 shrink-0 flex items-center justify-center">
-                  <img
-                    src={TENDENCIAS_CATALOGO[4].imagen}
-                    alt={TENDENCIAS_CATALOGO[4].nombre}
-                    className="w-full h-full object-contain filter drop-shadow-[0_12px_18px_rgba(31,20,16,0.22)] group-hover:scale-105 transition-transform duration-300"
-                  />
-                </div>
-
-                <div className="flex flex-col text-left">
-                  <h3 className="font-display font-black text-base sm:text-lg text-[#1F1410] tracking-tight uppercase leading-tight group-hover:text-[#E12927] transition-colors">
-                    {TENDENCIAS_CATALOGO[4].nombre}
-                  </h3>
-                  <span className="font-mono text-[10px] sm:text-[11px] font-bold text-stone-600 uppercase tracking-wider leading-snug mt-0.5">
-                    {TENDENCIAS_CATALOGO[4].subtitulo}
-                  </span>
-                  <span className="font-mono text-[9px] sm:text-[10px] font-semibold text-stone-500 tracking-wider mt-0.5">
-                    {TENDENCIAS_CATALOGO[4].codigo}
-                  </span>
-                  <span className="font-mono font-black text-base sm:text-xl text-[#1F1410] mt-1.5 tracking-tight group-hover:text-[#E12927] transition-colors">
-                    {TENDENCIAS_CATALOGO[4].precio}
-                  </span>
-                </div>
+                      <div className="flex flex-col text-left">
+                        <h3 className="font-display font-black text-base sm:text-lg text-[#1F1410] tracking-tight uppercase leading-tight group-hover:text-[#E12927] transition-colors">
+                          {item.nombre}
+                        </h3>
+                        <span className="font-mono text-[10px] sm:text-[11px] font-bold text-stone-600 uppercase tracking-wider leading-snug mt-0.5">
+                          {item.subtitulo}
+                        </span>
+                        <span className="font-mono text-[9px] sm:text-[10px] font-semibold text-stone-500 tracking-wider mt-0.5">
+                          {item.codigo}
+                        </span>
+                        <span className="font-mono font-black text-base sm:text-xl text-[#1F1410] mt-1.5 tracking-tight group-hover:text-[#E12927] transition-colors">
+                          {item.precio}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
-
-            {/* COLUMNA DERECHA */}
-            <div className="flex flex-col gap-8 sm:gap-12 pt-2 md:pt-4">
-              {/* ITEM 2: FRESA DUBÁI (Vaso alto rosa a la izquierda, texto a la derecha) */}
-              <div
-                onClick={() => handleItemClick(TENDENCIAS_CATALOGO[1])}
-                className="flex items-center gap-4 sm:gap-6 group cursor-pointer p-2.5 rounded-2xl hover:bg-white/50 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] select-none"
-              >
-                <div className="relative w-32 sm:w-40 h-44 sm:h-56 shrink-0 flex items-center justify-center">
-                  <img
-                    src={TENDENCIAS_CATALOGO[1].imagen}
-                    alt={TENDENCIAS_CATALOGO[1].nombre}
-                    className="w-full h-full object-contain filter drop-shadow-[0_14px_22px_rgba(31,20,16,0.22)] group-hover:scale-105 transition-transform duration-300"
-                  />
-                </div>
-
-                <div className="flex flex-col text-left">
-                  <h3 className="font-display font-black text-base sm:text-lg text-[#1F1410] tracking-tight uppercase leading-tight group-hover:text-[#E12927] transition-colors">
-                    {TENDENCIAS_CATALOGO[1].nombre}
-                  </h3>
-                  <span className="font-mono text-[10px] sm:text-[11px] font-bold text-stone-600 uppercase tracking-wider leading-snug mt-0.5">
-                    {TENDENCIAS_CATALOGO[1].subtitulo}
-                  </span>
-                  <span className="font-mono text-[9px] sm:text-[10px] font-semibold text-stone-500 tracking-wider mt-0.5">
-                    {TENDENCIAS_CATALOGO[1].codigo}
-                  </span>
-                  <span className="font-mono font-black text-base sm:text-xl text-[#1F1410] mt-1.5 tracking-tight group-hover:text-[#E12927] transition-colors">
-                    {TENDENCIAS_CATALOGO[1].precio}
-                  </span>
-                </div>
-              </div>
-
-              {/* ITEM 4: VELVET LAVANDA (Texto izquierda, vaso morado derecha) */}
-              <div
-                onClick={() => handleItemClick(TENDENCIAS_CATALOGO[3])}
-                className="flex items-center justify-between gap-4 sm:gap-6 group cursor-pointer p-2.5 rounded-2xl hover:bg-white/50 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] select-none"
-              >
-                <div className="flex flex-col text-left">
-                  <h3 className="font-display font-black text-base sm:text-lg text-[#1F1410] tracking-tight uppercase leading-tight group-hover:text-[#E12927] transition-colors">
-                    {TENDENCIAS_CATALOGO[3].nombre}
-                  </h3>
-                  <span className="font-mono text-[10px] sm:text-[11px] font-bold text-stone-600 uppercase tracking-wider leading-snug mt-0.5">
-                    {TENDENCIAS_CATALOGO[3].subtitulo}
-                  </span>
-                  <span className="font-mono text-[9px] sm:text-[10px] font-semibold text-stone-500 tracking-wider mt-0.5">
-                    {TENDENCIAS_CATALOGO[3].codigo}
-                  </span>
-                  <span className="font-mono font-black text-base sm:text-xl text-[#1F1410] mt-1.5 tracking-tight group-hover:text-[#E12927] transition-colors">
-                    {TENDENCIAS_CATALOGO[3].precio}
-                  </span>
-                </div>
-
-                <div className="relative w-32 sm:w-40 h-44 sm:h-56 shrink-0 flex items-center justify-center">
-                  <img
-                    src={TENDENCIAS_CATALOGO[3].imagen}
-                    alt={TENDENCIAS_CATALOGO[3].nombre}
-                    className="w-full h-full object-contain filter drop-shadow-[0_14px_22px_rgba(31,20,16,0.22)] group-hover:scale-105 transition-transform duration-300"
-                  />
-                </div>
-              </div>
-
-              {/* ITEM 6: BURGER DOBLE MARFIL (Texto izquierda, hamburguesa derecha) */}
-              <div
-                onClick={() => handleItemClick(TENDENCIAS_CATALOGO[5])}
-                className="flex items-center justify-between gap-4 sm:gap-6 group cursor-pointer p-2.5 rounded-2xl hover:bg-white/50 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] select-none"
-              >
-                <div className="flex flex-col text-left">
-                  <h3 className="font-display font-black text-base sm:text-lg text-[#1F1410] tracking-tight uppercase leading-tight group-hover:text-[#E12927] transition-colors">
-                    {TENDENCIAS_CATALOGO[5].nombre}
-                  </h3>
-                  <span className="font-mono text-[10px] sm:text-[11px] font-bold text-stone-600 uppercase tracking-wider leading-snug mt-0.5">
-                    {TENDENCIAS_CATALOGO[5].subtitulo}
-                  </span>
-                  <span className="font-mono text-[9px] sm:text-[10px] font-semibold text-stone-500 tracking-wider mt-0.5">
-                    {TENDENCIAS_CATALOGO[5].codigo}
-                  </span>
-                  <span className="font-mono font-black text-base sm:text-xl text-[#1F1410] mt-1.5 tracking-tight group-hover:text-[#E12927] transition-colors">
-                    {TENDENCIAS_CATALOGO[5].precio}
-                  </span>
-                </div>
-
-                <div className="relative w-36 sm:w-48 h-32 sm:h-40 shrink-0 flex items-center justify-center">
-                  <img
-                    src={TENDENCIAS_CATALOGO[5].imagen}
-                    alt={TENDENCIAS_CATALOGO[5].nombre}
-                    className="w-full h-full object-contain filter drop-shadow-[0_14px_22px_rgba(31,20,16,0.22)] group-hover:scale-105 transition-transform duration-300"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
+          )}
 
           {/* Pie de catálogo con acción para ver menú */}
           <div className="mt-10 sm:mt-12 pt-6 border-t border-[#1F1410]/15 flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -758,6 +600,7 @@ export default function HomeScreen({
           {/* ============================================================
               MAPA INTERACTIVO GOOGLE MAPS (IFRAME)
               ============================================================ */}
+          {activeSucursal && (
           <div className="bg-white rounded-3xl border border-stone-200/80 shadow-xl overflow-hidden text-left">
             {/* Header del Mapa con Pestañas de Sucursal */}
             <div className="bg-stone-900 text-white p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -818,6 +661,7 @@ export default function HomeScreen({
             </div>
 
           </div>
+          )}
         </div>
       </section>
 

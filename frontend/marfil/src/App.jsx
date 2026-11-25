@@ -93,6 +93,7 @@ export default function App() {
   const [sucursales, setSucursales] = useState([]);
   const [actividades, setActividades] = useState([]);
   const [promociones, setPromociones] = useState([]);
+  const [productos, setProductos] = useState([]);
   const [secciones, setSecciones] = useState([]);
   const [catalogoListo, setCatalogoListo] = useState(false);
   const [errorCatalogo, setErrorCatalogo] = useState('');
@@ -114,28 +115,19 @@ export default function App() {
   }, [aviso]);
 
   const cargarCatalogo = useCallback(async () => {
-    try {
-      const [s, a, p, productos] = await Promise.all([
-        api('/sucursales'),
-        api('/actividades'),
-        api('/promociones'),
-        api('/menu/productos')
-      ]);
-      setSucursales(s);
-      setActividades(a.map(aActividad));
-      setPromociones(p.map(aPromocion));
-      setSecciones(aSeccionesDeMenu(productos));
-      setCatalogoListo(true);
-    } catch (err) {
-      if (!(import.meta.env.DEV && import.meta.env.VITE_DEMO_OFFLINE === 'true' && !err.status)) throw err;
-      console.warn('API no disponible, usando catálogo local simulado.', err);
-      const { SUCURSALES, ACTIVIDADES, PROMOCIONES, SECCIONES_MENU } = await import('./data/marfilData');
-      setSucursales(SUCURSALES);
-      setActividades(ACTIVIDADES);
-      setPromociones(PROMOCIONES);
-      setSecciones(SECCIONES_MENU);
-      setCatalogoListo(true);
-    }
+    setErrorCatalogo('');
+    const [s, a, p, listaProductos] = await Promise.all([
+      api('/sucursales'),
+      api('/actividades'),
+      api('/promociones'),
+      api('/menu/productos')
+    ]);
+    setSucursales(s);
+    setActividades(a.map(aActividad));
+    setPromociones(p.map(aPromocion));
+    setProductos(listaProductos);
+    setSecciones(aSeccionesDeMenu(listaProductos));
+    setCatalogoListo(true);
   }, []);
 
   /**
@@ -306,29 +298,6 @@ export default function App() {
       navigateTo('confirmacion_reservacion');
       return null;
     } catch (error) {
-      if (import.meta.env.DEV && import.meta.env.VITE_DEMO_OFFLINE === 'true' && !error.status) {
-        setAviso('Modo demo: esta confirmación es simulada y no reserva lugares.');
-        // Fallback cuando la API está offline
-        const mockConfirmacion = {
-          id: `res-${Date.now().toString().slice(-4)}`,
-          folio: `MF-RES-${Math.floor(10000 + Math.random() * 90000)}`,
-          tipo: nueva.tipoId || 'mesa',
-          sucursalId: nueva.sucursalId || 'porras-matriz',
-          fecha: nueva.fechaISO || new Date().toISOString().slice(0, 10),
-          hora: nueva.hora || '10:00',
-          personas: nueva.personas || 2,
-          comensal: nueva.nombreCliente || 'Comensal Invitado',
-          telefono: nueva.telefonoCliente || '618-123-4567',
-          email: nueva.correoCliente,
-          notas: nueva.notas,
-          estado: 'confirmada',
-          tokenQR: 'DEMO-QR-' + Date.now()
-        };
-        setLastConfirmedReservation(mockConfirmacion);
-        setReservaciones((prev) => [mockConfirmacion, ...prev]);
-        navigateTo('confirmacion_reservacion');
-        return null;
-      }
       return error.message;
     }
   };
@@ -386,14 +355,36 @@ export default function App() {
       {/* Contenido Principal con Enrutador React */}
       <main className={activeScreen === 'hero' || activeScreen === 'inicio' ? 'w-full p-0 m-0 max-w-none flex-1' : 'main-content'} id="main-content">
         {!catalogoListo && activeScreen !== 'hero' && (
-          <p className="font-mono text-xs font-bold text-[#8E7A74] uppercase tracking-wider text-center py-24">
-            {errorCatalogo || 'Cargando Café Marfil...'}
-          </p>
+          <div className="max-w-md mx-auto my-24 px-6 py-10 text-center bg-white rounded-3xl border border-stone-200 shadow-sm">
+            {errorCatalogo ? (
+              <>
+                <p className="font-display font-bold text-lg text-[#1F1410] mb-2">
+                  No se pudo conectar con Café Marfil
+                </p>
+                <p className="font-body text-sm text-stone-600 mb-6">{errorCatalogo}</p>
+                <button
+                  type="button"
+                  onClick={() => cargarCatalogo().catch((e) => setErrorCatalogo(e.message))}
+                  className="px-6 py-2.5 rounded-full bg-[#E12927] hover:bg-[#C81E1C] text-white font-mono text-xs font-bold uppercase tracking-wider cursor-pointer transition-colors"
+                >
+                  Reintentar
+                </button>
+              </>
+            ) : (
+              <div className="flex flex-col items-center gap-3">
+                <span className="w-8 h-8 rounded-full border-2 border-stone-200 border-t-[#E12927] animate-spin" />
+                <p className="font-mono text-xs font-bold text-[#8E7A74] uppercase tracking-wider">
+                  Cargando Café Marfil...
+                </p>
+              </div>
+            )}
+          </div>
         )}
 
         {/* PROTOTIPO HERO COFFEE & CO. (/hero) */}
         {activeScreen === 'hero' && (
           <HeroSection
+            productos={productos}
             onOrderNow={(drink) => {
               setReservationWizardInitialData({
                 tipo: 'mesa',
@@ -418,6 +409,7 @@ export default function App() {
             }}
             onSelectActivity={handleSelectActivity}
             onSelectPromo={handleSelectPromo}
+            productos={productos}
             actividades={actividades}
             promociones={promociones}
             sucursales={sucursales}

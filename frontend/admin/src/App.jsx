@@ -39,6 +39,7 @@ export function App() {
   const [usuario, setUsuario] = useState(null);
   const [restaurandoSesion, setRestaurandoSesion] = useState(Boolean(sesion.token));
   const [datosListos, setDatosListos] = useState(false);
+  const [errorCarga, setErrorCarga] = useState('');
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedSucursal, setSelectedSucursal] = useState('todas');
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -103,25 +104,10 @@ export function App() {
 
   /** Lo llama LoginScreen; si las credenciales fallan lanza un error con el mensaje a mostrar. */
   const iniciarSesion = async (email, password) => {
-    try {
-      const respuesta = await api('/auth/staff/login', { metodo: 'POST', body: { email, password } });
-      sesion.guardar(respuesta.token);
-      setUsuario(respuesta.usuario);
-    } catch (err) {
-      if (import.meta.env.DEV && import.meta.env.VITE_DEMO_OFFLINE === 'true' && !err.status) {
-        console.warn('API no disponible, iniciando en modo demostración/offline');
-        setAviso({ tipo: 'error', texto: 'Modo demo: los datos son simulados y no se guardan.' });
-        setUsuario({
-          id: 1,
-          nombre: 'Sofía Valenzuela',
-          email: email || 'admin@cafemarfil.mx',
-          rol: 'admin',
-          sucursalId: 'porras-matriz'
-        });
-        return;
-      }
-      throw err;
-    }
+    const respuesta = await api('/auth/staff/login', { metodo: 'POST', body: { email, password } });
+    sesion.guardar(respuesta.token);
+    setErrorCarga('');
+    setUsuario(respuesta.usuario);
   };
 
   // ------------------------------------------------------------------------
@@ -131,6 +117,7 @@ export function App() {
   const cargarDatos = useCallback(async () => {
     const carga = ++cargaActual.current;
     setCargandoReservaciones(true);
+    setErrorCarga('');
     const sucursalId = selectedSucursal === 'todas' ? undefined : selectedSucursal;
     try {
       // La fecha del servidor solo delimita los indicadores y la operación de hoy.
@@ -161,31 +148,8 @@ export function App() {
       setDatosListos(true);
     } catch (err) {
       if (carga !== cargaActual.current) return;
-      if (!(import.meta.env.DEV && import.meta.env.VITE_DEMO_OFFLINE === 'true' && !err.status)) throw err;
-      console.warn('API no disponible en panel admin, usando mock data local.', err);
-      const mock = await import('./data/adminMockData');
-      if (carga !== cargaActual.current) return;
-      setMetricas(mock.INITIAL_METRICAS || {
-        ocupacionPorcentaje: 73,
-        mesasOcupadas: 11,
-        totalMesas: 15,
-        aforoActual: 93,
-        aforoMaximo: 133,
-        reservasHoy: 18,
-        checkInsHoy: 14,
-        promedioMinutosMesa: 52
-      });
-      setSucursales(mock.INITIAL_SUCURSALES);
-      setMesas(mock.INITIAL_MESAS);
-      setReservaciones(mock.INITIAL_RESERVAS);
-      setReservacionesHoy(mock.INITIAL_RESERVAS);
-      setMenuItems(mock.INITIAL_MENU_ITEMS);
-      setPromociones(mock.INITIAL_PROMOCIONES);
-      setClientesClub(mock.INITIAL_CLIENTES_CLUB || []);
-      setJuegos(mock.INITIAL_JUEGOS);
-      setStaff(mock.INITIAL_STAFF);
-      setEscaneos(mock.INITIAL_HISTORIAL_ESCANEOS || []);
-      setDatosListos(true);
+      setErrorCarga(err.message || 'No se pudieron cargar los datos del servidor.');
+      throw err;
     } finally {
       if (carga === cargaActual.current) setCargandoReservaciones(false);
     }
@@ -485,7 +449,30 @@ export function App() {
   if (!datosListos) {
     return (
       <>
-        <PantallaDeEspera texto="Cargando la operación del día..." />
+        {errorCarga ? (
+          <div className="h-screen w-screen bg-[#1F1410] flex flex-col items-center justify-center gap-4 px-6 text-center font-body text-white">
+            <p className="font-display font-bold text-lg">No se pudo conectar con la API</p>
+            <p className="text-sm text-white/70 max-w-md">{errorCarga}</p>
+            <div className="flex items-center gap-3 mt-2">
+              <button
+                type="button"
+                onClick={() => cargarDatos().catch(() => {})}
+                className="px-5 py-2 rounded-xl bg-[#E12927] hover:bg-[#c51e1c] text-white text-xs font-bold uppercase tracking-wider cursor-pointer"
+              >
+                Reintentar
+              </button>
+              <button
+                type="button"
+                onClick={cerrarSesion}
+                className="px-5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold uppercase tracking-wider cursor-pointer"
+              >
+                Cerrar sesión
+              </button>
+            </div>
+          </div>
+        ) : (
+          <PantallaDeEspera texto="Cargando la operación del día..." />
+        )}
         {avisoFlotante}
       </>
     );
@@ -530,6 +517,7 @@ export function App() {
               {activeTab === 'dashboard' && (
                 <DashboardView
                   metricas={metricas}
+                  menuItems={menuItems}
                   selectedSucursal={selectedSucursal}
                   sucursales={sucursales}
                   soundEnabled={soundEnabled}

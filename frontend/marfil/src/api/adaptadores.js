@@ -1,5 +1,4 @@
-// Traducen lo que entrega la API a la forma que ya esperan las pantallas de la
-// PWA (la que tenían los datos simulados de marfilData.js), para no tocar la interfaz.
+// Traducen lo que entrega la API al formato que consumen las pantallas de la PWA.
 
 const sinPrefijo = (nombreSucursal) => (nombreSucursal ?? '').replace('Sucursal ', '');
 
@@ -52,47 +51,93 @@ export const aPromocion = (p) => ({
   comoUsar: p.comoUsar ?? 'Muestra tu código al ordenar en mostrador.'
 });
 
-const aProductoDeMenu = (p) => ({
-  id: p.slug,
-  nombre: p.nombreCorto ?? p.nombre.toUpperCase(),
+export const aProductoDeMenu = (p) => ({
+  id: p.slug ?? String(p.id),
+  productoId: p.id,
+  nombre: p.nombreCorto || p.nombre.toUpperCase(),
   nombreCompleto: p.nombre,
-  categoria: p.etiqueta ?? p.categoria,
-  precio: p.precioStr,
-  precioNum: p.precio,
-  tamano: p.porcion ?? 'Porción individual',
+  categoria: p.etiqueta || p.categoria,
+  categoriaSlug: p.categoriaSlug,
+  descripcion: p.descripcion,
+  precio: p.precioStr ?? `$${Number(p.precio || 0).toFixed(0)} MXN`,
+  precioNum: Number(p.precio || 0),
+  tamano: p.porcion || 'Porción individual',
   calorias: p.calorias ? `${p.calorias} kcal` : 'Consulta en barra',
-  imagen: p.imagen,
-  colorCard: p.colorCard,
-  queTrae: p.ingredientes.length ? p.ingredientes : [p.descripcion],
-  alergenos: p.alergenos,
-  badge: p.disponibleEnCocina ? (p.badge ?? 'MARFIL') : 'AGOTADO HOY'
+  imagen: p.imagen || '/images/Menu/vaso-principal.png',
+  colorCard: p.colorCard || '#F5ECE8',
+  queTrae: Array.isArray(p.ingredientes) && p.ingredientes.length ? p.ingredientes : [p.descripcion].filter(Boolean),
+  alergenos: Array.isArray(p.alergenos) ? p.alergenos : [],
+  badge: p.disponibleEnCocina === false ? 'AGOTADO HOY' : (p.badge || 'MARFIL'),
+  disponibleEnCocina: p.disponibleEnCocina !== false,
+  destacado: Boolean(p.destacado),
+  estado: p.estado || 'publicado'
 });
 
+const META_SECCIONES = {
+  frappes: {
+    titulo: 'Frappés de Autor & Especialidad',
+    subtitulo: 'Indulgencia fría con granos de altura y confitería premium'
+  },
+  salado: {
+    titulo: 'Cocina Salada, Hamburguesas & Snacks',
+    subtitulo: 'Recetas contundentes con carne de res local y pan brioche de masa madre'
+  },
+  especialidad: {
+    titulo: 'Barra de Café de Especialidad',
+    subtitulo: 'Granos seleccionados de altura, espresso y métodos artesanales'
+  },
+  brunch: {
+    titulo: 'All-Day Brunch & Desayunos',
+    subtitulo: 'Chilaquiles, molletes y platillos servidos todo el día'
+  },
+  postres: {
+    titulo: 'Postres, Waffles & Fresas Dubái',
+    subtitulo: 'Dulces de autor con pistache, kataifi y confitería selecta'
+  },
+  social: {
+    titulo: 'Bebidas Sociales & Coctelería',
+    subtitulo: 'Cervezas, sodas italianas y tragos para compartir'
+  }
+};
+
 /**
- * MenuScreen dibuja exactamente dos secciones ('seccion-1' y 'seccion-2'):
- * la barra de frappés y la cocina salada. El carrusel está diseñado para
- * productos con imagen recortada sobre una tarjeta de color, así que solo
- * entran los que tienen `colorCard` en su ficha.
+ * Agrupa los productos del catálogo en secciones por categoría para MenuScreen.
  */
-export function aSeccionesDeMenu(productos) {
-  const de = (categoriaSlug) =>
-    productos.filter((p) => p.categoriaSlug === categoriaSlug && p.colorCard).map(aProductoDeMenu);
-  return [
-    {
-      id: 'seccion-1',
-      numero: 'Seccion 1',
-      titulo: 'Frappés de Autor & Especialidad',
-      subtitulo: 'Indulgencia fría con granos de altura y confitería premium',
-      productos: de('frappes')
-    },
-    {
-      id: 'seccion-2',
-      numero: 'Seccion 2',
-      titulo: 'Cocina Salada, Hamburguesas & Snacks',
-      subtitulo: 'Recetas contundentes con carne de res local y pan brioche de masa madre',
-      productos: de('salado')
+export function aSeccionesDeMenu(productos = []) {
+  const grupos = new Map();
+  for (const p of productos) {
+    const slug = p.categoriaSlug || 'otros';
+    if (!grupos.has(slug)) {
+      grupos.set(slug, {
+        slug,
+        categoriaNombre: p.categoria || 'Especialidades',
+        productos: []
+      });
     }
-  ];
+    grupos.get(slug).productos.push(aProductoDeMenu(p));
+  }
+
+  const ordenPreferido = ['frappes', 'salado', 'especialidad', 'brunch', 'postres', 'social'];
+  const ordenados = [...grupos.values()].sort((a, b) => {
+    const ia = ordenPreferido.indexOf(a.slug);
+    const ib = ordenPreferido.indexOf(b.slug);
+    if (ia !== -1 && ib !== -1) return ia - ib;
+    if (ia !== -1) return -1;
+    if (ib !== -1) return 1;
+    return a.categoriaNombre.localeCompare(b.categoriaNombre);
+  });
+
+  return ordenados.map((g, idx) => {
+    const meta = META_SECCIONES[g.slug];
+    return {
+      id: `seccion-${idx + 1}`,
+      slug: g.slug,
+      numero: `Seccion ${idx + 1}`,
+      titulo: meta?.titulo || g.categoriaNombre,
+      subtitulo: meta?.subtitulo || 'Preparados al momento en nuestras sucursales',
+      productos: g.productos
+    };
+  });
 }
 
 // --------------------------------------------------------------------------
