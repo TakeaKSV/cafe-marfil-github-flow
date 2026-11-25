@@ -16,19 +16,23 @@ const ERRORES_DE_CONEXION = new Set([
   'ER_BAD_DB_ERROR'
 ]);
 
-export function rutaNoEncontrada(req, res) {
-  res.status(404).json({ error: `No existe la ruta ${req.method} ${req.originalUrl}` });
+export function rutaNoEncontrada(_req, res) {
+  res.status(404).json({ error: 'No existe esa ruta.' });
 }
 
 /** Todas las respuestas de error tienen la forma { error: string, detalles?: [] }. */
-// eslint-disable-next-line no-unused-vars -- Express reconoce el manejador por sus 4 parámetros
 export function manejarErrores(err, _req, res, _next) {
+  if (res.headersSent) return _next(err);
   if (err instanceof HttpError) {
     return res.status(err.status).json({ error: err.message, ...(err.detalles && { detalles: err.detalles }) });
   }
   if (err.type === 'entity.parse.failed') {
     return res.status(400).json({ error: 'El cuerpo de la petición no es JSON válido.' });
   }
+  if (err.type === 'entity.too.large')
+    return res.status(413).json({ error: 'El cuerpo de la petición excede el límite permitido.' });
+  if (err.type === 'encoding.unsupported' || err.type === 'charset.unsupported')
+    return res.status(415).json({ error: 'Codificación no admitida.' });
   if (ERRORES_DE_INTEGRIDAD.has(err.code)) {
     // Red de seguridad: los servicios validan antes, pero la base tiene la última palabra.
     return res.status(409).json({ error: 'La operación choca con una regla de integridad de los datos.' });
@@ -40,7 +44,7 @@ export function manejarErrores(err, _req, res, _next) {
     console.error(`Sin conexión a MySQL (${err.code}). ¿Está encendido el servidor de base de datos?`);
     return res.status(503).json({ error: 'No hay conexión con la base de datos. Intenta de nuevo en un momento.' });
   }
-  console.error(err);
+  console.error('Error interno de la API.', { codigo: err.code ?? 'INTERNAL_ERROR' });
   res.status(500).json({ error: 'Error interno del servidor.' });
 }
 
@@ -49,7 +53,9 @@ export function registrarPeticiones(req, res, next) {
   const inicio = process.hrtime.bigint();
   res.on('finish', () => {
     const ms = Number(process.hrtime.bigint() - inicio) / 1e6;
-    console.log(`${req.method} ${req.originalUrl} -> ${res.statusCode} (${ms.toFixed(1)} ms)`);
+    console.log(
+      `${req.method} ${req.route?.path ?? '[ruta no encontrada]'} -> ${res.statusCode} (${ms.toFixed(1)} ms)`
+    );
   });
   next();
 }

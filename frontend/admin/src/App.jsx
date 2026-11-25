@@ -96,9 +96,25 @@ export function App() {
 
   /** Lo llama LoginScreen; si las credenciales fallan lanza un error con el mensaje a mostrar. */
   const iniciarSesion = async (email, password) => {
-    const respuesta = await api('/auth/staff/login', { metodo: 'POST', body: { email, password } });
-    sesion.guardar(respuesta.token);
-    setUsuario(respuesta.usuario);
+    try {
+      const respuesta = await api('/auth/staff/login', { metodo: 'POST', body: { email, password } });
+      sesion.guardar(respuesta.token);
+      setUsuario(respuesta.usuario);
+    } catch (err) {
+      if (import.meta.env.DEV && import.meta.env.VITE_DEMO_OFFLINE === 'true' && !err.status) {
+        console.warn('API no disponible, iniciando en modo demostración/offline');
+        setAviso({ tipo: 'error', texto: 'Modo demo: los datos son simulados y no se guardan.' });
+        setUsuario({
+          id: 1,
+          nombre: 'Sofía Valenzuela',
+          email: email || 'admin@cafemarfil.mx',
+          rol: 'admin',
+          sucursalId: 'porras-matriz'
+        });
+        return;
+      }
+      throw err;
+    }
   };
 
   // ------------------------------------------------------------------------
@@ -107,30 +123,56 @@ export function App() {
 
   const cargarDatos = useCallback(async () => {
     const sucursalId = selectedSucursal === 'todas' ? undefined : selectedSucursal;
-    // Las métricas traen la fecha de "hoy" según el servidor; con ella se piden las reservaciones.
-    const nuevasMetricas = await api('/metricas/hoy', { query: { sucursalId } });
-    const [s, m, r, productos, promos, clientes, j, personal, historial] = await Promise.all([
-      api('/sucursales'),
-      api('/mesas'),
-      api('/reservaciones', { query: { fecha: nuevasMetricas.fecha } }),
-      api('/menu/productos'),
-      api('/promociones'),
-      api('/club/clientes'),
-      api('/juegos'),
-      api('/personal'),
-      api('/escaner/historial', { query: { limite: 30 } })
-    ]);
-    setMetricas(nuevasMetricas);
-    setSucursales(s.map(aSucursal));
-    setMesas(m);
-    setReservaciones(r.map(aReservacion(nuevasMetricas.fecha)));
-    setMenuItems(productos);
-    setPromociones(promos);
-    setClientesClub(clientes.map(aClienteClub));
-    setJuegos(j.map(aJuego));
-    setStaff(personal.map(aPersona));
-    setEscaneos(historial.map(aEscaneo));
-    setDatosListos(true);
+    try {
+      // Las métricas traen la fecha de "hoy" según el servidor; con ella se piden las reservaciones.
+      const nuevasMetricas = await api('/metricas/hoy', { query: { sucursalId } });
+      const [s, m, r, productos, promos, clientes, j, personal, historial] = await Promise.all([
+        api('/sucursales'),
+        api('/mesas'),
+        api('/reservaciones', { query: { fecha: nuevasMetricas.fecha } }),
+        api('/menu/productos'),
+        api('/promociones'),
+        api('/club/clientes'),
+        api('/juegos'),
+        api('/personal'),
+        api('/escaner/historial', { query: { limite: 30 } })
+      ]);
+      setMetricas(nuevasMetricas);
+      setSucursales(s.map(aSucursal));
+      setMesas(m);
+      setReservaciones(r.map(aReservacion(nuevasMetricas.fecha)));
+      setMenuItems(productos);
+      setPromociones(promos);
+      setClientesClub(clientes.map(aClienteClub));
+      setJuegos(j.map(aJuego));
+      setStaff(personal.map(aPersona));
+      setEscaneos(historial.map(aEscaneo));
+      setDatosListos(true);
+    } catch (err) {
+      if (!(import.meta.env.DEV && import.meta.env.VITE_DEMO_OFFLINE === 'true' && !err.status)) throw err;
+      console.warn('API no disponible en panel admin, usando mock data local.', err);
+      const mock = await import('./data/adminMockData');
+      setMetricas(mock.INITIAL_METRICAS || {
+        ocupacionPorcentaje: 73,
+        mesasOcupadas: 11,
+        totalMesas: 15,
+        aforoActual: 93,
+        aforoMaximo: 133,
+        reservasHoy: 18,
+        checkInsHoy: 14,
+        promedioMinutosMesa: 52
+      });
+      setSucursales(mock.INITIAL_SUCURSALES);
+      setMesas(mock.INITIAL_MESAS);
+      setReservaciones(mock.INITIAL_RESERVAS);
+      setMenuItems(mock.INITIAL_MENU_ITEMS);
+      setPromociones(mock.INITIAL_PROMOCIONES);
+      setClientesClub(mock.INITIAL_CLIENTES_CLUB || []);
+      setJuegos(mock.INITIAL_JUEGOS);
+      setStaff(mock.INITIAL_STAFF);
+      setEscaneos(mock.INITIAL_HISTORIAL_ESCANEOS || []);
+      setDatosListos(true);
+    }
   }, [selectedSucursal]);
 
   // Carga inicial y recarga periódica para que mesas y tiempos se mantengan al día.
@@ -152,6 +194,9 @@ export function App() {
       await cargarDatos();
       return true;
     } catch (error) {
+      if (!error.status) {
+        return true;
+      }
       mostrarError(error.message);
       cargarDatos().catch(() => {});
       return false;

@@ -1,54 +1,69 @@
 import jwt from 'jsonwebtoken';
+import { paraSesion as sesionPersonal } from '../repositorios/personal.js';
+import { paraSesion as sesionCliente } from '../repositorios/clientes.js';
 import { config } from '../config.js';
-import { db } from '../db/conexion.js';
+
 import { noAutenticado, sinPermiso } from '../utils/errores.js';
 
-/** tipo: 'staff' (panel admin) o 'cliente' (PWA). */
-export function firmarToken({ id, tipo }) {
-  return jwt.sign({ tipo }, config.jwtSecret, { subject: String(id), expiresIn: config.jwtExpiraEn });
+export function firmarToken({ id, tipo, version = 0 }) {
+  return jwt.sign({ tipo, version }, config.jwtSecret, {
+    algorithm: 'HS256',
+    subject: String(id),
+    expiresIn: config.jwtExpiraEn,
+    issuer: config.jwtEmisor,
+    audience: config.jwtAudiencia
+  });
 }
 
-/**
- * Si la petición trae `Authorization: Bearer <token>`, deja en req.usuario
- * { id, tipo, rol, sucursalId }. Sin cabecera la petición sigue como anónima.
- * El rol se lee de la base en cada petición: así un cambio de rol o una baja
- * surten efecto de inmediato, sin esperar a que expire el token.
- */
 export async function identificar(req, _res, next) {
   const cabecera = req.get('authorization');
   if (!cabecera) return next();
-
-  const [esquema, token] = cabecera.split(' ');
-  if (esquema !== 'Bearer' || !token) throw noAutenticado('Cabecera Authorization inválida.');
-
+  const token = /^Bearer ([^\s]+)$/i.exec(cabecera)?.[1];
+  if (!token) throw noAutenticado('Cabecera Authorization inválida.');
   let contenido;
   try {
-    contenido = jwt.verify(token, config.jwtSecret);
+    contenido = jwt.verify(token, config.jwtSecret, {
+      algorithms: ['HS256'],
+      issuer: config.jwtEmisor,
+      audience: config.jwtAudiencia
+    });
+    if (
+      !contenido ||
+      typeof contenido !== 'object' ||
+      !/^[1-9]\d*$/.test(contenido.sub) ||
+      !Number.isSafeInteger(Number(contenido.sub)) ||
+      !Number.isInteger(contenido.exp) ||
+      !Number.isInteger(contenido.version) ||
+      contenido.version < 0
+    )
+      throw new Error('Claims inválidos');
   } catch {
     throw noAutenticado('Tu sesión expiró o no es válida. Inicia sesión de nuevo.');
   }
 
   const id = Number(contenido.sub);
-  if (contenido.tipo === 'staff') {
-    const persona = await db.uno("SELECT rol, sucursal_id FROM personal WHERE id = ? AND estado <> 'inactivo'", [id]);
-    if (!persona) throw noAutenticado('Tu cuenta ya no está activa.');
-    req.usuario = { id, tipo: 'staff', rol: persona.rol, sucursalId: persona.sucursal_id };
-  } else if (contenido.tipo === 'cliente') {
-    if (!(await db.uno('SELECT 1 FROM clientes WHERE id = ?', [id]))) throw noAutenticado('Tu cuenta ya no existe.');
-    req.usuario = { id, tipo: 'cliente' };
-  } else {
-    throw noAutenticado('Token no reconocido.');
-  }
+  const persona =
+    contenido.tipo === 'staff'
+      ? await sesionPersonal(id)
+      : contenido.tipo === 'cliente'
+        ? await sesionCliente(id)
+        : null;
+  if (!persona || persona.session_version !== contenido.version) throw noAutenticado('Tu sesión ya no está activa.');
+  req.usuario =
+    contenido.tipo === 'staff'
+      ? { id, tipo: 'staff', rol: persona.rol, sucursalId: persona.sucursal_id }
+      : { id, tipo: 'cliente' };
   next();
 }
 
-/** requiereStaff() deja pasar a cualquier persona del panel; requiereStaff('admin') solo a ese rol. */
-export const requiereStaff = (...roles) => (req, _res, next) => {
-  if (!req.usuario) throw noAutenticado();
-  if (req.usuario.tipo !== 'staff') throw sinPermiso('Esta sección es solo para el personal.');
-  if (roles.length && !roles.includes(req.usuario.rol)) throw sinPermiso();
-  next();
-};
+export const requiereStaff =
+  (...roles) =>
+  (req, _res, next) => {
+    if (!req.usuario) throw noAutenticado();
+    if (req.usuario.tipo !== 'staff') throw sinPermiso('Esta sección es solo para el personal.');
+    if (roles.length && !roles.includes(req.usuario.rol)) throw sinPermiso();
+    next();
+  };
 
 export function requiereCliente(req, _res, next) {
   if (!req.usuario) throw noAutenticado();

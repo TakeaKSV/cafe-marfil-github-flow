@@ -10,17 +10,30 @@ const dosDigitos = (n) => String(n).padStart(2, '0');
 const capitalizar = (texto) => texto.charAt(0).toUpperCase() + texto.slice(1);
 
 const fmtFechaLocal = new Intl.DateTimeFormat('en-CA', {
-  timeZone: zona, year: 'numeric', month: '2-digit', day: '2-digit'
+  timeZone: zona,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit'
 });
 const fmtDesfase = new Intl.DateTimeFormat('en-US', { timeZone: zona, timeZoneName: 'longOffset' });
 const fmtHoraLocal = new Intl.DateTimeFormat('en-GB', {
-  timeZone: zona, hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+  timeZone: zona,
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23'
 });
 const fmtFechaLarga = new Intl.DateTimeFormat('es-MX', {
-  timeZone: 'UTC', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+  timeZone: 'UTC',
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric'
 });
 const fmtFechaCorta = new Intl.DateTimeFormat('es-MX', {
-  timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short'
+  timeZone: 'UTC',
+  weekday: 'short',
+  day: 'numeric',
+  month: 'short'
 });
 
 export const ahoraISO = () => new Date().toISOString();

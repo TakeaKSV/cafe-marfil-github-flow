@@ -6,7 +6,7 @@
 --   * Fechas de calendario: DATE. Horas de reloj: TIME.
 --   * Marcas de tiempo (creado_en, inicio, fin...): DATETIME(3) siempre en UTC.
 --   * Booleanos: TINYINT(1). Listas simples de texto: columna JSON.
---   * Todo el archivo es idempotente (IF NOT EXISTS): se aplica en cada arranque.
+--   * Snapshot 1.1.0 idempotente: solo lo ejecuta la migración inicial.
 --   * El orden importa: una tabla debe existir antes de que otra la referencie.
 -- ==========================================================================
 
