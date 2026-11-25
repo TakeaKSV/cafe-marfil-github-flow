@@ -13,7 +13,8 @@ import {
   Coffee,
   CheckCircle2,
   ChevronDown,
-  Check
+  Check,
+  Sparkles
 } from 'lucide-react';
 import { playSound } from '../utils/audioFeedback';
 
@@ -55,6 +56,7 @@ export const Sidebar = ({
     { id: 'floorplan', label: 'Mesas en Vivo', icon: LayoutGrid },
     { id: 'scanner', label: 'Escáner QR', icon: QrCode },
     { id: 'menu', label: 'Menú & Cocina', icon: UtensilsCrossed },
+    { id: 'activities', label: 'Actividades', icon: Sparkles },
     { id: 'promotions', label: 'Promociones', icon: Tag },
     { id: 'ludoteca', label: 'Ludoteca', icon: Dice5 },
     { id: 'staff', label: 'Personal & Turnos', icon: Users }
