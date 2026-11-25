@@ -17,6 +17,7 @@ import MyReservationsScreen from './screens/MyReservationsScreen';
 import BranchesScreen from './screens/BranchesScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import AuthScreen from './screens/AuthScreen';
+import EmailFlowScreen from './screens/EmailFlowScreen';
 import HeroSection from './components/HeroSection';
 import MenuScreen from './screens/MenuScreen';
 
@@ -33,8 +34,17 @@ import {
 } from './api/adaptadores';
 
 export default function App() {
-  // 1. Estado de Pantalla Activa con soporte para URL /hero, /menu o hashes
+  const [emailToken, setEmailToken] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('verificar') || params.get('restablecer') || '';
+  });
+  const [reenviandoVerif, setReenviandoVerif] = useState(false);
+
+  // 1. Estado de Pantalla Activa con soporte para URL /hero, /menu, ?verificar o ?restablecer
   const [activeScreen, setActiveScreen] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('verificar')) return 'verificar_correo';
+    if (params.get('restablecer')) return 'restablecer_password';
     const path = window.location.pathname.toLowerCase();
     const hash = window.location.hash.toLowerCase();
     if (path === '/hero' || hash === '#/hero' || hash === '#hero') {
@@ -45,6 +55,19 @@ export default function App() {
     }
     return 'inicio';
   });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const verificado = params.get('verificado');
+    if (verificado === 'ok') {
+      setAviso('¡Tu correo electrónico fue verificado con éxito!');
+    } else if (verificado === 'error') {
+      setAviso('El enlace de verificación no es válido o ya expiró.');
+    }
+    if (params.has('verificar') || params.has('restablecer') || params.has('verificado')) {
+      window.history.replaceState({}, '', window.location.pathname || '/');
+    }
+  }, []);
 
   // Escuchar cambios de URL (popstate y hashchange) para soportar /hero y /menu
   useEffect(() => {
@@ -190,8 +213,34 @@ export default function App() {
   };
   const iniciarSesion = async (email, password) =>
     entrar(await api('/auth/clientes/login', { metodo: 'POST', body: { email, password } }));
-  const crearCuenta = async (datos) =>
-    entrar(await api('/auth/clientes/registro', { metodo: 'POST', body: datos }));
+  const crearCuenta = async (datos) => {
+    const respuesta = await api('/auth/clientes/registro', { metodo: 'POST', body: datos });
+    await entrar(respuesta);
+    setAviso('¡Cuenta creada! Revisa tu correo electrónico para confirmar tu dirección.');
+  };
+
+  const handleReenviarVerificacion = async () => {
+    if (reenviandoVerif) return;
+    setReenviandoVerif(true);
+    try {
+      const resp = await api('/auth/verificacion/reenviar', { metodo: 'POST' });
+      setAviso(resp?.mensaje || 'Te enviamos un nuevo correo de verificación.');
+      if (resp?.yaVerificado) {
+        const me = await api('/auth/me').catch(() => null);
+        if (me?.cliente) setCliente(me.cliente);
+      }
+    } catch (error) {
+      setAviso(error.message);
+    } finally {
+      setReenviandoVerif(false);
+    }
+  };
+
+  const handleCorreoVerificado = useCallback((clienteActualizado) => {
+    if (clienteActualizado) {
+      setCliente((prev) => (prev && prev.id === clienteActualizado.id ? clienteActualizado : prev));
+    }
+  }, []);
 
   const cerrarSesion = () => {
     sesion.cerrar();
@@ -352,6 +401,25 @@ export default function App() {
         openNotifications={() => setIsNotifDrawerOpen(true)}
       />
 
+      {/* Banner de verificación pendiente de correo */}
+      {perfil && perfil.correo && !perfil.emailVerificado && activeScreen !== 'hero' && (
+        <div className="w-full bg-[#FCEAE9] border-b border-[#E12927]/30 px-4 py-2.5 mt-[72px] -mb-[72px] relative z-30">
+          <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-3">
+            <p className="font-body text-xs sm:text-sm text-[#1F1410] font-medium m-0">
+              <strong className="text-[#E12927]">Verifica tu correo electrónico ({perfil.correo})</strong> para poder canjear tus beneficios Club Marfil en sucursal.
+            </p>
+            <button
+              type="button"
+              onClick={handleReenviarVerificacion}
+              disabled={reenviandoVerif}
+              className="px-3.5 py-1.5 rounded-md bg-[#E12927] hover:bg-[#C81E1C] text-white font-mono text-[11px] font-bold uppercase tracking-wider cursor-pointer disabled:opacity-60 transition-colors"
+            >
+              {reenviandoVerif ? 'Enviando...' : 'Reenviar correo'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Contenido Principal con Enrutador React */}
       <main className={activeScreen === 'hero' || activeScreen === 'inicio' ? 'w-full p-0 m-0 max-w-none flex-1' : 'main-content'} id="main-content">
         {!catalogoListo && activeScreen !== 'hero' && (
@@ -473,11 +541,14 @@ export default function App() {
             <BenefitsScreen
               perfil={perfil}
               beneficios={beneficios}
+              onResendVerification={handleReenviarVerificacion}
+              resendingVerification={reenviandoVerif}
             />
           ) : (
             <AuthScreen
               onLogin={iniciarSesion}
               onRegister={crearCuenta}
+              onForgotPassword={() => navigateTo('olvide_password')}
               motivo="Inicia sesión para ver tu pasaporte de sellos y tus beneficios."
             />
           )
@@ -527,7 +598,47 @@ export default function App() {
 
         {/* PERFIL DEL CLIENTE */}
         {activeScreen === 'perfil' && !perfil && (
-          <AuthScreen onLogin={iniciarSesion} onRegister={crearCuenta} />
+          <AuthScreen
+            onLogin={iniciarSesion}
+            onRegister={crearCuenta}
+            onForgotPassword={() => navigateTo('olvide_password')}
+          />
+        )}
+        {activeScreen === 'verificar_correo' && (
+          <EmailFlowScreen
+            modo="verificar"
+            token={emailToken}
+            onVerified={handleCorreoVerificado}
+            onGoLogin={() => {
+              setEmailToken('');
+              navigateTo('perfil');
+            }}
+            onGoHome={() => {
+              setEmailToken('');
+              navigateTo('inicio');
+            }}
+          />
+        )}
+        {activeScreen === 'olvide_password' && (
+          <EmailFlowScreen
+            modo="olvide"
+            onGoLogin={() => navigateTo('perfil')}
+            onGoHome={() => navigateTo('inicio')}
+          />
+        )}
+        {activeScreen === 'restablecer_password' && (
+          <EmailFlowScreen
+            modo="restablecer"
+            token={emailToken}
+            onGoLogin={() => {
+              setEmailToken('');
+              navigateTo('perfil');
+            }}
+            onGoHome={() => {
+              setEmailToken('');
+              navigateTo('inicio');
+            }}
+          />
         )}
         {activeScreen === 'perfil' && perfil && (
           <ProfileScreen

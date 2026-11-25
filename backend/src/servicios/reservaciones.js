@@ -17,6 +17,7 @@ import { ahoraISO, fechaEnFrase, fechaTexto, horaTexto, hoyLocal, minutosDelDia 
 
 import { lugaresOcupados, obtenerActividad } from './actividades.js';
 import { crearNotificacion, registrarEscaneo } from './bitacora.js';
+import { enviarCancelacionReservacion, enviarConfirmacionReservacion } from './correo.js';
 import { abrirServicio, cerrarServicio } from './mesas.js';
 import { exigirSucursal } from './sucursales.js';
 
@@ -168,8 +169,8 @@ async function validarCupo({ id }, fecha, personas, excluirReservacionId = 0) {
  *   personalId  host que la registra desde el panel (puede asignar mesa)
  * Sin ninguno de los dos es una reservación de invitado.
  */
-export function crearReservacion(datos, { clienteId = null, personalId = null } = {}) {
-  return enTransaccion(async () => {
+export async function crearReservacion(datos, { clienteId = null, personalId = null } = {}) {
+  const creada = await enTransaccion(async () => {
     let { sucursalId, fecha, hora } = datos;
     let actividad = null;
 
@@ -236,6 +237,21 @@ export function crearReservacion(datos, { clienteId = null, personalId = null } 
     });
     return creada;
   });
+
+  if (creada.email) {
+    await enviarConfirmacionReservacion({
+      email: creada.email,
+      nombre: creada.comensal,
+      folio: creada.folio,
+      sucursalNombre: creada.sucursalNombre,
+      fechaTexto: creada.fechaTexto,
+      horaTexto: creada.horaTexto,
+      personas: creada.personas,
+      tipoNombre: creada.tipoNombre,
+      tokenQR: creada.tokenQR
+    }).catch(() => {});
+  }
+  return creada;
 }
 
 /** Edita una reservación que aún no inicia (solo en estado "confirmada"). */
@@ -347,8 +363,8 @@ export function completarReservacion(folio, { ticketTotal } = {}) {
 }
 
 /** `clienteId`: si se pasa, la reservación debe ser de ese cliente (cancelación desde la PWA). */
-export function cancelarReservacion(folio, { clienteId } = {}) {
-  return enTransaccion(async () => {
+export async function cancelarReservacion(folio, { clienteId } = {}) {
+  const cancelada = await enTransaccion(async () => {
     const fila = await filaPorFolioBloqueada(folio);
     if (clienteId !== undefined && fila.cliente_id !== clienteId) {
       throw noEncontrado(`No existe una reservación con el folio ${folio}.`);
@@ -364,6 +380,18 @@ export function cancelarReservacion(folio, { clienteId } = {}) {
     });
     return obtenerReservacion(fila.folio);
   });
+
+  if (cancelada.email) {
+    await enviarCancelacionReservacion({
+      email: cancelada.email,
+      nombre: cancelada.comensal,
+      folio: cancelada.folio,
+      sucursalNombre: cancelada.sucursalNombre,
+      fechaTexto: cancelada.fechaTexto,
+      horaTexto: cancelada.horaTexto
+    }).catch(() => {});
+  }
+  return cancelada;
 }
 
 export function marcarNoShow(folio) {

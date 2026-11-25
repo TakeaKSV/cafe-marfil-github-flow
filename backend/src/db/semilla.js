@@ -17,7 +17,7 @@ import { cifrarPassword } from '../utils/password.js';
 
 import { generarTokenQR } from '../utils/codigos.js';
 import { fechaLocal, horaLocal, hoyLocal, instanteLocal, sumarDias } from '../utils/fechas.js';
-import { consulta, enTransaccion } from './conexion.js';
+import { conexion, consulta, enTransaccion } from './conexion.js';
 
 /** Contraseña de todas las cuentas de ejemplo. Solo para desarrollo. */
 export const PASSWORD_DEMO = 'marfil2026';
@@ -635,6 +635,7 @@ export function sembrar({ soloCatalogo = false } = {}) {
 
     const cliente = {};
     if (!soloCatalogo) {
+    const tieneEmailVerificado = await conexion.schema.hasColumn('clientes', 'email_verificado_en');
     for (const c of [
       {
         clave: 'paola',
@@ -702,6 +703,7 @@ export function sembrar({ soloCatalogo = false } = {}) {
         ultima_visita: c.ultima,
         sucursal_habitual_id: c.habitual,
         preferencias: json(c.preferencias ?? {}),
+        ...(tieneEmailVerificado ? { email_verificado_en: c.email ? ahoraISO : null } : {}),
         creado_en: haceDias(150)
       });
       // Historial de sellos: una visita por renglón, la última coincide con ultima_visita.

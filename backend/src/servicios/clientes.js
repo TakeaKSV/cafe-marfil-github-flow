@@ -1,14 +1,22 @@
 // Clientes y Club Marfil: cuentas de la PWA, pasaporte de sellos y beneficios.
 
+import crypto from 'node:crypto';
 import { cifrarPassword, verificarPassword } from '../utils/password.js';
 import { config } from '../config.js';
 import { bloquearFila, enTransaccion } from '../db/conexion.js';
 import * as repo from '../repositorios/clientes.js';
+import * as repoTokens from '../repositorios/tokensCorreo.js';
 import { codigoUnico, generarCodigoBeneficio, generarCodigoClub, leerJSON } from '../utils/codigos.js';
-import { conflicto, noAutenticado, noEncontrado } from '../utils/errores.js';
+import { conflicto, noAutenticado, noEncontrado, sinPermiso, solicitudInvalida } from '../utils/errores.js';
 import { ahoraISO, fechaEnFrase, hoyLocal } from '../utils/fechas.js';
 
 import { crearNotificacion, registrarEscaneo } from './bitacora.js';
+import {
+  enviarBienvenida,
+  enviarRecuperacionPassword,
+  enviarVerificacionCorreo,
+  verificarDominioCorreo
+} from './correo.js';
 import { exigirSucursal } from './sucursales.js';
 
 // recompensa_nombre: premio del pasaporte que el cliente ya ganó y aún no canjea.
@@ -39,7 +47,8 @@ function aCliente(fila) {
     sucursalHabitualId: fila.sucursal_habitual_id,
     sucursalHabitual: fila.sucursal_habitual,
     preferencias: leerJSON(fila.preferencias, {}),
-    tieneCuenta: Boolean(fila.password_hash)
+    tieneCuenta: Boolean(fila.password_hash),
+    emailVerificado: Boolean(fila.email_verificado_en)
   };
 }
 
@@ -71,8 +80,11 @@ export async function obtenerClientePorCodigo(codigo) {
 /** Alta de cliente. Con `password` crea cuenta para la PWA; sin ella es un alta en caja. */
 export async function registrarCliente(datos) {
   if (datos.sucursalHabitualId) await exigirSucursal(datos.sucursalHabitualId);
-  if (datos.email && (await repo.emailExiste(datos.email))) {
-    throw conflicto('Ya existe una cuenta con ese correo.');
+  if (datos.email) {
+    await verificarDominioCorreo(datos.email);
+    if (await repo.emailExiste(datos.email)) {
+      throw conflicto('Ya existe una cuenta con ese correo.');
+    }
   }
 
   const codigo = await codigoUnico(generarCodigoClub, (c) => repo.codigoExiste(c));
@@ -89,6 +101,132 @@ export async function registrarCliente(datos) {
   return obtenerCliente(id);
 }
 
+const hashToken = (tokenPlano) => crypto.createHash('sha256').update(String(tokenPlano)).digest('hex');
+
+export async function emitirVerificacionCorreo(clienteId) {
+  const cliente = await obtenerCliente(clienteId);
+  if (!cliente.email) throw solicitudInvalida('Esta cuenta no tiene un correo registrado.');
+  const tokenPlano = crypto.randomBytes(32).toString('hex');
+  const ahora = ahoraISO();
+  const expiraEn = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+  await repoTokens.invalidarPendientes(cliente.id, 'verificacion', ahora);
+  await repoTokens.crear({
+    clienteId: cliente.id,
+    tokenHash: hashToken(tokenPlano),
+    tipo: 'verificacion',
+    expiraEn,
+    creadoEn: ahora
+  });
+
+  const enlace = `${config.correo.appUrl}/?verificar=${tokenPlano}`;
+  const resultado = await enviarVerificacionCorreo({
+    nombre: cliente.nombre,
+    email: cliente.email,
+    enlace
+  });
+  return { enviado: resultado.enviado, cliente };
+}
+
+export async function verificarCorreoPorToken(tokenPlano) {
+  if (!tokenPlano || typeof tokenPlano !== 'string' || tokenPlano.length < 32) {
+    throw solicitudInvalida('El enlace de verificación no es válido o está incompleto.');
+  }
+  const registro = await repoTokens.porHash(hashToken(tokenPlano));
+  if (!registro || registro.tipo !== 'verificacion') {
+    throw solicitudInvalida('El enlace de verificación no es válido o ya no existe.');
+  }
+  if (registro.usado_en) {
+    throw solicitudInvalida('Este enlace de verificación ya fue utilizado.');
+  }
+  if (new Date(registro.expira_en).getTime() < Date.now()) {
+    throw solicitudInvalida('El enlace de verificación expiró. Solicita uno nuevo desde tu perfil.');
+  }
+
+  const cliente = await enTransaccion(async () => {
+    await bloquearFila('tokens_correo', registro.id);
+    const actual = await repoTokens.porHash(hashToken(tokenPlano));
+    if (!actual || actual.usado_en) {
+      throw solicitudInvalida('Este enlace de verificación ya fue utilizado.');
+    }
+    const ahora = ahoraISO();
+    await repoTokens.marcarUsado(actual.id, ahora);
+    await repo.marcarEmailVerificado(actual.cliente_id, ahora);
+    return obtenerCliente(actual.cliente_id);
+  });
+
+  await enviarBienvenida({
+    nombre: cliente.nombre,
+    email: cliente.email,
+    codigoCliente: cliente.codigoCliente
+  });
+  return cliente;
+}
+
+export async function reenviarVerificacionCorreo(clienteId) {
+  const cliente = await obtenerCliente(clienteId);
+  if (!cliente.email) throw solicitudInvalida('Tu cuenta no tiene un correo electrónico asociado.');
+  if (cliente.emailVerificado) {
+    return { yaVerificado: true, enviado: false };
+  }
+  const { enviado } = await emitirVerificacionCorreo(cliente.id);
+  return { yaVerificado: false, enviado };
+}
+
+export async function solicitarRecuperacionPassword(email) {
+  const fila = await repo.porEmail(email);
+  if (!fila || !fila.password_hash) return { enviado: false };
+
+  const tokenPlano = crypto.randomBytes(32).toString('hex');
+  const ahora = ahoraISO();
+  const expiraEn = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
+  await repoTokens.invalidarPendientes(fila.id, 'recuperacion', ahora);
+  await repoTokens.crear({
+    clienteId: fila.id,
+    tokenHash: hashToken(tokenPlano),
+    tipo: 'recuperacion',
+    expiraEn,
+    creadoEn: ahora
+  });
+
+  const enlace = `${config.correo.appUrl}/?restablecer=${tokenPlano}`;
+  const resultado = await enviarRecuperacionPassword({
+    nombre: fila.nombre,
+    email: fila.email,
+    enlace
+  });
+  return { enviado: resultado.enviado };
+}
+
+export async function restablecerPasswordPorToken(tokenPlano, nuevaPassword) {
+  if (!tokenPlano || typeof tokenPlano !== 'string' || tokenPlano.length < 32) {
+    throw solicitudInvalida('El enlace de recuperación no es válido.');
+  }
+  const registro = await repoTokens.porHash(hashToken(tokenPlano));
+  if (!registro || registro.tipo !== 'recuperacion') {
+    throw solicitudInvalida('El enlace de recuperación no es válido o ya no existe.');
+  }
+  if (registro.usado_en) {
+    throw solicitudInvalida('Este enlace de recuperación ya fue utilizado.');
+  }
+  if (new Date(registro.expira_en).getTime() < Date.now()) {
+    throw solicitudInvalida('El enlace de recuperación expiró. Solicita uno nuevo.');
+  }
+
+  const passwordHash = await cifrarPassword(nuevaPassword);
+  await enTransaccion(async () => {
+    await bloquearFila('tokens_correo', registro.id);
+    const actual = await repoTokens.porHash(hashToken(tokenPlano));
+    if (!actual || actual.usado_en) {
+      throw solicitudInvalida('Este enlace de recuperación ya fue utilizado.');
+    }
+    await repoTokens.marcarUsado(actual.id, ahoraISO());
+    await repo.actualizarPassword(actual.cliente_id, passwordHash);
+  });
+  return { ok: true };
+}
+
 export async function autenticarCliente(email, password) {
   const fila = await repo.porEmail(email);
   const valido = await verificarPassword(password, fila?.password_hash);
@@ -97,7 +235,11 @@ export async function autenticarCliente(email, password) {
 }
 
 export async function actualizarPerfil(id, cambios) {
-  return enTransaccion(async () => {
+  let cambioEmail = false;
+  if (cambios.email) {
+    await verificarDominioCorreo(cambios.email);
+  }
+  const actualizado = await enTransaccion(async () => {
     await bloquearFila('clientes', id);
 
     const actual = await obtenerCliente(id);
@@ -105,6 +247,7 @@ export async function actualizarPerfil(id, cambios) {
       if (await repo.emailEnUso(cambios.email, id)) {
         throw conflicto('Ese correo ya está en uso por otra cuenta.');
       }
+      cambioEmail = true;
     }
     if (cambios.sucursalHabitualId) await exigirSucursal(cambios.sucursalHabitualId);
 
@@ -113,10 +256,19 @@ export async function actualizarPerfil(id, cambios) {
       ? JSON.stringify({ ...actual.preferencias, ...cambios.preferencias })
       : undefined;
 
-    await repo.actualizarClientes(id, { ...cambios, preferencias });
+    await repo.actualizarClientes(id, {
+      ...cambios,
+      preferencias,
+      ...(cambioEmail ? { emailVerificadoEn: null } : {})
+    });
 
     return obtenerCliente(id);
   });
+
+  if (cambioEmail && actualizado.email) {
+    await emitirVerificacionCorreo(id).catch(() => {});
+  }
+  return actualizado;
 }
 
 // --------------------------------------------------------------------------
@@ -260,6 +412,10 @@ export function canjearBeneficio(codigo, { personalId = null } = {}) {
     if (!encontrado) throw noEncontrado(`No existe un beneficio con el código ${codigo}.`);
     await bloquearFila('clientes', encontrado.clienteId);
     await bloquearFila('beneficios', encontrado.id);
+    const clienteActual = await obtenerCliente(encontrado.clienteId);
+    if (clienteActual.tieneCuenta && clienteActual.email && !clienteActual.emailVerificado) {
+      throw sinPermiso('El cliente debe verificar su correo electrónico antes de canjear beneficios.');
+    }
     const beneficio = await buscarBeneficioPorCodigo(codigo); // estado real, ya con la fila bloqueada
 
     if (beneficio.estado === 'usado') throw conflicto('Este beneficio ya fue canjeado.');

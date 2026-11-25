@@ -171,6 +171,7 @@ export const aPerfil = (c) => ({
   sellosActuales: c.sellosActuales,
   sellosTotalesParaMeta: c.sellosMeta,
   puntosFidelidad: c.puntos,
+  emailVerificado: Boolean(c.emailVerificado),
   preferencias: {
     ...c.preferencias,
     cafeFavorito: c.preferencias.cafeFavorito ?? c.preferencias.bebidaFavorita,

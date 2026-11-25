@@ -22,6 +22,9 @@ process.env.DB_NAME = 'cafe_marfil_test';
 process.env.DB_RESET_CONFIRM = process.env.DB_NAME;
 process.env.AUTH_RATE_LIMIT_MAX = '1000';
 process.env.PUBLIC_WRITE_RATE_LIMIT_MAX = '1000';
+process.env.MAIL_RESEND_RATE_LIMIT_MAX = '1000';
+process.env.MAIL_ENABLED = 'false';
+process.env.MAIL_CHECK_MX = 'false';
 process.env.RATE_LIMIT_MAX = '100000';
 process.env.JWT_SECRET = 'secreto-solo-para-pruebas';
 
@@ -29,6 +32,8 @@ const { cerrarConexion } = await import('../src/db/conexion.js');
 const { borrarTodo, prepararBase } = await import('../src/db/mantenimiento.js');
 const { crearApp } = await import('../src/app.js');
 const { PASSWORD_DEMO, sembrar } = await import('../src/db/semilla.js');
+const { establecerTransporteCorreo, restaurarTransporteCorreo } = await import('../src/servicios/correo.js');
+const { otorgarBeneficio } = await import('../src/servicios/clientes.js');
 const { hoyLocal, sumarDias } = await import('../src/utils/fechas.js');
 const { config } = await import('../src/config.js');
 
@@ -1123,4 +1128,123 @@ test('una promoción con sucursal inválida revierte toda su creación', async (
   });
   assert.equal(alta.status, 404);
   assert.equal((await api('GET', '/promociones/MF-PROMO-ROLLBACK', { token: sesion.admin })).status, 404);
+});
+
+test('correos: verificación de registro, bloqueo de canje sin verificar, recuperación y reservaciones', async () => {
+  const bandeja = [];
+  establecerTransporteCorreo({
+    async sendMail(msg) {
+      bandeja.push(msg);
+      return { messageId: `<test-${bandeja.length}@marfil.local>` };
+    }
+  });
+
+  try {
+    // 1. Correo temporal rechazado en registro.
+    const temporal = await api('POST', '/auth/clientes/registro', {
+      body: { nombre: 'Temporal', email: 'uno@mailinator.com', password: 'password123' }
+    });
+    assert.equal(temporal.status, 400);
+
+    // 2. Registro válido envía correo de verificación y crea cliente no verificado.
+    const registro = await api('POST', '/auth/clientes/registro', {
+      body: {
+        nombre: 'Camila Verificada',
+        email: 'camila.verif@example.com',
+        password: 'password123',
+        telefono: '618-222-3344'
+      }
+    });
+    assert.equal(registro.status, 201);
+    assert.equal(registro.datos.cliente.emailVerificado, false);
+    assert.equal(registro.datos.verificacionEnviada, true);
+    assert.equal(bandeja.length, 1);
+    assert.match(bandeja[0].subject, /Verifica tu correo/);
+    const tokenVerif = /\?verificar=([a-f0-9]{64})/.exec(bandeja[0].text)?.[1];
+    assert.ok(tokenVerif, 'el correo debe incluir el token de verificación');
+
+    // 3. Cuenta no verificada no puede canjear beneficios en caja.
+    const beneficio = await otorgarBeneficio(registro.datos.cliente.id, {
+      titulo: 'Café Americano Gratis',
+      origen: 'manual'
+    });
+    const canjeBloqueado = await api('POST', `/club/beneficios/${beneficio.codigo}/canjear`, {
+      token: sesion.host
+    });
+    assert.equal(canjeBloqueado.status, 403);
+
+    // 4. Token inválido falla con 400; token válido verifica, envía bienvenida y no puede reusarse.
+    assert.equal((await api('GET', '/auth/verificar?token=invalido&formato=json')).status, 400);
+
+    const verificado = await api('GET', `/auth/verificar?token=${tokenVerif}&formato=json`);
+    assert.equal(verificado.status, 200);
+    assert.equal(verificado.datos.cliente.emailVerificado, true);
+    assert.equal(bandeja.length, 2);
+    assert.match(bandeja[1].subject, /activa/);
+
+    // Reutilizar el mismo token falla.
+    assert.equal((await api('GET', `/auth/verificar?token=${tokenVerif}&formato=json`)).status, 400);
+
+    // Ya verificada, sí puede canjear su beneficio.
+    const canjeOk = await api('POST', `/club/beneficios/${beneficio.codigo}/canjear`, {
+      token: sesion.host
+    });
+    assert.equal(canjeOk.status, 200);
+
+    // Reenviar en cuenta ya verificada responde yaVerificado: true sin enviar nuevo correo.
+    const reenvioYa = await api('POST', '/auth/verificacion/reenviar', { token: registro.datos.token });
+    assert.equal(reenvioYa.status, 200);
+    assert.equal(reenvioYa.datos.yaVerificado, true);
+
+    // 5. Olvidé contraseña: no revela correos inexistentes, envía enlace a existentes y revoca sesiones.
+    const inexistente = await api('POST', '/auth/password/olvide', {
+      body: { email: 'no.existe@example.com' }
+    });
+    assert.equal(inexistente.status, 200);
+    assert.equal(bandeja.length, 2);
+
+    const olvide = await api('POST', '/auth/password/olvide', {
+      body: { email: 'camila.verif@example.com' }
+    });
+    assert.equal(olvide.status, 200);
+    assert.equal(bandeja.length, 3);
+    const tokenReset = /\?restablecer=([a-f0-9]{64})/.exec(bandeja[2].text)?.[1];
+    assert.ok(tokenReset);
+
+    const reset = await api('POST', '/auth/password/restablecer', {
+      body: { token: tokenReset, password: 'nuevaPassword99' }
+    });
+    assert.equal(reset.status, 200);
+
+    // El token JWT anterior quedó revocado por session_version++.
+    assert.equal((await api('GET', '/auth/me', { token: registro.datos.token })).status, 401);
+    // El enlace de recuperación no se puede reutilizar.
+    assert.equal(
+      (await api('POST', '/auth/password/restablecer', { body: { token: tokenReset, password: 'otraPassword88' } })).status,
+      400
+    );
+    // Inicia sesión con la nueva contraseña.
+    const nuevoLogin = await api('POST', '/auth/clientes/login', {
+      body: { email: 'camila.verif@example.com', password: 'nuevaPassword99' }
+    });
+    assert.equal(nuevoLogin.status, 200);
+
+    // 6. Reservación + cancelación envían correos transaccionales.
+    const resCreada = await api('POST', '/reservaciones', {
+      token: nuevoLogin.datos.token,
+      body: { sucursalId: 'calvario', fecha: MANANA, hora: '10:30', personas: 2 }
+    });
+    assert.equal(resCreada.status, 201);
+    assert.equal(bandeja.length, 4);
+    assert.match(bandeja[3].subject, new RegExp(resCreada.datos.folio));
+
+    const resCancelada = await api('POST', `/mi/reservaciones/${resCreada.datos.folio}/cancelar`, {
+      token: nuevoLogin.datos.token
+    });
+    assert.equal(resCancelada.status, 200);
+    assert.equal(bandeja.length, 5);
+    assert.match(bandeja[4].subject, /cancelada/i);
+  } finally {
+    restaurarTransporteCorreo();
+  }
 });

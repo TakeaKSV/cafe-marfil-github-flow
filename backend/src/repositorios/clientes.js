@@ -79,10 +79,16 @@ const CAMPOS_CLIENTES = {
   telefono: 'telefono',
   ciudad: 'ciudad',
   sucursalHabitualId: 'sucursal_habitual_id',
-  preferencias: 'preferencias'
+  preferencias: 'preferencias',
+  emailVerificadoEn: 'email_verificado_en'
 };
 
 export const actualizarClientes = (id, cambios) => actualizar('clientes', id, mapearCampos(cambios, CAMPOS_CLIENTES));
+
+export const marcarEmailVerificado = (id, ahora) => actualizar('clientes', id, { email_verificado_en: ahora });
+
+export const actualizarPassword = (id, passwordHash) =>
+  consulta('clientes').where({ id }).update({ password_hash: passwordHash }).increment('session_version', 1);
 
 export const porId = (id) => clientes().where('c.id', id).first();
 
