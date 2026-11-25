@@ -39,7 +39,11 @@ const esquema = z.object({
   MAIL_FROM: z.string().default('Café Marfil <no-reply@cafemarfil.mx>'),
   APP_URL: z.string().default('http://localhost:5173'),
   MAIL_ENABLED: z.string().optional(),
-  MAIL_CHECK_MX: z.string().optional()
+  MAIL_CHECK_MX: z.string().optional(),
+  CLOUDINARY_CLOUD_NAME: z.string().default(''),
+  CLOUDINARY_API_KEY: z.string().default(''),
+  CLOUDINARY_API_SECRET: z.string().default(''),
+  CLOUDINARY_FOLDER: z.string().default('cafe-marfil')
 });
 
 export function cargarConfig(env) {
@@ -120,6 +124,12 @@ export function cargarConfig(env) {
       password: datos.SMTP_PASS,
       remitente: datos.MAIL_FROM,
       appUrl: datos.APP_URL.replace(/\/+$/, '')
+    },
+    cloudinary: {
+      cloudName: datos.CLOUDINARY_CLOUD_NAME.trim(),
+      apiKey: datos.CLOUDINARY_API_KEY.trim(),
+      apiSecret: datos.CLOUDINARY_API_SECRET.trim(),
+      folder: datos.CLOUDINARY_FOLDER.trim() || 'cafe-marfil'
     },
     zonaHoraria: datos.ZONA_HORARIA,
     ticketEstimadoPorPersona: 180,

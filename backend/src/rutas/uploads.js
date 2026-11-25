@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { Router } from 'express';
 import multer from 'multer';
 import { requiereStaff } from '../middleware/auth.js';
+import { cloudinaryConfigurado, normalizarCarpeta, subirACloudinary } from '../servicios/cloudinary.js';
 import { solicitudInvalida } from '../utils/errores.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -41,38 +42,64 @@ const upload = multer({
 const router = Router();
 const soloGerencia = requiereStaff('admin', 'gerente');
 
-router.post('/imagen', soloGerencia, (req, res, next) => {
-  upload.single('imagen')(req, res, (err) => {
-    if (err instanceof multer.MulterError) {
-      if (err.code === 'LIMIT_FILE_SIZE') {
-        return next(solicitudInvalida('La imagen supera el límite máximo de 2 MB.'));
+router.post(
+  '/imagen',
+  soloGerencia,
+  (req, res, next) => {
+    upload.single('imagen')(req, res, (err) => {
+      if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return next(solicitudInvalida('La imagen supera el límite máximo de 2 MB.'));
+        }
+        return next(solicitudInvalida('Error al procesar el archivo enviado.'));
       }
-      return next(solicitudInvalida('Error al procesar el archivo enviado.'));
+      if (err) return next(err);
+      return next();
+    });
+  },
+  async (req, res) => {
+    const archivo = req.file;
+    if (!archivo) throw solicitudInvalida('Debes adjuntar un archivo en el campo "imagen".');
+    if (!MIME_PERMITIDOS.has(archivo.mimetype)) {
+      throw solicitudInvalida('Formato no permitido. Solo se aceptan imágenes JPG, PNG o WebP.');
     }
-    if (err) return next(err);
-    return next();
-  });
-}, async (req, res) => {
-  const archivo = req.file;
-  if (!archivo) throw solicitudInvalida('Debes adjuntar un archivo en el campo "imagen".');
-  if (!MIME_PERMITIDOS.has(archivo.mimetype)) {
-    throw solicitudInvalida('Formato no permitido. Solo se aceptan imágenes JPG, PNG o WebP.');
-  }
-  const extReal = detectarExtensionReal(archivo.buffer);
-  if (!extReal) {
-    throw solicitudInvalida('El archivo no corresponde a una imagen JPG, PNG o WebP válida.');
-  }
+    const extReal = detectarExtensionReal(archivo.buffer);
+    if (!extReal) {
+      throw solicitudInvalida('El archivo no corresponde a una imagen JPG, PNG o WebP válida.');
+    }
 
-  await fs.mkdir(DIR_UPLOADS, { recursive: true });
-  const nombre = `${crypto.randomUUID()}.${extReal}`;
-  await fs.writeFile(path.join(DIR_UPLOADS, nombre), archivo.buffer);
+    const carpeta = normalizarCarpeta(req.query.carpeta || req.body?.carpeta);
 
-  res.status(201).json({
-    url: `/uploads/${nombre}`,
-    archivo: nombre,
-    tamano: archivo.size,
-    tipo: archivo.mimetype
-  });
-});
+    if (cloudinaryConfigurado()) {
+      const subida = await subirACloudinary({
+        buffer: archivo.buffer,
+        mimetype: archivo.mimetype,
+        nombreArchivo: `${crypto.randomUUID()}.${extReal}`,
+        carpeta
+      });
+      return res.status(201).json({
+        url: subida.url,
+        publicId: subida.publicId,
+        carpeta,
+        proveedor: 'cloudinary',
+        tamano: archivo.size,
+        tipo: archivo.mimetype
+      });
+    }
+
+    await fs.mkdir(DIR_UPLOADS, { recursive: true });
+    const nombre = `${crypto.randomUUID()}.${extReal}`;
+    await fs.writeFile(path.join(DIR_UPLOADS, nombre), archivo.buffer);
+
+    return res.status(201).json({
+      url: `/uploads/${nombre}`,
+      archivo: nombre,
+      carpeta,
+      proveedor: 'local',
+      tamano: archivo.size,
+      tipo: archivo.mimetype
+    });
+  }
+);
 
 export default router;
