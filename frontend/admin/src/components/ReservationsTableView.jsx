@@ -195,8 +195,8 @@ export const ReservationsTableView = ({
       <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
         
         {/* Card 1: Total Reservaciones del Día */}
-        <div className="md:col-span-5 bg-white p-6 rounded-2xl border border-[#1F1410]/8 shadow-xs flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-[#EEF2FF] border border-[#6366F1]/20 flex items-center justify-center text-[#4338CA] shrink-0">
+        <div className="md:col-span-5 admin-surface p-6 flex items-center gap-4 hover-lift">
+          <div className="w-12 h-12 rounded-2xl bg-[#FCEAE9] border border-[#E12927]/15 flex items-center justify-center text-[#E12927] shrink-0">
             <CalendarDays className="w-6 h-6" />
           </div>
           <div>
@@ -212,8 +212,8 @@ export const ReservationsTableView = ({
           </div>
         </div>
 
-        {/* Card 2: Códigos Escaneados & Segmented Progress Bar (Idéntico a Zendenta) */}
-        <div className="md:col-span-7 bg-white p-6 rounded-2xl border border-[#1F1410]/8 shadow-xs flex flex-col justify-between">
+        {/* Card 2: Códigos Escaneados & Segmented Progress Bar */}
+        <div className="md:col-span-7 admin-surface p-6 flex flex-col justify-between hover-lift">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-baseline gap-2">
               <span className="font-display font-bold text-2xl text-[#1F1410]">
@@ -369,15 +369,15 @@ export const ReservationsTableView = ({
         {reservaciones.length >= 500 && ' · Se muestran hasta 500 registros. Elige una fecha para acotar la consulta.'}
       </p>
 
-      {/* 4. Tabla de Datos Estilo Zendenta (Filas suaves, espaciosas y redondeadas) */}
-      <div className="bg-white rounded-2xl border border-[#1F1410]/8 overflow-hidden shadow-xs">
+      {/* 4. Tabla de Datos Moderna Café Marfil */}
+      <div className="admin-table-shell">
         {cargando ? (
           <SkeletonTable filas={6} />
         ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             
-            <thead className="border-b border-[#1F1410]/8 text-[#1F1410]/40 font-mono uppercase tracking-wider text-[10px]">
+            <thead className="font-mono uppercase tracking-wider text-[10px]">
               <tr>
                 <th className="py-3.5 px-5 w-10">
                   <input

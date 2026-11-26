@@ -616,7 +616,7 @@ export function App() {
   }
 
   return (
-    <div className="h-screen w-screen bg-[#F8FAFC] flex overflow-hidden font-body selection:bg-[#E12927] selection:text-white">
+    <div className="h-screen w-screen bg-[#F8F5F1] flex overflow-hidden font-body selection:bg-[#E12927] selection:text-white">
 
       {/* Sidebar Lateral Fijo: Siempre visible al 100%, nunca cambia de posición con el scroll */}
       <Sidebar
@@ -633,7 +633,7 @@ export function App() {
         />
 
         {/* Área Central de Contenido con scroll independiente (el sidebar NO se mueve) */}
-        <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-[#F8FAFC]">
+        <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-[#F8F5F1]">
 
           {/* Topbar Superior Fijo */}
           <Topbar

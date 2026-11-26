@@ -1,151 +1,219 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import gsap from 'gsap';
 import {
   Calendar,
   Clock,
   MapPin,
-  ArrowLeft,
+  X,
   CalendarPlus,
-  Compass,
-  Sparkles,
   CheckCircle2,
   Users
 } from 'lucide-react';
 import { sounds } from '../utils/audio';
 
 export default function ActivityDetailScreen({ activity, onBack, onBookActivity }) {
+  const modalRef = useRef(null);
+
+  useEffect(() => {
+    if (!activity) return undefined;
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') onBack();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    let tween;
+    if (modalRef.current) {
+      tween = gsap.fromTo(
+        modalRef.current,
+        { y: 24, scale: 0.95, opacity: 0 },
+        { y: 0, scale: 1, opacity: 1, duration: 0.35, ease: 'power3.out' }
+      );
+    }
+
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = prevOverflow;
+      if (tween) tween.kill();
+    };
+  }, [activity, onBack]);
+
   if (!activity) return null;
 
   const isFull = activity.lugaresDisponibles <= 0;
-  const percentOccupied = Math.round((activity.lugaresOcupados / activity.cupoTotal) * 100);
+  const percentOccupied = activity.cupoTotal
+    ? Math.min(100, Math.round((activity.lugaresOcupados / activity.cupoTotal) * 100))
+    : 0;
+
+  const handleClose = () => {
+    sounds.playClick();
+    onBack();
+  };
 
   const handleBook = () => {
     sounds.playClick();
     onBookActivity(activity);
   };
 
-  return (
-    <div className="flex flex-col gap-6 fade-in pb-16">
-      {/* Botón Volver */}
-      <button
-        className="inline-flex items-center gap-2 font-mono text-xs font-bold text-[#8E7A74] hover:text-[#E12927] transition-colors cursor-pointer self-start"
-        onClick={() => {
-          sounds.playClick();
-          onBack();
-        }}
-      >
-        <ArrowLeft size={16} />
-        <span>VOLVER A ACTIVIDADES</span>
-      </button>
+  const incluyeLista = Array.isArray(activity.incluye) ? activity.incluye : [];
 
-      {/* Grid Principal HeroUI Layout 100% Sólido */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_1.3fr] gap-8 items-start">
-        {/* Columna Izquierda: Imagen y Datos Rápidos */}
-        <div className="flex flex-col gap-5">
-          <div className="relative rounded-lg overflow-hidden bg-stone-100 shadow-md border-2 border-stone-300 aspect-4/3">
-            <img src={activity.imagen} alt={activity.nombre} className="w-full h-full object-cover" />
-            <div className="absolute top-4 left-4 right-4 flex items-center justify-between pointer-events-none">
-              <span className="px-4 py-1.5 rounded-sm font-mono text-xs font-bold uppercase tracking-wider bg-[#1F1410] text-white shadow-md">
-                {activity.categoria}
-              </span>
-              <span className="px-4 py-1.5 rounded-sm font-mono text-xs font-bold uppercase tracking-wider bg-[#E12927] text-white shadow-md border border-[#E12927]">
-                {activity.precio}
-              </span>
-            </div>
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9990] bg-[#1F1410]/65 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-5"
+      onClick={handleClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={activity.nombre}
+    >
+      <div
+        ref={modalRef}
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-w-4xl max-h-[92dvh] bg-white rounded-t-[28px] sm:rounded-[28px] shadow-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-12"
+      >
+        {/* Botón cerrar flotante */}
+        <button
+          type="button"
+          onClick={handleClose}
+          aria-label="Cerrar detalle de actividad"
+          className="absolute top-3.5 right-3.5 z-30 w-9 h-9 rounded-full bg-white/90 hover:bg-white text-[#1F1410] hover:text-[#E12927] shadow-md flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer"
+        >
+          <X size={19} strokeWidth={2.4} />
+        </button>
+
+        {/* Columna Izquierda / Superior: Foto Full-Bleed + Cupo en vivo */}
+        <div className="relative lg:col-span-5 h-56 sm:h-64 lg:h-auto lg:min-h-[460px] bg-[#1F1410] overflow-hidden">
+          <img
+            src={activity.imagen}
+            alt={activity.nombre}
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/15 pointer-events-none" />
+
+          {/* Categoría arriba */}
+          <div className="absolute top-4 left-4 flex items-center gap-2">
+            <span className="px-3 py-1 rounded-full bg-black/45 backdrop-blur-md border border-white/15 text-white text-[11px] font-semibold">
+              {activity.categoria}
+            </span>
           </div>
 
-          {/* Tarjeta de Disponibilidad de Cupo */}
-          <div className="bg-white rounded-lg border-2 border-stone-300 p-6 shadow-md flex flex-col gap-3">
-            <div className="flex items-start justify-between">
-              <div>
-                <span className="block font-mono text-[11px] font-bold text-[#8E7A74] uppercase tracking-wider">DISPONIBILIDAD EN SALA</span>
-                <h4 className="font-display text-lg font-bold text-[#1F1410] mt-0.5">
-                  {isFull ? 'Cupo agotado' : `Quedan ${activity.lugaresDisponibles} de ${activity.cupoTotal} lugares`}
-                </h4>
-              </div>
-              <span className="font-mono text-xs font-bold text-[#E12927]">{percentOccupied}% ocupado</span>
+          {/* Tarjeta translúcida de disponibilidad sobre la foto */}
+          <div className="absolute inset-x-4 bottom-4 rounded-2xl bg-black/45 backdrop-blur-md border border-white/15 p-3.5 text-white text-left">
+            <div className="flex items-center justify-between text-xs mb-1.5">
+              <span className="font-semibold">
+                {isFull
+                  ? 'Cupo agotado'
+                  : `Quedan ${activity.lugaresDisponibles} de ${activity.cupoTotal} lugares`}
+              </span>
+              <span className="text-white/80 text-[11px]">{percentOccupied}% ocupado</span>
             </div>
-
-            <div className="w-full h-3 rounded-sm bg-stone-200 overflow-hidden">
+            <div className="w-full h-2 rounded-full bg-white/20 overflow-hidden">
               <div
-                className={`h-full rounded-sm transition-all duration-500 ${percentOccupied > 85 ? 'bg-[#E12927]' : 'bg-emerald-500'
-                  }`}
+                className={`h-full rounded-full transition-all duration-500 ${
+                  percentOccupied > 85 ? 'bg-[#E12927]' : 'bg-emerald-400'
+                }`}
                 style={{ width: `${percentOccupied}%` }}
               />
             </div>
-            <p className="font-body text-xs text-[#8E7A74] m-0 font-medium">
-              * El cupo se garantiza al instante al confirmar tu reservación con nuestros anfitriones.
-            </p>
           </div>
         </div>
 
-        {/* Columna Derecha: Información Editorial */}
-        <div className="flex flex-col gap-6">
-          <div>
-            <div className="inline-flex items-center gap-1.5 font-mono text-xs font-bold text-[#E12927] tracking-wider uppercase mb-1">
-              <MapPin size={14} />
-              <span>{activity.sucursalNombre}</span>
+        {/* Columna Derecha / Inferior: Detalles + CTA */}
+        <div className="lg:col-span-7 flex flex-col max-h-[calc(92dvh-14rem)] sm:max-h-[calc(92dvh-16rem)] lg:max-h-[92dvh]">
+          <div className="flex-1 overflow-y-auto p-5 sm:p-7 flex flex-col gap-5 text-left">
+            {/* Sucursal y Título */}
+            <div className="pr-8">
+              <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#E12927] mb-1">
+                <MapPin size={14} />
+                <span>{activity.sucursalNombre}</span>
+              </div>
+              <h2 className="font-display text-2xl sm:text-3xl font-bold text-[#1F1410] leading-tight">
+                {activity.nombre}
+              </h2>
             </div>
-            <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold text-[#1F1410] tracking-tight leading-tight">
-              {activity.nombre}
-            </h1>
-          </div>
 
-          {/* Meta Cards Row */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="p-4 rounded-md bg-white border-2 border-stone-300 flex items-center gap-3 shadow-xs">
-              <Calendar size={18} className="text-[#E12927] shrink-0" />
-              <div>
-                <span className="block font-mono text-[10px] font-bold text-[#8E7A74] uppercase tracking-wider">FECHA</span>
-                <strong className="font-mono text-xs text-[#1F1410]">{activity.fecha}</strong>
+            {/* Metadatos compactos */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <div className="p-3 rounded-2xl bg-[#FAF7F5] flex items-center gap-2.5">
+                <Calendar size={16} className="text-[#E12927] shrink-0" />
+                <div className="min-w-0">
+                  <span className="block text-[10px] text-[#8E7A74] uppercase">Fecha</span>
+                  <strong className="text-xs text-[#1F1410] truncate block">{activity.fecha}</strong>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-[#FAF7F5] flex items-center gap-2.5">
+                <Clock size={16} className="text-[#E12927] shrink-0" />
+                <div className="min-w-0">
+                  <span className="block text-[10px] text-[#8E7A74] uppercase">Horario</span>
+                  <strong className="text-xs text-[#1F1410] truncate block">{activity.hora}</strong>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-[#FAF7F5] flex items-center gap-2.5">
+                <Users size={16} className="text-[#E12927] shrink-0" />
+                <div className="min-w-0">
+                  <span className="block text-[10px] text-[#8E7A74] uppercase">Duración</span>
+                  <strong className="text-xs text-[#1F1410] truncate block">{activity.duracion}</strong>
+                </div>
               </div>
             </div>
 
-            <div className="p-4 rounded-md bg-white border-2 border-stone-300 flex items-center gap-3 shadow-xs">
-              <Clock size={18} className="text-[#E12927] shrink-0" />
-              <div>
-                <span className="block font-mono text-[10px] font-bold text-[#8E7A74] uppercase tracking-wider">HORARIO</span>
-                <strong className="font-mono text-xs text-[#1F1410]">{activity.hora}</strong>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-md bg-white border-2 border-stone-300 flex items-center gap-3 shadow-xs">
-              <Users size={18} className="text-[#E12927] shrink-0" />
-              <div>
-                <span className="block font-mono text-[10px] font-bold text-[#8E7A74] uppercase tracking-wider">DURACIÓN</span>
-                <strong className="font-body text-xs text-[#1F1410] font-semibold">{activity.duracion}</strong>
-              </div>
-            </div>
-          </div>
-
-          {/* Descripción */}
-          <div className="flex flex-col gap-2">
-            <h3 className="font-display text-xl font-bold text-[#1F1410]">Sobre esta experiencia</h3>
-            <p className="font-body text-sm sm:text-base text-[#1F1410]/80 leading-relaxed font-medium">
-              {activity.descripcionCompleta}
-            </p>
-          </div>
-
-          {/* CTA Box HeroUI Banner 100% Sólido */}
-          <div className="p-6 sm:p-7 rounded-lg bg-[#FCEAE9] border-2 border-[#E12927]/40 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg">
+            {/* Descripción */}
             <div>
-              <span className="block font-mono text-[11px] font-bold text-[#8E7A74] uppercase tracking-wider">CUPO LIMITADO</span>
-              <div className="font-mono text-2xl font-bold text-[#E12927]">{activity.precio}</div>
+              <h3 className="text-sm font-bold text-[#1F1410] mb-1.5">Sobre esta experiencia</h3>
+              <p className="text-xs sm:text-sm text-[#5A4840] leading-relaxed">
+                {activity.descripcionCompleta || activity.resumen}
+              </p>
+            </div>
+
+            {/* Qué incluye */}
+            {incluyeLista.length > 0 && (
+              <div>
+                <h3 className="text-sm font-bold text-[#1F1410] mb-2">Incluye</h3>
+                <ul className="space-y-1.5 text-xs sm:text-sm text-[#5A4840]">
+                  {incluyeLista.map((item, idx) => (
+                    <li key={idx} className="flex items-start gap-2">
+                      <CheckCircle2 size={15} className="text-emerald-600 shrink-0 mt-0.5" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {activity.requisitos && (
+              <p className="text-xs text-[#8E7A74] leading-relaxed">
+                {activity.requisitos}
+              </p>
+            )}
+          </div>
+
+          {/* Barra inferior fija con precio y botón de reserva */}
+          <div className="p-4 sm:px-7 sm:py-5 border-t border-black/[0.06] bg-[#FAF9F8] flex items-center justify-between gap-4 shrink-0">
+            <div className="text-left">
+              <span className="block text-[11px] text-[#8E7A74]">Acceso / Precio</span>
+              <span className="text-xl sm:text-2xl font-bold text-[#1F1410]">{activity.precio}</span>
             </div>
 
             <button
+              type="button"
               disabled={isFull}
-              className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-md font-mono text-xs font-bold uppercase tracking-wider shadow-lg transition-all duration-200 cursor-pointer ${isFull
-                ? 'bg-stone-300 text-stone-500 cursor-not-allowed'
-                : 'bg-[#E12927] hover:bg-[#C81E1C] active:scale-95 text-white border-2 border-[#E12927] shadow-[#E12927]/30 hover:shadow-xl hover:-translate-y-0.5'
-                }`}
               onClick={handleBook}
+              className={`inline-flex items-center justify-center gap-2 px-6 py-3 rounded-2xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+                isFull
+                  ? 'bg-stone-300 text-stone-500 cursor-not-allowed'
+                  : 'bg-[#1F1410] hover:bg-[#E12927] active:scale-95 text-white shadow-md'
+              }`}
             >
               <CalendarPlus size={16} />
-              <span>{isFull ? 'Cupo lleno' : 'Apartar mis lugares'}</span>
+              <span>{isFull ? 'Cupo lleno' : 'Apartar lugares'}</span>
             </button>
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

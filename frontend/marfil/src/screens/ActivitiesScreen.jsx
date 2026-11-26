@@ -1,187 +1,142 @@
-import React, { useState } from 'react';
-import { Calendar, Clock, MapPin, Sparkles, Search, ChevronRight } from 'lucide-react';
+import React, { useRef, useEffect } from 'react';
+import gsap from 'gsap';
+import { ChevronRight } from 'lucide-react';
 import { sounds } from '../utils/audio';
 
+const EMOJIS_CATEGORIA = {
+  cine: '🎬',
+  talleres: '🎨',
+  musica: '🎵',
+  juegos: '🎲',
+  privados: '🎉',
+  temporada: '🎄'
+};
+
+function emojiParaActividad(act) {
+  return EMOJIS_CATEGORIA[act?.categoriaSlug] || '';
+}
+
 export default function ActivitiesScreen({
-  actividades,
-  sucursales,
+  actividades = [],
   onSelectActivity
 }) {
-  const [selectedCategory, setSelectedCategory] = useState('todas');
-  const [selectedSucursal, setSelectedSucursal] = useState('todas');
-  const [searchTerm, setSearchTerm] = useState('');
+  const gridRef = useRef(null);
 
-  const categorias = [
-    { id: 'todas', label: 'Todas' },
-    { id: 'cine', label: '🎬 Cine & Proyecciones' },
-    { id: 'talleres', label: '🎨 Talleres Creativos' },
-    { id: 'musica', label: '🎵 Música en Vivo' },
-    { id: 'juegos', label: '🎲 Juegos de Mesa' },
-    { id: 'privados', label: '🎉 Eventos Privados' },
-    { id: 'temporada', label: '🎄 Temporada' },
-  ];
+  useEffect(() => {
+    if (!gridRef.current) return undefined;
+    const cards = gridRef.current.querySelectorAll('[data-activity-card]');
+    if (!cards.length) return undefined;
 
-  const filteredActividades = actividades.filter((act) => {
-    const matchCat = selectedCategory === 'todas' || act.categoriaSlug === selectedCategory;
-    const matchSuc = selectedSucursal === 'todas' || act.sucursalId === selectedSucursal;
-    const matchSearch =
-      act.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      act.resumen.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchCat && matchSuc && matchSearch;
-  });
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        cards,
+        { y: 28, opacity: 0, scale: 0.96 },
+        {
+          y: 0,
+          opacity: 1,
+          scale: 1,
+          duration: 0.55,
+          stagger: 0.07,
+          ease: 'power3.out',
+          clearProps: 'transform'
+        }
+      );
+    }, gridRef);
+
+    return () => ctx.revert();
+  }, [actividades.length]);
 
   return (
-    <div className="flex flex-col gap-8 fade-in pb-16">
+    <div className="flex flex-col gap-7 sm:gap-8 fade-in pb-16 pt-2">
       {/* Encabezado Editorial */}
       <div className="max-w-2xl text-left">
-
-        <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold text-[#1F1410] tracking-tight mb-3">
+        <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold text-[#1F1410] tracking-tight mb-2.5">
           Actividades & Eventos
         </h1>
-        <p className="font-body text-sm sm:text-base text-[#1F1410]/80 leading-relaxed font-medium">
-          Noches de cine, talleres de pintura neón, flash tattoos, música en vivo, juegos de mesa y eventos privados. Elige tu experiencia y aparta tu lugar.
+        <p className="font-body text-sm sm:text-base text-[#1F1410]/75 leading-relaxed">
+          Noches de cine, talleres creativos, música en vivo, juegos de mesa y eventos privados. Elige tu experiencia y aparta tu lugar.
         </p>
       </div>
 
-      {/* Barra de Filtros y Búsqueda */}
-      <div className="flex flex-col gap-4">
-        {/* Categorías HeroUI Chips */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-          {categorias.map((cat) => {
-            const isActive = selectedCategory === cat.id;
-            return (
-              <button
-                key={cat.id}
-                className={`whitespace-nowrap px-5 py-2.5 rounded-md font-mono text-xs font-bold cursor-pointer transition-all duration-200 border-2 ${
-                  isActive
-                    ? 'bg-[#E12927] text-white border-[#E12927] shadow-md shadow-[#E12927]/30 scale-[1.02]'
-                    : 'bg-white hover:bg-[#FCEAE9] text-[#1F1410] border-stone-300 hover:border-[#E12927] shadow-xs'
-                }`}
-                onClick={() => {
-                  sounds.playClick();
-                  setSelectedCategory(cat.id);
-                }}
-              >
-                {cat.label}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Filtro por Sucursal y Búsqueda */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="flex items-center gap-2.5 px-4 py-3 rounded-md bg-white border-2 border-stone-300 shadow-xs flex-1 sm:max-w-xs focus-within:border-[#E12927] transition-colors">
-            <MapPin size={18} className="text-[#E12927] shrink-0" />
-            <select
-              className="w-full bg-transparent text-xs sm:text-sm font-body text-[#1F1410] font-medium focus:outline-none cursor-pointer"
-              value={selectedSucursal}
-              onChange={(e) => {
-                sounds.playClick();
-                setSelectedSucursal(e.target.value);
-              }}
-            >
-              <option value="todas">Todas las sucursales</option>
-              {sucursales.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex items-center gap-2.5 px-4 py-3 rounded-md bg-white border-2 border-stone-300 shadow-xs flex-1 focus-within:border-[#E12927] transition-colors">
-            <Search size={18} className="text-[#8E7A74] shrink-0" />
-            <input
-              type="text"
-              placeholder="Buscar por juego, música, cata..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-transparent text-xs sm:text-sm font-body text-[#1F1410] font-medium placeholder-[#8E7A74] focus:outline-none"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Listado de Actividades en Grid 100% Sólido */}
-      {filteredActividades.length === 0 ? (
-        <div className="flex flex-col items-center justify-center text-center p-12 rounded-lg bg-white border-2 border-stone-300 gap-3 shadow-md">
-          <Sparkles size={36} className="text-[#E12927]" />
-          <h3 className="font-display text-xl font-bold text-[#1F1410]">No se encontraron actividades con estos filtros</h3>
-          <p className="font-body text-sm text-[#5A4840] max-w-md">Intenta cambiar la categoría o la sucursal seleccionada.</p>
-          <button
-            className="mt-3 px-6 py-2.5 rounded-md font-mono text-xs font-bold uppercase tracking-wider text-[#1F1410] border-2 border-[#1F1410] bg-white hover:bg-[#1F1410] hover:text-white transition-all cursor-pointer shadow-xs"
-            onClick={() => {
-              setSelectedCategory('todas');
-              setSelectedSucursal('todas');
-              setSearchTerm('');
-            }}
-          >
-            Restablecer filtros
-          </button>
+      {/* Grid de Tarjetas Verticales Full-Bleed */}
+      {actividades.length === 0 ? (
+        <div className="flex flex-col items-center justify-center text-center p-10 sm:p-12 rounded-3xl bg-white/85 border border-[#1F1410]/10 gap-3 shadow-sm">
+          <h3 className="font-display text-xl font-bold text-[#1F1410]">
+            Aún no hay actividades publicadas
+          </h3>
+          <p className="font-body text-sm text-[#5A4840] max-w-md">
+            Vuelve pronto para descubrir nuestros próximos eventos y talleres.
+          </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredActividades.map((act) => (
-            <article
-              key={act.id}
-              className="bg-white rounded-lg border-2 border-stone-300 overflow-hidden flex flex-col shadow-md hover:shadow-2xl hover:border-[#E12927] hover:-translate-y-1.5 transition-all duration-300 cursor-pointer group"
-              onClick={() => {
-                sounds.playClick();
-                onSelectActivity(act);
-              }}
-            >
-              {/* Imagen */}
-              <div className="relative h-52 bg-stone-100 overflow-hidden border-b-2 border-stone-200">
+        <div
+          ref={gridRef}
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 sm:gap-7 pt-3"
+        >
+          {actividades.map((act) => {
+            const emoji = emojiParaActividad(act);
+            const fechaLabel = act.fechaCorta || act.fecha || '';
+            const horaInicio = (act.hora || '').split('–')[0].trim();
+            const metaLine = [fechaLabel, horaInicio, act.sucursalNombre].filter(Boolean).join(' · ');
+
+            return (
+              <article
+                key={act.id}
+                data-activity-card
+                onClick={() => {
+                  sounds.playClick();
+                  onSelectActivity(act);
+                }}
+                className="relative h-[370px] sm:h-[400px] lg:h-[420px] rounded-[24px] overflow-hidden cursor-pointer group transition-all duration-300 ease-out hover:-translate-y-4 active:scale-[0.99] select-none bg-[#1F1410] shadow-lg shadow-black/15 hover:shadow-2xl hover:shadow-black/25"
+              >
+                {/* Imagen Full-Bleed */}
                 <img
                   src={act.imagen}
                   alt={act.nombre}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
                 />
-              </div>
 
-              {/* Contenido de la tarjeta */}
-              <div className="p-5 flex flex-col flex-1 gap-3">
-                <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] font-mono font-bold text-[#6B5A52] uppercase tracking-wider">
-                  <span className="inline-flex items-center gap-1">
-                    <Calendar size={13} className="text-[#E12927]" /> {act.fechaCorta}
-                  </span>
-                  <span className="inline-flex items-center gap-1">
-                    <Clock size={13} className="text-[#E12927]" /> {act.hora.split('–')[0]}
-                  </span>
-                  <span className="inline-flex items-center gap-1">
-                    <MapPin size={13} className="text-[#E12927]" /> {act.sucursalNombre}
-                  </span>
-                </div>
+                {/* Degradado oscuro neutro para legibilidad */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent pointer-events-none" />
 
-                <h2 className="font-display text-xl font-bold text-[#1F1410] leading-snug group-hover:text-[#E12927] transition-colors">
-                  {act.nombre}
-                </h2>
-                <p className="font-body text-xs sm:text-sm text-[#5A4840] leading-relaxed line-clamp-3">
-                  {act.resumen}
-                </p>
-
-                {/* Pie de tarjeta con costo y botón HeroUI */}
-                <div className="mt-auto pt-4 flex items-center justify-between border-t-2 border-stone-200">
+                {/* Contenido inferior estilo referencia */}
+                <div className="absolute inset-x-0 bottom-0 p-5 sm:p-6 flex flex-col gap-3.5 text-left">
                   <div>
-                    <span className="block font-mono text-[10px] font-bold tracking-wider text-[#8E7A74] uppercase">PRECIO / ACCESO</span>
-                    <span className="font-mono text-lg font-bold text-[#E12927]">{act.precio}</span>
+                    <h2 className="text-xl sm:text-2xl font-bold text-white leading-snug tracking-tight drop-shadow-xs line-clamp-2">
+                      <span>{act.nombre}</span>
+                      {emoji && (
+                        <span className="ml-1.5 inline-block align-middle text-lg sm:text-xl" aria-hidden="true">
+                          {emoji}
+                        </span>
+                      )}
+                    </h2>
+
+                    <p className="text-xs text-white/80 mt-1 truncate">
+                      {metaLine || act.precio}
+                      {metaLine && act.precio ? ` · ${act.precio}` : ''}
+                    </p>
                   </div>
 
+                  {/* Botón translúcido oscuro con flecha > */}
                   <button
-                    className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-md font-mono text-xs font-bold uppercase tracking-wider bg-[#E12927] hover:bg-[#C81E1C] active:scale-95 text-white border-2 border-[#E12927] shadow-md shadow-[#E12927]/30 hover:shadow-lg transition-all duration-200 cursor-pointer"
+                    type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       sounds.playClick();
                       onSelectActivity(act);
                     }}
+                    className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-black/25 hover:bg-black/45 backdrop-blur-md border border-white/15 text-white text-xs sm:text-sm font-medium transition-all duration-200 cursor-pointer group/btn"
                   >
-                    <span>Ver detalles</span>
-                    <ChevronRight size={14} />
+                    <span>Explorar ahora</span>
+                    <ChevronRight
+                      size={16}
+                      className="opacity-85 group-hover/btn:translate-x-0.5 transition-transform"
+                    />
                   </button>
                 </div>
-              </div>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </div>
       )}
     </div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Header from './components/Header';
 import BottomNav from './components/BottomNav';
 import NotificationsDrawer from './components/NotificationsDrawer';
+import ReservationModal from './components/ReservationModal';
 import ElephantLogo from './components/ElephantLogo';
 import { AlertCard, AlertToastStack, useAlertas } from './components/ui/AlertSystem';
 import { MainLoader } from './components/ui/MainLoader';
@@ -107,6 +108,8 @@ export default function App() {
   // 2. Estado de Navegación contextual
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [selectedPromo, setSelectedPromo] = useState(null);
+  const [reservationModalOpen, setReservationModalOpen] = useState(false);
+  const [reservationModalSuccess, setReservationModalSuccess] = useState(false);
   const [lastConfirmedReservation, setLastConfirmedReservation] = useState(null);
   const [reservationWizardInitialData, setReservationWizardInitialData] = useState(null);
   const [initialMenuProduct, setInitialMenuProduct] = useState(null);
@@ -318,6 +321,17 @@ export default function App() {
 
   // Métodos de navegación y acciones
   const navigateTo = (screenId) => {
+    if (screenId === 'reservar') {
+      setReservationModalSuccess(false);
+      setReservationModalOpen(true);
+      return;
+    }
+    if (screenId === 'confirmacion_reservacion' && reservationModalOpen) {
+      setReservationModalSuccess(true);
+      return;
+    }
+    setReservationModalOpen(false);
+    setReservationModalSuccess(false);
     setActiveScreen(screenId);
     if (screenId === 'hero') {
       window.history.pushState({}, '', '/hero');
@@ -331,16 +345,15 @@ export default function App() {
 
   const handleSelectActivity = (activity) => {
     setSelectedActivity(activity);
-    navigateTo('detalle_actividad');
   };
 
   const handleSelectPromo = (promo) => {
     setSelectedPromo(promo);
-    navigateTo('detalle_promocion');
   };
 
   // Reservar directamente una actividad
   const handleBookActivity = (activity) => {
+    setSelectedActivity(null);
     setReservationWizardInitialData({
       tipo: 'actividad',
       actividad: activity,
@@ -470,7 +483,7 @@ export default function App() {
       )}
 
       {/* Contenido Principal con Enrutador React */}
-      <main className={activeScreen === 'hero' || activeScreen === 'inicio' ? 'w-full p-0 m-0 max-w-none flex-1' : 'main-content'} id="main-content">
+      <main className={activeScreen === 'hero' || activeScreen === 'inicio' || activeScreen === 'menu' || activeScreen === 'promociones' || activeScreen === 'perfil' || (activeScreen === 'beneficios' && Boolean(perfil)) ? 'w-full p-0 m-0 max-w-none flex-1' : 'main-content'} id="main-content">
         {!catalogoListo && activeScreen !== 'hero' && (
           errorCatalogo ? (
             <div className="max-w-lg mx-auto my-24 px-4">
@@ -552,28 +565,11 @@ export default function App() {
           />
         )}
 
-        {/* DETALLE DE ACTIVIDAD */}
-        {catalogoListo && activeScreen === 'detalle_actividad' && (
-          <ActivityDetailScreen
-            activity={selectedActivity || actividades[0]}
-            onBack={() => navigateTo('actividades')}
-            onBookActivity={handleBookActivity}
-          />
-        )}
-
         {/* PROMOCIONES */}
         {catalogoListo && activeScreen === 'promociones' && (
           <PromotionsScreen
             promociones={promociones}
             onSelectPromo={handleSelectPromo}
-          />
-        )}
-
-        {/* DETALLE DE PROMOCIÓN */}
-        {catalogoListo && activeScreen === 'detalle_promocion' && (
-          <PromotionDetailScreen
-            promo={selectedPromo || promociones[0]}
-            onBack={() => navigateTo('promociones')}
           />
         )}
 
@@ -729,66 +725,46 @@ export default function App() {
         )}
       </main>
 
-      {/* Footer Editorial Café Marfil Urban Brunch */}
+      {/* Footer Compacto Café Marfil */}
       <footer className="marfil-footer">
         <div className="footer-inner">
           <div className="footer-top-row">
             <div className="footer-brand-col">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', marginBottom: '0.75rem' }}>
-                <ElephantLogo size={46} color="rojo" />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <ElephantLogo size={32} color="negro" />
                 <div>
                   <div className="footer-logo font-display">Café Marfil</div>
-                  <span className="font-mono" style={{ fontSize: '0.75rem', letterSpacing: '0.12em', color: 'var(--rojo-marfil)', textTransform: 'uppercase' }}>
-                    CAFÉ DE ESPECIALIDAD & DESAYUNOS
-                  </span>
+                  <span className="footer-subtitle">Durango, Dgo. · 2 Sucursales</span>
                 </div>
               </div>
-              <p className="footer-tagline font-body">
-                Barra de especialidad, frappés de autor, cocina salada y dulce contundente en Durango, México. Desayunos todo el día, chilaquiles con boneless y fresas estilo Dubái.
-              </p>
-              <div className="footer-city-badge font-mono">
-                DURANGO, DGO. · 2 SUCURSALES
-              </div>
             </div>
 
-            <div className="footer-links-col">
-              <h4 className="font-mono" style={{ color: 'var(--rojo-marfil)', letterSpacing: '0.1em', fontWeight: 700, fontSize: '0.82rem' }}>
-                EXPLORAR CARTA & ESPACIOS
-              </h4>
-              <ul className="footer-nav-list font-body">
-                <li><button onClick={() => navigateTo('menu')}>Menú & Carrusel</button></li>
-                <li><button onClick={() => navigateTo('actividades')}>Actividades & Catas</button></li>
-                <li><button onClick={() => navigateTo('promociones')}>Promociones & Combos</button></li>
-                <li><button onClick={() => navigateTo('reservar')}>Reservar Mesa o Evento</button></li>
-                <li><button onClick={() => navigateTo('beneficios')}>Pasaporte de Sellos</button></li>
-                <li><button onClick={() => navigateTo('sucursales')}>Sucursales en Durango</button></li>
-              </ul>
-            </div>
+            <nav className="footer-nav-inline font-body" aria-label="Enlaces del pie">
+              <button type="button" onClick={() => navigateTo('menu')}>Menú</button>
+              <button type="button" onClick={() => navigateTo('actividades')}>Actividades</button>
+              <button type="button" onClick={() => navigateTo('promociones')}>Promociones</button>
+              <button type="button" onClick={() => navigateTo('reservar')}>Reservar</button>
+              <button type="button" onClick={() => navigateTo('beneficios')}>Club Marfil</button>
+              <button type="button" onClick={() => navigateTo('sucursales')}>Sucursales</button>
+            </nav>
 
-            <div className="footer-social-col">
-              <h4 className="font-mono" style={{ color: 'var(--rojo-marfil)', letterSpacing: '0.1em', fontWeight: 700, fontSize: '0.82rem' }}>
-                COMUNIDAD MARFIL
-              </h4>
-              <p className="font-body" style={{ color: 'var(--text-light)', fontSize: '0.92rem' }}>
-                Comparte tus momentos de café y juegos de mesa etiquetándonos en Instagram:
-              </p>
+            <div className="footer-contact-col">
               <a
                 href="https://instagram.com"
                 target="_blank"
                 rel="noreferrer"
-                className="footer-insta-btn font-mono"
+                className="footer-social-link"
               >
-                @cafe.marfil · #CafeMarfilDgo
+                @cafe.marfil
               </a>
-              <span className="font-mono" style={{ color: 'var(--text-light)', fontSize: '0.78rem', display: 'block', marginTop: '0.75rem' }}>
-                ATENCIÓN & WHATSAPP: (618) 811-2345
-              </span>
+              <span className="footer-sep">·</span>
+              <span className="footer-phone">(618) 811-2345</span>
             </div>
           </div>
 
-          <div className="footer-bottom-bar font-mono" style={{ fontSize: '0.78rem' }}>
+          <div className="footer-bottom-bar">
             <span>© 2026 Café Marfil Durango. Todos los derechos reservados.</span>
-            <span>Desayunos Todo el Día · Café de Especialidad · Juegos de Mesa</span>
+            <span>Café de Especialidad · Desayunos · Juegos de Mesa</span>
           </div>
         </div>
       </footer>
@@ -805,6 +781,85 @@ export default function App() {
 
       <AlertToastStack alertas={alertas} onDismiss={cerrarAlerta} />
 
+      {/* Modal de Reservación de Mesa / Apartar Lugares */}
+      <ReservationModal
+        isOpen={reservationModalOpen}
+        onClose={() => {
+          setReservationModalOpen(false);
+          setReservationModalSuccess(false);
+        }}
+        titulo={
+          reservationModalSuccess
+            ? 'Reservación Confirmada'
+            : reservationWizardInitialData?.actividad
+            ? `Apartar lugares · ${reservationWizardInitialData.actividad.nombre}`
+            : 'Reservar Mesa en Café Marfil'
+        }
+        subtitulo={
+          reservationModalSuccess
+            ? 'Tu pase digital está listo para mostrarse al llegar.'
+            : reservationWizardInitialData?.actividad
+            ? 'Confirma tus lugares para esta experiencia en minutos.'
+            : 'Elige tu sucursal, horario, personas y mesa favorita.'
+        }
+      >
+        {reservationModalSuccess ? (
+          <ReservationSuccessScreen
+            reservation={lastConfirmedReservation || reservaciones[0]}
+            onGoHome={() => {
+              setReservationModalOpen(false);
+              setReservationModalSuccess(false);
+              navigateTo('inicio');
+            }}
+            onViewReservations={() => {
+              setReservationModalOpen(false);
+              setReservationModalSuccess(false);
+              navigateTo('mis_reservaciones');
+            }}
+          />
+        ) : !catalogoListo ? (
+          <SkeletonList filas={4} />
+        ) : perfil ? (
+          <ReservationWizard
+            key={reservationWizardInitialData?.actividadId || reservationWizardInitialData?.sucursalId || 'mesa'}
+            sucursales={sucursales}
+            actividades={actividades}
+            juegos={juegosCatalogo}
+            initialData={reservationWizardInitialData}
+            contacto={perfil}
+            onCancel={() => {
+              setReservationModalOpen(false);
+              setReservationModalSuccess(false);
+            }}
+            onCompleteReservation={handleCompleteReservation}
+          />
+        ) : (
+          <AuthScreen
+            modoInicial="registrar"
+            onLogin={iniciarSesion}
+            onRegister={crearCuenta}
+            onVerifyCode={verificarCodigoCuenta}
+            onResendCode={reenviarCodigoCuenta}
+            onForgotPassword={() => {
+              setReservationModalOpen(false);
+              navigateTo('olvide_password');
+            }}
+            motivo="Para apartar tu mesa o lugar en una actividad necesitas una cuenta Club Marfil. Crea tu cuenta (o inicia sesión) y continuaremos automáticamente con tu reservación."
+          />
+        )}
+      </ReservationModal>
+
+      {/* Modales de detalle de Actividad y Promoción */}
+      <ActivityDetailScreen
+        activity={selectedActivity}
+        onBack={() => setSelectedActivity(null)}
+        onBookActivity={handleBookActivity}
+      />
+      <PromotionDetailScreen
+        promo={selectedPromo}
+        onBack={() => setSelectedPromo(null)}
+      />
+
       {/* Drawer Lateral de Notificaciones */}
       <NotificationsDrawer
         isOpen={isNotifDrawerOpen}
@@ -817,13 +872,13 @@ export default function App() {
       <style>{`
         .marfil-footer {
           background-color: var(--blanco);
-          border-top: 1px solid var(--border-medium);
-          padding: 3.5rem 1.5rem 6.5rem 1.5rem;
+          border-top: 1px solid var(--border-light);
+          padding: 1.4rem 1.25rem 5.25rem 1.25rem;
           margin-top: auto;
         }
-        @media (min-width: 900px) {
+        @media (min-width: 768px) {
           .marfil-footer {
-            padding-bottom: 3.5rem;
+            padding: 1.4rem 2rem;
           }
         }
         .footer-inner {
@@ -831,97 +886,83 @@ export default function App() {
           margin: 0 auto;
           display: flex;
           flex-direction: column;
-          gap: 2.5rem;
+          gap: 1rem;
         }
         .footer-top-row {
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 2.5rem;
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 0.9rem;
         }
-        @media (min-width: 768px) {
+        @media (min-width: 900px) {
           .footer-top-row {
-            grid-template-columns: 1.5fr 1fr 1.25fr;
+            flex-direction: row;
+            align-items: center;
           }
         }
         .footer-logo {
-          font-size: 1.75rem;
+          font-size: 1.2rem;
           font-weight: 700;
           color: var(--negro-cafe);
-          margin: 0;
           line-height: 1.1;
         }
-        .footer-tagline {
-          max-width: 360px;
-          line-height: 1.6;
-          margin-bottom: 1rem;
+        .footer-subtitle {
+          font-size: 0.72rem;
           color: var(--text-light);
-          font-size: 0.92rem;
+          display: block;
         }
-        .footer-city-badge {
-          display: inline-block;
-          background-color: var(--rosa-claro);
-          border: 1px solid rgba(225, 41, 39, 0.2);
-          padding: 0.35rem 0.75rem;
-          border-radius: var(--radius-full);
-          font-weight: 700;
-          color: var(--rojo-marfil);
-          font-size: 0.75rem;
-          letter-spacing: 0.08em;
-        }
-        .footer-nav-list {
-          list-style: none;
+        .footer-nav-inline {
           display: flex;
-          flex-direction: column;
-          gap: 0.65rem;
-          margin-top: 0.75rem;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 0.5rem 1.15rem;
         }
-        .footer-nav-list button {
-          color: var(--text-light);
-          font-size: 0.92rem;
+        .footer-nav-inline button {
+          color: var(--text-muted);
+          font-size: 0.82rem;
           padding: 0;
-          text-align: left;
           background: none;
           border: none;
           cursor: pointer;
           transition: color 0.15s ease;
         }
-        .footer-nav-list button:hover {
+        .footer-nav-inline button:hover {
           color: var(--rojo-marfil);
         }
-        .footer-social-col p {
-          margin: 0.75rem 0 1rem 0;
-          line-height: 1.5;
-        }
-        .footer-insta-btn {
-          display: inline-flex;
+        .footer-contact-col {
+          display: flex;
           align-items: center;
-          background-color: var(--bg-surface-tinted);
-          border: 1px solid var(--border-medium);
-          padding: 0.55rem 1.1rem;
-          border-radius: var(--radius-full);
-          color: var(--negro-cafe);
-          font-weight: 700;
+          gap: 0.5rem;
           font-size: 0.8rem;
-          text-decoration: none;
-          transition: all 0.18s ease;
+          color: var(--text-light);
         }
-        .footer-insta-btn:hover {
-          border-color: var(--rojo-marfil);
+        .footer-social-link {
+          color: var(--negro-cafe);
+          font-weight: 600;
+          text-decoration: none;
+          transition: color 0.15s ease;
+        }
+        .footer-social-link:hover {
           color: var(--rojo-marfil);
-          background-color: var(--rosa-claro);
+        }
+        .footer-sep {
+          opacity: 0.4;
         }
         .footer-bottom-bar {
           display: flex;
           flex-direction: column;
-          gap: 0.75rem;
-          border-top: 1px solid var(--border-medium);
-          padding-top: 1.5rem;
+          gap: 0.35rem;
+          border-top: 1px solid var(--border-light);
+          padding-top: 0.85rem;
+          font-size: 0.72rem;
           color: var(--text-light);
         }
         @media (min-width: 768px) {
           .footer-bottom-bar {
             flex-direction: row;
             justify-content: space-between;
+            align-items: center;
           }
         }
       `}</style>

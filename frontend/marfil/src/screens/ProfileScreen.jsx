@@ -13,7 +13,8 @@ import {
   ShieldCheck,
   Phone,
   Mail,
-  UserCheck
+  LogOut,
+  Zap
 } from 'lucide-react';
 import { sounds } from '../utils/audio';
 import { reglas, useFormulario } from '../utils/validacion';
@@ -44,8 +45,10 @@ export default function ProfileScreen({
   onViewBenefits,
   theme,
   toggleTheme,
-  reservacionesCount
+  reservacionesCount = 0,
+  beneficiosCount = 0
 }) {
+  const [activeTab, setActiveTab] = useState('resumen'); // 'resumen' | 'datos' | 'preferencias'
   const [isEditing, setIsEditing] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [errorGeneral, setErrorGeneral] = useState('');
@@ -70,6 +73,21 @@ export default function ProfileScreen({
       correo: (v) => reglas.email(v)
     }
   );
+
+  const openEditor = () => {
+    sounds.playClick();
+    const p = separarNombreFallback(perfil);
+    form.resetear({
+      nombres: p.nombres,
+      apellidoPaterno: p.apellidoPaterno,
+      apellidoMaterno: p.apellidoMaterno,
+      telefono: perfil.telefono || '',
+      correo: perfil.correo || ''
+    });
+    setErrorGeneral('');
+    setIsEditing(true);
+    setActiveTab('datos');
+  };
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -106,82 +124,371 @@ export default function ProfileScreen({
     }
   };
 
+  const sellosActuales = perfil.sellosActuales ?? 0;
+  const sellosMeta = perfil.sellosTotalesParaMeta ?? 8;
+  const iniciales = (perfil.nombre || 'CM')
+    .split(' ')
+    .filter(Boolean)
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+
+  const bebidaFav = perfil.preferencias?.frappeFavorito || perfil.preferencias?.cafeFavorito || 'Flat White 12oz';
+  const platilloFav = perfil.preferencias?.platilloFavorito || 'Chilaquiles verdes con boneless';
+  const sucursalFav = perfil.preferencias?.sucursalFrecuente || 'Centro Histórico (Casona)';
+
   return (
-    <div className="flex flex-col gap-8 fade-in pb-16">
-      {/* Encabezado */}
-      <div className="max-w-2xl text-left">
+    <div className="w-full min-h-[calc(100dvh-72px)] bg-[#FAF7F5] dark:bg-[#150E0C] overflow-x-clip fade-in pb-24 md:pb-12">
+      {/* ====================================================================
+          1. CABECERA CURVA ESTILO PERFIL REFERENCIA EN COLORES CAFÉ MARFIL
+          ==================================================================== */}
+      <div className="w-full bg-gradient-to-b from-[#8F191B] via-[#5E1416] to-[#1F1410] rounded-b-[40px] sm:rounded-b-[52px] text-white shadow-xl relative overflow-hidden">
+        {/* Halos suaves */}
+        <div className="pointer-events-none absolute -top-16 left-1/2 -translate-x-1/2 w-[420px] h-[260px] rounded-full bg-[#E12927]/30 blur-3xl" />
 
-        <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold text-[#1F1410] tracking-tight mb-3">
-          Mi Perfil & Fidelidad
-        </h1>
-        <p className="font-body text-sm sm:text-base text-[#1F1410]/80 leading-relaxed font-medium">
-          Administra tus datos, preferencias gastronómicas y consulta tus puntos del programa de lealtad <em>Café Marfil Durango</em>.
-        </p>
-      </div>
+        <div className="max-w-5xl mx-auto px-5 sm:px-8 pt-6 pb-8 sm:pb-10 relative z-10 flex flex-col items-center">
+          {/* Botones circulares translúcidos en las esquinas superiores */}
+          <div className="w-full flex items-center justify-between mb-4">
+            <button
+              type="button"
+              onClick={() => {
+                sounds.playClick();
+                toggleTheme();
+              }}
+              aria-label="Cambiar modo oscuro o claro"
+              title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+              className="w-11 h-11 rounded-full bg-white/15 hover:bg-white/25 backdrop-blur-md border border-white/20 text-white flex items-center justify-center transition-all cursor-pointer active:scale-95"
+            >
+              {theme === 'dark' ? <Sun size={18} className="text-amber-300" /> : <Moon size={18} />}
+            </button>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_0.9fr] gap-8 items-start">
-        {/* Tarjeta de Usuario Principal HeroUI Card 100% Sólida */}
-        <div className="flex flex-col gap-6">
-          <div className="bg-white rounded-lg border-2 border-stone-300 p-6 sm:p-8 shadow-md flex flex-col gap-6">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-md bg-[#1F1410] text-white flex items-center justify-center font-display text-2xl font-bold relative shadow-md">
-                  <span>{perfil.nombre.split(' ').map((n) => n[0]).slice(0, 2).join('')}</span>
-                  <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-xs bg-[#E12927] text-white flex items-center justify-center text-xs shadow-xs border-2 border-white">
-                    ★
-                  </div>
-                </div>
-
-                <div>
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-sm font-mono text-[10px] font-bold uppercase tracking-wider bg-[#E12927] text-white mb-1 shadow-xs border border-[#E12927]">
-                    <Award size={12} /> {perfil.nivelFidelidad}
-                  </div>
-                  <h2 className="font-display text-2xl font-bold text-[#1F1410] leading-snug">
-                    {perfil.nombre}
-                  </h2>
-                  <div className="flex items-center gap-1 font-mono text-xs text-[#8E7A74]">
-                    <MapPin size={13} className="text-[#E12927]" /> {perfil.ciudad}
-                  </div>
-                </div>
-              </div>
-
+            {onLogout && (
               <button
-                className="w-10 h-10 rounded-md border-2 border-stone-300 bg-white flex items-center justify-center text-[#1F1410] hover:bg-[#FCEAE9] hover:border-[#E12927] active:scale-95 transition-all cursor-pointer shadow-xs"
+                type="button"
                 onClick={() => {
                   sounds.playClick();
-                  if (!isEditing) {
-                    const p = separarNombreFallback(perfil);
-                    form.resetear({
-                      nombres: p.nombres,
-                      apellidoPaterno: p.apellidoPaterno,
-                      apellidoMaterno: p.apellidoMaterno,
-                      telefono: perfil.telefono || '',
-                      correo: perfil.correo || ''
-                    });
-                    setErrorGeneral('');
-                  }
-                  setIsEditing(!isEditing);
+                  onLogout();
                 }}
-                title={isEditing ? 'Cancelar edición' : 'Editar información'}
+                aria-label="Cerrar sesión"
+                title="Cerrar sesión"
+                className="w-11 h-11 rounded-full bg-white/15 hover:bg-[#E12927] backdrop-blur-md border border-white/20 text-white flex items-center justify-center transition-all cursor-pointer active:scale-95"
               >
-                <Edit2 size={16} />
+                <LogOut size={17} />
+              </button>
+            )}
+          </div>
+
+          {/* Medallón Avatar centrado */}
+          <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-white/15 backdrop-blur-md border-4 border-white/25 shadow-2xl flex items-center justify-center font-display text-4xl sm:text-5xl font-bold text-white select-none mb-6">
+            {iniciales}
+          </div>
+
+          {/* Fila inferior del banner curvo: Nombre + Nivel a la izquierda / 3 botones circulares blancos a la derecha */}
+          <div className="w-full flex flex-col sm:flex-row sm:items-end justify-between gap-5">
+            <div className="text-left">
+              <h1 className="font-display text-3xl sm:text-4xl font-bold text-white leading-tight">
+                {perfil.nombre}
+              </h1>
+              <div className="flex flex-wrap items-center gap-2.5 mt-1.5 text-xs sm:text-sm text-white/80">
+                <span>{perfil.nivelFidelidad || 'Club Marfil'}</span>
+                <span>·</span>
+                <span className="inline-flex items-center gap-1">
+                  <MapPin size={13} className="text-[#FCEAE9]" />
+                  {perfil.ciudad}
+                </span>
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/15 text-white text-xs font-semibold">
+                  <Zap size={11} className="fill-current text-amber-300" />
+                  {perfil.puntosFidelidad ?? 0} pts
+                </span>
+              </div>
+            </div>
+
+            {/* 3 botones circulares blancos estilo referencia (Editar · Reservaciones · Beneficios) */}
+            <div className="flex items-center gap-3 self-start sm:self-end">
+              <button
+                type="button"
+                onClick={openEditor}
+                title="Editar perfil"
+                aria-label="Editar perfil"
+                className="w-12 h-12 rounded-full bg-white dark:bg-[#2A1B18] text-[#1F1410] dark:text-white hover:bg-[#FCEAE9] hover:text-[#E12927] shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer"
+              >
+                <Edit2 size={18} />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playClick();
+                  onViewReservations();
+                }}
+                title="Mis reservaciones"
+                aria-label="Mis reservaciones"
+                className="w-12 h-12 rounded-full bg-white dark:bg-[#2A1B18] text-[#1F1410] dark:text-white hover:bg-[#FCEAE9] hover:text-[#E12927] shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer"
+              >
+                <Calendar size={18} />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playClick();
+                  onViewBenefits();
+                }}
+                title="Mis beneficios y sellos"
+                aria-label="Mis beneficios y sellos"
+                className="w-12 h-12 rounded-full bg-white dark:bg-[#2A1B18] text-[#1F1410] dark:text-white hover:bg-[#FCEAE9] hover:text-[#E12927] shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer"
+              >
+                <Gift size={18} />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ====================================================================
+          2. FRANJA SUAVE CURVA DE 3 ESTADÍSTICAS (COMO 8 YEARS · 2.7K+ · 4.8)
+          ==================================================================== */}
+      <div className="max-w-5xl mx-auto px-4 sm:px-8 -mt-4 relative z-0">
+        <div className="rounded-b-[32px] bg-[#FCEAE9]/80 dark:bg-[#251815] pt-8 pb-5 px-5 sm:px-8 grid grid-cols-3 gap-3 sm:gap-6 shadow-xs border-x border-b border-[#E12927]/10 dark:border-white/10">
+          <div className="flex items-center justify-center sm:justify-start gap-2.5 sm:gap-3.5">
+            <span className="w-10 h-10 rounded-full bg-white dark:bg-[#1F1410] text-[#E12927] flex items-center justify-center shadow-2xs shrink-0">
+              <Coffee size={18} />
+            </span>
+            <div className="text-left min-w-0">
+              <strong className="block text-sm sm:text-lg font-bold text-[#1F1410] dark:text-[#FAF7F5] leading-tight">
+                {perfil.visitasRealizadas ?? 0} visitas
+              </strong>
+              <span className="block text-[11px] sm:text-xs text-[#6B5A52] dark:text-[#B4A099] truncate">
+                Experiencia
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-center sm:justify-start gap-2.5 sm:gap-3.5">
+            <span className="w-10 h-10 rounded-full bg-white dark:bg-[#1F1410] text-[#E12927] flex items-center justify-center shadow-2xs shrink-0">
+              <Award size={18} />
+            </span>
+            <div className="text-left min-w-0">
+              <strong className="block text-sm sm:text-lg font-bold text-[#1F1410] dark:text-[#FAF7F5] leading-tight">
+                {perfil.puntosFidelidad ?? 0}
+              </strong>
+              <span className="block text-[11px] sm:text-xs text-[#6B5A52] dark:text-[#B4A099] truncate">
+                Puntos Club
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-center sm:justify-start gap-2.5 sm:gap-3.5">
+            <span className="w-10 h-10 rounded-full bg-white dark:bg-[#1F1410] text-[#E12927] flex items-center justify-center shadow-2xs shrink-0">
+              <Gift size={18} />
+            </span>
+            <div className="text-left min-w-0">
+              <strong className="block text-sm sm:text-lg font-bold text-[#1F1410] dark:text-[#FAF7F5] leading-tight">
+                {sellosActuales}/{sellosMeta}
+              </strong>
+              <span className="block text-[11px] sm:text-xs text-[#6B5A52] dark:text-[#B4A099] truncate">
+                Sellos Marfil
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ====================================================================
+          3. SECCIÓN DE PESTAÑAS SUAVES + CONTENIDO COMPLETO DEL PERFIL
+          ==================================================================== */}
+      <div className="max-w-5xl mx-auto px-5 sm:px-8 pt-7 flex flex-col gap-6">
+        {/* Pestañas estilo selector de mes de la referencia */}
+        <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto pb-1">
+          {[
+            { id: 'resumen', label: 'Resumen' },
+            { id: 'datos', label: 'Mis datos' },
+            { id: 'preferencias', label: 'Preferencias & Ajustes' }
+          ].map((tab) => {
+            const isCurrent = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => {
+                  sounds.playClick();
+                  setActiveTab(tab.id);
+                }}
+                className={`px-5 py-2.5 rounded-full text-xs sm:text-sm whitespace-nowrap transition-all cursor-pointer ${
+                  isCurrent
+                    ? 'bg-[#FCEAE9] dark:bg-[#3A1E1C] text-[#E12927] font-bold shadow-2xs'
+                    : 'text-[#8E7A74] dark:text-[#A9968F] hover:text-[#1F1410] dark:hover:text-[#FAF7F5]'
+                }`}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* ==================================================================
+            4. CONTENIDO POR PESTAÑA
+            ================================================================== */}
+        {activeTab === 'resumen' && (
+          <div className="flex flex-col gap-6">
+            {/* Tarjetas de acceso rápido limpias */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
+              {/* Card 1: Mis Reservaciones */}
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playClick();
+                  onViewReservations();
+                }}
+                className="group text-left p-5 rounded-[24px] bg-white dark:bg-[#1F1410] border border-black/[0.06] dark:border-white/10 shadow-xs hover:shadow-md hover:-translate-y-1 transition-all cursor-pointer flex flex-col justify-between gap-4"
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="w-11 h-11 rounded-2xl bg-[#FCEAE9] dark:bg-[#321B19] text-[#E12927] flex items-center justify-center">
+                    <Calendar size={20} />
+                  </span>
+                  <span className="px-3 py-1 rounded-full bg-[#1F1410] dark:bg-[#E12927] text-white text-xs font-bold">
+                    {reservacionesCount} activas
+                  </span>
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[#1F1410] dark:text-[#FAF7F5] group-hover:text-[#E12927] transition-colors">
+                    Mis Reservaciones
+                  </h3>
+                  <p className="text-xs text-[#6B5A52] dark:text-[#B4A099] mt-0.5">
+                    Consulta tus mesas, actividades y pases QR.
+                  </p>
+                </div>
+              </button>
+
+              {/* Card 2: Pasaporte de Sellos */}
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playClick();
+                  onViewBenefits();
+                }}
+                className="group text-left p-5 rounded-[24px] bg-white dark:bg-[#1F1410] border border-black/[0.06] dark:border-white/10 shadow-xs hover:shadow-md hover:-translate-y-1 transition-all cursor-pointer flex flex-col justify-between gap-4"
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="w-11 h-11 rounded-2xl bg-[#FCEAE9] dark:bg-[#321B19] text-[#E12927] flex items-center justify-center">
+                    <Gift size={20} />
+                  </span>
+                  <span className="text-xs font-bold text-[#E12927]">
+                    {beneficiosCount} premios
+                  </span>
+                </div>
+                <div className="w-full">
+                  <h3 className="text-base font-bold text-[#1F1410] dark:text-[#FAF7F5] group-hover:text-[#E12927] transition-colors">
+                    Beneficios & Sellos
+                  </h3>
+                  <div className="grid grid-cols-8 gap-1 mt-2.5">
+                    {Array.from({ length: sellosMeta }).map((_, i) => (
+                      <span
+                        key={i}
+                        className={`h-2 rounded-full ${
+                          i < sellosActuales ? 'bg-[#E12927]' : 'bg-[#1F1410]/15 dark:bg-white/15'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </button>
+
+              {/* Card 3: Preferencias */}
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playClick();
+                  setActiveTab('preferencias');
+                }}
+                className="group text-left p-5 rounded-[24px] bg-white dark:bg-[#1F1410] border border-black/[0.06] dark:border-white/10 shadow-xs hover:shadow-md hover:-translate-y-1 transition-all cursor-pointer flex flex-col justify-between gap-4"
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="w-11 h-11 rounded-2xl bg-[#FCEAE9] dark:bg-[#321B19] text-[#E12927] flex items-center justify-center">
+                    <Coffee size={20} />
+                  </span>
+                  <ChevronRight size={18} className="text-[#8E7A74] group-hover:text-[#E12927] group-hover:translate-x-0.5 transition-all" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[#1F1410] dark:text-[#FAF7F5] group-hover:text-[#E12927] transition-colors">
+                    Tus Favoritos
+                  </h3>
+                  <p className="text-xs text-[#6B5A52] dark:text-[#B4A099] mt-0.5 truncate">
+                    {bebidaFav} · {sucursalFav}
+                  </p>
+                </div>
               </button>
             </div>
 
-            {/* Formulario de Edición o Vista */}
+            {/* Contacto rápido */}
+            <div className="flex flex-wrap items-center gap-4 px-5 py-4 rounded-2xl bg-white dark:bg-[#1F1410] border border-black/[0.06] dark:border-white/10 text-xs sm:text-sm text-[#5A4840] dark:text-[#C5B4AE]">
+              {perfil.correo && (
+                <span className="inline-flex items-center gap-2">
+                  <Mail size={15} className="text-[#E12927]" />
+                  {perfil.correo}
+                </span>
+              )}
+              {perfil.telefono && (
+                <span className="inline-flex items-center gap-2">
+                  <Phone size={15} className="text-[#E12927]" />
+                  {perfil.telefono}
+                </span>
+              )}
+              <span className="inline-flex items-center gap-2 ml-auto text-xs text-[#8E7A74]">
+                <ShieldCheck size={15} className="text-[#E12927]" />
+                Datos protegidos en Café Marfil Durango
+              </span>
+            </div>
+
+            {/* Botón CTA ancho completo estilo referencia (Book Appointment) */}
+            <button
+              type="button"
+              onClick={() => {
+                sounds.playClick();
+                onViewBenefits();
+              }}
+              className="w-full py-4 px-6 rounded-full bg-[#E12927] hover:bg-[#C81E1C] active:scale-[0.99] text-white text-sm sm:text-base font-bold shadow-lg shadow-[#E12927]/25 transition-all cursor-pointer"
+            >
+              Ver mi Pasaporte de Sellos · {sellosActuales} de {sellosMeta}
+            </button>
+          </div>
+        )}
+
+        {activeTab === 'datos' && (
+          <div className="mt-6 max-w-2xl text-left">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-bold text-[#1F1410] dark:text-[#FAF7F5]">
+                  Información personal
+                </h2>
+                <p className="text-xs text-[#8E7A74] dark:text-[#A9968F]">
+                  Mantén tus datos al día para agilizar tus reservaciones y acumular sellos.
+                </p>
+              </div>
+              {!isEditing && (
+                <button
+                  type="button"
+                  onClick={openEditor}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#1F1410] dark:bg-[#FAF7F5] text-white dark:text-[#1F1410] text-xs font-semibold cursor-pointer"
+                >
+                  <Edit2 size={13} />
+                  <span>Editar</span>
+                </button>
+              )}
+            </div>
+
             {isEditing ? (
-              <form onSubmit={handleSave} noValidate className="flex flex-col gap-4 pt-2 border-t-2 border-stone-200">
+              <form onSubmit={handleSave} noValidate className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1">
-                  <label htmlFor="perfil-nombres" className="font-mono text-[11px] font-bold text-[#8E7A74] tracking-wider uppercase">
-                    NOMBRE(S) *
+                  <label htmlFor="perfil-nombres" className="text-xs font-semibold text-[#6B5A52] dark:text-[#C5B4AE]">
+                    Nombre(s) *
                   </label>
                   <input
                     id="perfil-nombres"
                     type="text"
                     value={form.valores.nombres}
                     onChange={(e) => form.setCampo('nombres', e.target.value)}
-                    className={`px-4 py-3 rounded-md border-2 bg-white text-sm font-body text-[#1F1410] focus:outline-none ${
-                      form.errores.nombres ? 'border-[#E12927] bg-[#FCEAE9]/20' : 'border-stone-300 focus:border-[#E12927]'
+                    className={`px-4 py-2.5 rounded-xl border bg-[#FAF7F5] dark:bg-[#261A16] text-sm text-[#1F1410] dark:text-[#FAF7F5] focus:outline-none ${
+                      form.errores.nombres ? 'border-[#E12927]' : 'border-black/15 dark:border-white/15 focus:border-[#E12927]'
                     }`}
                     {...form.propsCampo('nombres')}
                   />
@@ -194,16 +501,16 @@ export default function ProfileScreen({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="flex flex-col gap-1">
-                    <label htmlFor="perfil-ap-paterno" className="font-mono text-[11px] font-bold text-[#8E7A74] tracking-wider uppercase">
-                      APELLIDO PATERNO *
+                    <label htmlFor="perfil-ap-paterno" className="text-xs font-semibold text-[#6B5A52] dark:text-[#C5B4AE]">
+                      Apellido paterno *
                     </label>
                     <input
                       id="perfil-ap-paterno"
                       type="text"
                       value={form.valores.apellidoPaterno}
                       onChange={(e) => form.setCampo('apellidoPaterno', e.target.value)}
-                      className={`px-4 py-3 rounded-md border-2 bg-white text-sm font-body text-[#1F1410] focus:outline-none ${
-                        form.errores.apellidoPaterno ? 'border-[#E12927] bg-[#FCEAE9]/20' : 'border-stone-300 focus:border-[#E12927]'
+                      className={`px-4 py-2.5 rounded-xl border bg-[#FAF7F5] dark:bg-[#261A16] text-sm text-[#1F1410] dark:text-[#FAF7F5] focus:outline-none ${
+                        form.errores.apellidoPaterno ? 'border-[#E12927]' : 'border-black/15 dark:border-white/15 focus:border-[#E12927]'
                       }`}
                       {...form.propsCampo('apellidoPaterno')}
                     />
@@ -215,8 +522,8 @@ export default function ProfileScreen({
                   </div>
 
                   <div className="flex flex-col gap-1">
-                    <label htmlFor="perfil-ap-materno" className="font-mono text-[11px] font-bold text-[#8E7A74] tracking-wider uppercase">
-                      APELLIDO MATERNO
+                    <label htmlFor="perfil-ap-materno" className="text-xs font-semibold text-[#6B5A52] dark:text-[#C5B4AE]">
+                      Apellido materno
                     </label>
                     <input
                       id="perfil-ap-materno"
@@ -224,8 +531,8 @@ export default function ProfileScreen({
                       value={form.valores.apellidoMaterno}
                       onChange={(e) => form.setCampo('apellidoMaterno', e.target.value)}
                       placeholder="Opcional"
-                      className={`px-4 py-3 rounded-md border-2 bg-white text-sm font-body text-[#1F1410] focus:outline-none ${
-                        form.errores.apellidoMaterno ? 'border-[#E12927] bg-[#FCEAE9]/20' : 'border-stone-300 focus:border-[#E12927]'
+                      className={`px-4 py-2.5 rounded-xl border bg-[#FAF7F5] dark:bg-[#261A16] text-sm text-[#1F1410] dark:text-[#FAF7F5] focus:outline-none ${
+                        form.errores.apellidoMaterno ? 'border-[#E12927]' : 'border-black/15 dark:border-white/15 focus:border-[#E12927]'
                       }`}
                       {...form.propsCampo('apellidoMaterno')}
                     />
@@ -237,61 +544,70 @@ export default function ProfileScreen({
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-1">
-                  <label htmlFor="perfil-telefono" className="font-mono text-[11px] font-bold text-[#8E7A74] tracking-wider uppercase">
-                    TELÉFONO DE CONTACTO
-                  </label>
-                  <input
-                    id="perfil-telefono"
-                    type="tel"
-                    value={form.valores.telefono}
-                    onChange={(e) => form.setCampo('telefono', e.target.value)}
-                    placeholder="(618) 123-4567"
-                    className={`px-4 py-3 rounded-md border-2 bg-[#FAF7F5] text-sm font-body text-[#1F1410] focus:outline-none ${
-                      form.errores.telefono ? 'border-[#E12927] bg-[#FCEAE9]/20' : 'border-stone-300 focus:border-[#E12927]'
-                    }`}
-                    {...form.propsCampo('telefono')}
-                  />
-                  {form.errores.telefono && (
-                    <p id="error-telefono" role="alert" className="text-xs font-semibold text-[#E12927]">
-                      {form.errores.telefono}
-                    </p>
-                  )}
-                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1">
+                    <label htmlFor="perfil-telefono" className="text-xs font-semibold text-[#6B5A52] dark:text-[#C5B4AE]">
+                      Teléfono de contacto
+                    </label>
+                    <input
+                      id="perfil-telefono"
+                      type="tel"
+                      value={form.valores.telefono}
+                      onChange={(e) => form.setCampo('telefono', e.target.value)}
+                      placeholder="(618) 123-4567"
+                      className={`px-4 py-2.5 rounded-xl border bg-[#FAF7F5] dark:bg-[#261A16] text-sm text-[#1F1410] dark:text-[#FAF7F5] focus:outline-none ${
+                        form.errores.telefono ? 'border-[#E12927]' : 'border-black/15 dark:border-white/15 focus:border-[#E12927]'
+                      }`}
+                      {...form.propsCampo('telefono')}
+                    />
+                    {form.errores.telefono && (
+                      <p id="error-telefono" role="alert" className="text-xs font-semibold text-[#E12927]">
+                        {form.errores.telefono}
+                      </p>
+                    )}
+                  </div>
 
-                <div className="flex flex-col gap-1">
-                  <label htmlFor="perfil-correo" className="font-mono text-[11px] font-bold text-[#8E7A74] tracking-wider uppercase">
-                    CORREO ELECTRÓNICO *
-                  </label>
-                  <input
-                    id="perfil-correo"
-                    type="email"
-                    value={form.valores.correo}
-                    onChange={(e) => form.setCampo('correo', e.target.value)}
-                    className={`px-4 py-3 rounded-md border-2 bg-[#FAF7F5] text-sm font-body text-[#1F1410] focus:outline-none ${
-                      form.errores.correo ? 'border-[#E12927] bg-[#FCEAE9]/20' : 'border-stone-300 focus:border-[#E12927]'
-                    }`}
-                    {...form.propsCampo('correo')}
-                  />
-                  {form.errores.correo && (
-                    <p id="error-correo" role="alert" className="text-xs font-semibold text-[#E12927]">
-                      {form.errores.correo}
-                    </p>
-                  )}
+                  <div className="flex flex-col gap-1">
+                    <label htmlFor="perfil-correo" className="text-xs font-semibold text-[#6B5A52] dark:text-[#C5B4AE]">
+                      Correo electrónico *
+                    </label>
+                    <input
+                      id="perfil-correo"
+                      type="email"
+                      value={form.valores.correo}
+                      onChange={(e) => form.setCampo('correo', e.target.value)}
+                      className={`px-4 py-2.5 rounded-xl border bg-[#FAF7F5] dark:bg-[#261A16] text-sm text-[#1F1410] dark:text-[#FAF7F5] focus:outline-none ${
+                        form.errores.correo ? 'border-[#E12927]' : 'border-black/15 dark:border-white/15 focus:border-[#E12927]'
+                      }`}
+                      {...form.propsCampo('correo')}
+                    />
+                    {form.errores.correo && (
+                      <p id="error-correo" role="alert" className="text-xs font-semibold text-[#E12927]">
+                        {form.errores.correo}
+                      </p>
+                    )}
+                  </div>
                 </div>
 
                 {errorGeneral && (
-                  <p role="alert" className="text-xs font-semibold text-[#E12927] bg-[#FCEAE9] px-3 py-2 rounded-md border border-[#E12927]/30">
+                  <p role="alert" className="text-xs font-semibold text-[#E12927] bg-[#FCEAE9] dark:bg-[#3A1C1A] px-3 py-2 rounded-xl">
                     {errorGeneral}
                   </p>
                 )}
 
-                <div className="flex justify-end gap-3 mt-2">
+                <div className="flex justify-end gap-2.5 mt-2">
                   <button
                     type="button"
-                    className="px-6 py-2.5 rounded-md font-mono text-xs font-bold uppercase tracking-wider border-2 border-[#1F1410] bg-white text-[#1F1410] hover:bg-[#1F1410] hover:text-white active:scale-95 transition-all cursor-pointer shadow-xs"
+                    className="px-5 py-2.5 rounded-xl border border-black/15 dark:border-white/15 text-xs font-semibold text-[#1F1410] dark:text-[#FAF7F5] cursor-pointer"
                     onClick={() => {
-                      form.resetear({ nombre: perfil.nombre || '', telefono: perfil.telefono || '', correo: perfil.correo || '' });
+                      const p = separarNombreFallback(perfil);
+                      form.resetear({
+                        nombres: p.nombres,
+                        apellidoPaterno: p.apellidoPaterno,
+                        apellidoMaterno: p.apellidoMaterno,
+                        telefono: perfil.telefono || '',
+                        correo: perfil.correo || ''
+                      });
                       setIsEditing(false);
                     }}
                   >
@@ -300,174 +616,126 @@ export default function ProfileScreen({
                   <button
                     type="submit"
                     disabled={guardando}
-                    className="inline-flex items-center gap-1.5 px-7 py-2.5 rounded-md font-mono text-xs font-bold uppercase tracking-wider bg-[#E12927] hover:bg-[#C81E1C] active:scale-95 text-white border-2 border-[#E12927] shadow-md shadow-[#E12927]/30 hover:shadow-lg transition-all duration-200 cursor-pointer disabled:opacity-60"
+                    className="inline-flex items-center gap-1.5 px-6 py-2.5 rounded-xl bg-[#E12927] hover:bg-[#C81E1C] text-white text-xs font-semibold cursor-pointer disabled:opacity-60 shadow-sm"
                   >
-                    <Check size={16} />
+                    <Check size={15} />
                     <span>{guardando ? 'Guardando...' : 'Guardar cambios'}</span>
                   </button>
                 </div>
               </form>
             ) : (
-              <div className="flex flex-wrap gap-4 text-xs sm:text-sm font-body text-[#1F1410] font-medium pt-2 border-t-2 border-stone-200">
-                <div className="flex items-center gap-2">
-                  <Phone size={16} className="text-[#E12927]" />
-                  <span>{perfil.telefono}</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div className="p-4 rounded-2xl bg-[#FAF7F5] dark:bg-[#261A16]">
+                  <span className="block text-[11px] text-[#8E7A74] dark:text-[#A9968F]">Nombre completo</span>
+                  <strong className="text-sm text-[#1F1410] dark:text-[#FAF7F5]">{perfil.nombre}</strong>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Mail size={16} className="text-[#E12927]" />
-                  <span>{perfil.correo}</span>
+                <div className="p-4 rounded-2xl bg-[#FAF7F5] dark:bg-[#261A16]">
+                  <span className="block text-[11px] text-[#8E7A74] dark:text-[#A9968F]">Nivel Club Marfil</span>
+                  <strong className="inline-flex items-center gap-1.5 text-sm text-[#1F1410] dark:text-[#FAF7F5]">
+                    <Award size={14} className="text-[#E12927]" />
+                    {perfil.nivelFidelidad}
+                  </strong>
                 </div>
+                <div className="p-4 rounded-2xl bg-[#FAF7F5] dark:bg-[#261A16]">
+                  <span className="block text-[11px] text-[#8E7A74] dark:text-[#A9968F]">Correo electrónico</span>
+                  <strong className="text-sm text-[#1F1410] dark:text-[#FAF7F5]">{perfil.correo || 'Sin registrar'}</strong>
+                </div>
+                <div className="p-4 rounded-2xl bg-[#FAF7F5] dark:bg-[#261A16]">
+                  <span className="block text-[11px] text-[#8E7A74] dark:text-[#A9968F]">Teléfono</span>
+                  <strong className="text-sm text-[#1F1410] dark:text-[#FAF7F5]">{perfil.telefono || 'Sin registrar'}</strong>
+                </div>
+                <div className="p-4 rounded-2xl bg-[#FAF7F5] dark:bg-[#261A16]">
+                  <span className="block text-[11px] text-[#8E7A74] dark:text-[#A9968F]">Ciudad</span>
+                  <strong className="inline-flex items-center gap-1 text-sm text-[#1F1410] dark:text-[#FAF7F5]">
+                    <MapPin size={13} className="text-[#E12927]" /> {perfil.ciudad}
+                  </strong>
+                </div>
+                {perfil.codigoCliente && (
+                  <div className="p-4 rounded-2xl bg-[#FAF7F5] dark:bg-[#261A16]">
+                    <span className="block text-[11px] text-[#8E7A74] dark:text-[#A9968F]">Código Club Marfil</span>
+                    <strong className="text-sm text-[#1F1410] dark:text-[#FAF7F5]">{perfil.codigoCliente}</strong>
+                  </div>
+                )}
               </div>
             )}
-
-            {/* Métricas Rápidas HeroUI Stat slots */}
-            <div className="flex items-center justify-around pt-4 border-t-2 border-stone-200 text-center">
-              <div>
-                <span className="block font-mono text-2xl font-bold text-[#E12927]">{perfil.visitasRealizadas}</span>
-                <span className="font-body text-xs text-[#8E7A74] font-medium">Visitas a Marfil</span>
-              </div>
-              <div className="w-px h-8 bg-stone-300" />
-              <div>
-                <span className="block font-mono text-2xl font-bold text-[#E12927]">{reservacionesCount}</span>
-                <span className="font-body text-xs text-[#8E7A74] font-medium">Reservaciones</span>
-              </div>
-              <div className="w-px h-8 bg-stone-300" />
-              <div>
-                <span className="block font-mono text-2xl font-bold text-[#E12927]">{perfil.puntosFidelidad}</span>
-                <span className="font-body text-xs text-[#8E7A74] font-medium">Puntos Marfil</span>
-              </div>
-            </div>
           </div>
+        )}
 
-          {/* Preferencias de Café y Experiencia */}
-          <div className="bg-white rounded-lg border-2 border-stone-300 p-6 sm:p-8 shadow-md flex flex-col gap-4">
-            <div className="flex items-center gap-3">
-              <Coffee size={22} className="text-[#E12927]" />
-              <h3 className="font-display text-xl font-bold text-[#1F1410]">Mis Preferencias Gastronómicas</h3>
-            </div>
-            <p className="font-body text-xs sm:text-sm text-[#8E7A74] -mt-1 font-medium">
-              Personalizamos tus bebidas y recomendaciones de cocina al momento de ordenar en Durango.
-            </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mt-2">
-              <div className="p-4 rounded-md bg-[#FCEAE9] border-2 border-[#E12927]/40 shadow-xs">
-                <span className="block font-mono text-[10px] font-bold text-[#E12927] tracking-wider uppercase mb-1">
-                  BEBIDA FAVORITA
-                </span>
-                <strong className="font-body text-sm text-[#1F1410]">{perfil.preferencias?.frappeFavorito || perfil.preferencias?.cafeFavorito || 'Flat White 12oz'}</strong>
-              </div>
-
-              <div className="p-4 rounded-md bg-[#FCEAE9] border-2 border-[#E12927]/40 shadow-xs">
-                <span className="block font-mono text-[10px] font-bold text-[#E12927] tracking-wider uppercase mb-1">
-                  PLATILLO ESTRELLA
-                </span>
-                <strong className="font-body text-sm text-[#1F1410]">{perfil.preferencias?.platilloFavorito || 'Chilaquiles verdes con boneless'}</strong>
-              </div>
-
-              <div className="p-4 rounded-md bg-[#FCEAE9] border-2 border-[#E12927]/40 shadow-xs">
-                <span className="block font-mono text-[10px] font-bold text-[#E12927] tracking-wider uppercase mb-1">
-                  EXPERIENCIA PREFERIDA
-                </span>
-                <strong className="font-body text-sm text-[#1F1410]">Noche de Juegos de Mesa (+60 títulos)</strong>
-              </div>
-
-              <div className="p-4 rounded-md bg-[#FCEAE9] border-2 border-[#E12927]/40 shadow-xs">
-                <span className="block font-mono text-[10px] font-bold text-[#E12927] tracking-wider uppercase mb-1">
-                  SUCURSAL FRECUENTE
-                </span>
-                <strong className="font-body text-sm text-[#1F1410]">{perfil.preferencias?.sucursalFrecuente || 'Centro Histórico (Casona)'}</strong>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Columna Derecha: Accesos Directos y Ajustes */}
-        <div className="flex flex-col gap-6">
-          <div className="bg-white rounded-lg border-2 border-stone-300 p-6 sm:p-7 shadow-md flex flex-col gap-4">
-            <h3 className="font-display text-xl font-bold text-[#1F1410]">Accesos Rápidos</h3>
-
-            <div className="flex flex-col gap-3">
-              <div
-                className="flex items-center justify-between p-4 rounded-md bg-white border-2 border-stone-300 hover:border-[#E12927] hover:bg-[#FCEAE9] hover:translate-x-1 transition-all cursor-pointer group shadow-xs"
-                onClick={() => {
-                  sounds.playClick();
-                  onViewReservations();
-                }}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-md bg-[#FCEAE9] text-[#E12927] flex items-center justify-center border-2 border-[#E12927]/30">
-                    <Calendar size={20} />
-                  </div>
-                  <div>
-                    <h4 className="font-body text-sm font-bold text-[#1F1410] m-0">Mis Reservaciones</h4>
-                    <span className="font-mono text-xs text-[#8E7A74] font-medium">{reservacionesCount} activas</span>
-                  </div>
-                </div>
-                <ChevronRight size={18} className="text-[#E12927] group-hover:translate-x-1 transition-transform" />
-              </div>
-
-              <div
-                className="flex items-center justify-between p-4 rounded-md bg-white border-2 border-stone-300 hover:border-[#E12927] hover:bg-[#FCEAE9] hover:translate-x-1 transition-all cursor-pointer group shadow-xs"
-                onClick={() => {
-                  sounds.playClick();
-                  onViewBenefits();
-                }}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-md bg-[#FCEAE9] text-[#E12927] flex items-center justify-center border-2 border-[#E12927]/30">
-                    <Gift size={20} />
-                  </div>
-                  <div>
-                    <h4 className="font-body text-sm font-bold text-[#1F1410] m-0">Mis Beneficios & Sellos</h4>
-                    <span className="font-mono text-xs text-[#8E7A74] font-medium">6 de 8 sellos completados</span>
-                  </div>
-                </div>
-                <ChevronRight size={18} className="text-[#E12927] group-hover:translate-x-1 transition-transform" />
-              </div>
-            </div>
-          </div>
-
-          {/* Ajuste de Tema */}
-          <div className="bg-white rounded-lg border-2 border-stone-300 p-6 shadow-md flex items-center justify-between gap-4">
+        {activeTab === 'preferencias' && (
+          <div className="mt-6 flex flex-col gap-6 text-left">
             <div>
-              <h4 className="font-display text-base font-bold text-[#1F1410] mb-0.5">Modo de Lectura</h4>
-              <p className="font-body text-xs text-[#8E7A74] m-0 font-medium">Ajusta la paleta visual para lectura diurna o nocturna.</p>
+              <h2 className="text-lg font-bold text-[#1F1410] dark:text-[#FAF7F5] mb-1">
+                Mis Preferencias Gastronómicas
+              </h2>
+              <p className="text-xs text-[#8E7A74] dark:text-[#A9968F]">
+                Personalizamos tus bebidas y recomendaciones de cocina al ordenar en Durango.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 mt-4">
+                <div className="p-4 rounded-2xl bg-[#FAF7F5] dark:bg-[#261A16]">
+                  <span className="block text-[10px] font-bold text-[#E12927] uppercase tracking-wider mb-1">
+                    Bebida favorita
+                  </span>
+                  <strong className="text-sm text-[#1F1410] dark:text-[#FAF7F5]">{bebidaFav}</strong>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-[#FAF7F5] dark:bg-[#261A16]">
+                  <span className="block text-[10px] font-bold text-[#E12927] uppercase tracking-wider mb-1">
+                    Platillo estrella
+                  </span>
+                  <strong className="text-sm text-[#1F1410] dark:text-[#FAF7F5]">{platilloFav}</strong>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-[#FAF7F5] dark:bg-[#261A16]">
+                  <span className="block text-[10px] font-bold text-[#E12927] uppercase tracking-wider mb-1">
+                    Experiencia preferida
+                  </span>
+                  <strong className="text-sm text-[#1F1410] dark:text-[#FAF7F5]">Noche de Juegos de Mesa (+60 títulos)</strong>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-[#FAF7F5] dark:bg-[#261A16]">
+                  <span className="block text-[10px] font-bold text-[#E12927] uppercase tracking-wider mb-1">
+                    Sucursal frecuente
+                  </span>
+                  <strong className="text-sm text-[#1F1410] dark:text-[#FAF7F5]">{sucursalFav}</strong>
+                </div>
+              </div>
             </div>
 
-            <button
-              className="w-11 h-11 rounded-md border-2 border-stone-300 bg-white flex items-center justify-center text-[#1F1410] hover:bg-[#FCEAE9] hover:border-[#E12927] active:scale-95 transition-all cursor-pointer shrink-0 shadow-xs"
-              onClick={() => {
-                sounds.playClick();
-                toggleTheme();
-              }}
-              aria-label="Cambiar modo"
-            >
-              {theme === 'dark' ? <Moon size={20} className="text-white" /> : <Sun size={20} className="text-amber-500" />}
-            </button>
+            {/* Ajuste de Modo Oscuro / Claro */}
+            <div className="p-5 rounded-2xl bg-[#FAF7F5] dark:bg-[#261A16] flex items-center justify-between gap-4">
+              <div>
+                <h3 className="text-sm sm:text-base font-bold text-[#1F1410] dark:text-[#FAF7F5]">
+                  Apariencia del sistema ({theme === 'dark' ? 'Modo oscuro' : 'Modo claro'})
+                </h3>
+                <p className="text-xs text-[#8E7A74] dark:text-[#A9968F] mt-0.5">
+                  Adapta la paleta visual de toda la app para lectura diurna o nocturna.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playClick();
+                  toggleTheme();
+                }}
+                aria-label="Cambiar modo de apariencia"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white dark:bg-[#1C1310] border border-black/15 dark:border-white/15 text-xs font-semibold text-[#1F1410] dark:text-[#FAF7F5] hover:border-[#E12927] transition-all cursor-pointer shrink-0"
+              >
+                {theme === 'dark' ? (
+                  <>
+                    <Sun size={15} className="text-amber-400" />
+                    <span>Cambiar a claro</span>
+                  </>
+                ) : (
+                  <>
+                    <Moon size={15} />
+                    <span>Cambiar a oscuro</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
-
-          {/* Cerrar sesión */}
-          {onLogout && (
-            <button
-              type="button"
-              className="p-3.5 rounded-md border-2 border-stone-300 bg-white font-mono text-xs font-bold uppercase tracking-wider text-[#1F1410] hover:bg-[#FCEAE9] hover:border-[#E12927] active:scale-[0.99] transition-all cursor-pointer shadow-xs"
-              onClick={() => {
-                sounds.playClick();
-                onLogout();
-              }}
-            >
-              Cerrar sesión
-            </button>
-          )}
-
-          {/* Garantía de Comunidad */}
-          <div className="bg-[#FCEAE9] rounded-lg border-2 border-[#E12927]/40 p-5 flex items-start gap-3.5 shadow-xs">
-            <ShieldCheck size={24} className="text-[#E12927] shrink-0 mt-0.5" />
-            <p className="font-body text-xs text-[#1F1410] leading-relaxed m-0 font-medium">
-              Tus datos sólo se utilizan para gestionar tus reservaciones de mesa y validar tus sellos de fidelidad en Café Marfil Durango.
-            </p>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

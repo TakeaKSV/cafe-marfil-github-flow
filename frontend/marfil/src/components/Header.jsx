@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Bell, CalendarDays, User, LogIn } from 'lucide-react';
 import ElephantLogo from './ElephantLogo';
 import { sounds } from '../utils/audio';
@@ -10,6 +10,15 @@ export default function Header({
   openNotifications,
   isLoggedIn = false
 }) {
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setIsScrolled(window.scrollY > 40);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [activeScreen]);
+
   const navItems = [
     { id: 'inicio', label: 'Inicio' },
     { id: 'menu', label: 'Menú' },
@@ -25,16 +34,17 @@ export default function Header({
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const isHeroOverlay = activeScreen === 'inicio' || activeScreen === 'hero';
+  const isFixedOverlay = activeScreen === 'inicio' || activeScreen === 'hero';
+  const isHeroOverlay = isFixedOverlay && !isScrolled;
 
   return (
     <>
-      {/* Navbar Principal: Transparente sobre el Hero / Glassmorphic en otras vistas */}
+      {/* Navbar Principal: Transparente sobre el Hero al inicio / Sólida legible al scrollear */}
       <header
-        className={`${
+        className={`${isFixedOverlay ? 'fixed top-0 inset-x-0' : 'sticky top-0'} z-40 ${
           isHeroOverlay
-            ? 'fixed top-0 inset-x-0 z-40 bg-transparent border-b border-white/15 backdrop-blur-xs text-white'
-            : 'sticky top-0 z-40 bg-white/90 backdrop-blur-xl border-b border-stone-200/60 text-[#1F1410] shadow-xs'
+            ? 'bg-transparent border-b border-white/15 backdrop-blur-xs text-white'
+            : 'bg-white/95 backdrop-blur-xl border-b border-stone-200/70 text-[#1F1410] shadow-sm'
         } transition-all duration-300`}
       >
         <div className="max-w-[1240px] mx-auto px-4 sm:px-6 h-[72px] flex items-center justify-between gap-4">

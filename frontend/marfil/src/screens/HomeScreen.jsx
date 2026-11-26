@@ -349,11 +349,6 @@ export default function HomeScreen({
                 COLUMNA DERECHA: TEXTO CONCISO QUE INCITA A VER TODOS LOS EVENTOS
                 ============================================================ */}
             <div className="lg:col-span-6 flex flex-col items-start text-left lg:pl-4">
-              {/* Badge de Categoría */}
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FCEAE9] text-[#E12927] font-mono text-xs font-bold uppercase tracking-wider mb-3.5 border border-[#E12927]/20">
-                [ CARTELERA & EXPERIENCIAS ]
-              </span>
-
               {/* Título en Negro Café (#1F1410) y Rojo Marfil (#E12927) */}
               <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-black text-[#1F1410] tracking-tight leading-[1.12] mb-3">
                 Música en Vivo, <br />
@@ -428,12 +423,6 @@ export default function HomeScreen({
                 LADO DERECHO: TIPOGRAFÍA ESTILO EDITORIAL POSTER + BENEFICIOS
                 ============================================================ */}
             <div className="lg:col-span-6 text-left flex flex-col items-start lg:pl-4">
-              {/* Eyebrow Tag */}
-              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white border border-[#E12927]/25 text-[#E12927] font-mono text-xs font-bold uppercase tracking-wider mb-3 shadow-xs">
-                <Gift size={14} className="text-[#E12927]" />
-                <span>PROGRAMA DE LEALTAD EXCLUSIVO</span>
-              </div>
-
               {/* Gran Titular Display con contraste Cursivo Serif / Bold Sans */}
               <div className="mb-3">
                 <span className="font-display italic text-5xl sm:text-6xl lg:text-7xl font-semibold text-[#E12927] tracking-tight block leading-[0.95] drop-shadow-xs">
@@ -476,10 +465,6 @@ export default function HomeScreen({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-4">
             <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FCEAE9] text-[#E12927] font-mono text-xs font-bold uppercase tracking-wider mb-2 border border-[#E12927]/20">
-                <MapPin size={14} />
-                <span>SUCURSALES REALES EN DURANGO, DGO.</span>
-              </div>
               <h2 className="font-display text-2xl sm:text-4xl font-extrabold text-[#1F1410] tracking-tight">
                 Visítanos en Nuestras Sucursales
               </h2>
@@ -497,27 +482,27 @@ export default function HomeScreen({
           </div>
 
           {/* Grid de las 2 Sucursales Reales con Fotos Reales */}
-          <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+          <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
             {sucursales.map((sucursal) => {
               const isActive = activeSucursalId === sucursal.id;
               return (
                 <div
                   key={sucursal.id}
                   onClick={() => setActiveSucursalId(sucursal.id)}
-                  className={`bg-white rounded-2xl border-2 overflow-hidden transition-all duration-300 flex flex-col justify-between group cursor-pointer shadow-sm hover:shadow-xl ${isActive
-                    ? 'border-[#E12927] ring-2 ring-[#E12927]/20 shadow-md'
-                    : 'border-stone-200 hover:border-stone-400'
+                  className={`bg-white rounded-[24px] border overflow-hidden transition-all duration-300 flex flex-col justify-between group cursor-pointer shadow-sm hover:shadow-xl ${isActive
+                    ? 'border-[#E12927] ring-2 ring-[#E12927]/15 shadow-md'
+                    : 'border-stone-200 hover:border-stone-300'
                     }`}
                 >
                   <div>
-                    {/* Foto Real de la Sucursal */}
-                    <div className="relative h-52 w-full overflow-hidden bg-stone-100">
+                    {/* Foto Real de la Sucursal en proporción 16:10 */}
+                    <div className="relative aspect-[16/10] w-full overflow-hidden bg-[#1F1410]">
                       <img
                         src={sucursal.imagen}
                         alt={sucursal.nombre}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20 pointer-events-none" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/15 pointer-events-none" />
 
                       {sucursal.destacada && (
                         <span className="absolute top-3 left-3 bg-[#E12927] text-white font-mono text-[10px] font-bold px-2.5 py-0.5 rounded-full shadow-md">

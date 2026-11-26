@@ -7,24 +7,35 @@
   --color-rosa-claro: #FCEAE9;
   --color-app-bg: #FAF7F5;
   --color-surface-soft: #F5EFEB;
-  --color-border-card: rgba(31, 20, 16, 0.12);
+  --color-border-card: rgba(31, 20, 16, 0.1);
   --color-border-focus: #E12927;
 
-  --font-display: 'Fraunces', Georgia, serif;
-  --font-body: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'Space Mono', monospace;
+  --font-display: "Fraunces", Georgia, serif;
+  --font-body: "Fraunces", Georgia, serif;
+  --font-mono: "Fraunces", Georgia, serif;
 }
 
 :root {
   --rojo-marfil: #E12927;
+  --rojo-marfil-hover: #C21E1C;
   --negro-cafe: #1F1410;
   --blanco: #FFFFFF;
   --rosa-claro: #FCEAE9;
-  --bg-app: #FAF7F5;
-  
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --bg-app: #F8F5F1;
+  --surface-elevated: rgba(255, 255, 255, 0.94);
+  --border-subtle: rgba(31, 20, 16, 0.08);
+  --shadow-card: 0 1px 2px rgba(31, 20, 16, 0.04), 0 8px 24px -12px rgba(31, 20, 16, 0.08);
+  --shadow-card-hover: 0 12px 30px -10px rgba(31, 20, 16, 0.12), 0 4px 12px -6px rgba(225, 41, 39, 0.08);
+
+  --ease-out-quint: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out-cubic: cubic-bezier(0.645, 0.045, 0.355, 1);
+  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+
+  font-family: "Fraunces", Georgia, serif;
   color: #1F1410;
-  background-color: #FAF7F5;
+  background-color: var(--bg-app);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 * {
@@ -33,41 +44,133 @@
 
 /* Tipografías */
 .font-display {
-  font-family: 'Fraunces', Georgia, serif;
+  font-family: "Fraunces", Georgia, serif;
+  font-weight: 600;
 }
 
 .font-body {
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: "Fraunces", Georgia, serif;
+  font-weight: 500;
 }
 
 .font-mono {
-  font-family: 'Space Mono', monospace;
+  font-family: "Fraunces", Georgia, serif;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Scrollbars estilizadas */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #FAF7F5;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #D9D2CD;
-  border-radius: 2px;
+  background: rgba(31, 20, 16, 0.16);
+  border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #E12927;
+  background: rgba(225, 41, 39, 0.7);
 }
 
-/* Variables de Easing fluidas (Animations on the Web / Emil Kowalski) */
-:root {
-  --ease-out-quint: cubic-bezier(0.23, 1, 0.32, 1);
-  --ease-in-out-cubic: cubic-bezier(0.645, 0.045, 0.355, 1);
-  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+/* ==========================================================================
+   SISTEMA MODERNO DE TABLAS, SUPERFICIES Y PROCESOS ADMIN
+   ========================================================================== */
+
+.admin-surface {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 1.25rem;
+  box-shadow: var(--shadow-card);
+  transition: box-shadow 220ms var(--ease-out-quint), border-color 220ms ease, transform 220ms var(--ease-out-quint);
+}
+
+.admin-surface:hover {
+  border-color: rgba(31, 20, 16, 0.13);
+}
+
+/* Contenedor de tablas con scroll fluido y sombra interna */
+.admin-table-shell {
+  background: #FFFFFF;
+  border: 1px solid rgba(31, 20, 16, 0.09);
+  border-radius: 1.35rem;
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.admin-table-shell table,
+main table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-table-shell thead th,
+main table thead th {
+  background: linear-gradient(180deg, #FCF9F6 0%, #F7F2EC 100%);
+  border-bottom: 1px solid rgba(31, 20, 16, 0.09);
+  color: rgba(31, 20, 16, 0.58);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  white-space: nowrap;
+}
+
+.admin-table-shell tbody tr,
+main table tbody tr {
+  transition: background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.admin-table-shell tbody tr:hover,
+main table tbody tr:hover {
+  background-color: #FCF7F4;
+}
+
+.admin-table-shell tbody td,
+main table tbody td {
+  border-bottom: 1px solid rgba(31, 20, 16, 0.055);
+  vertical-align: middle;
+}
+
+.admin-table-shell tbody tr:last-child td,
+main table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Inputs, selects y textareas refinados en procesos y modales */
+main input[type="text"],
+main input[type="search"],
+main input[type="email"],
+main input[type="tel"],
+main input[type="number"],
+main input[type="date"],
+main input[type="time"],
+main select,
+main textarea {
+  transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+}
+
+main input[type="text"]:focus,
+main input[type="search"]:focus,
+main input[type="email"]:focus,
+main input[type="tel"]:focus,
+main input[type="number"]:focus,
+main input[type="date"]:focus,
+main input[type="time"]:focus,
+main select:focus,
+main textarea:focus {
+  border-color: #E12927;
+  box-shadow: 0 0 0 3px rgba(225, 41, 39, 0.12);
+  outline: none;
 }
 
 /* Efectos de elevación e interacción universal */
@@ -76,8 +179,8 @@
 }
 
 .hover-lift:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 10px 25px -5px rgba(31, 20, 16, 0.08), 0 8px 10px -6px rgba(31, 20, 16, 0.05);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card-hover);
 }
 
 .hover-lift-sm {
@@ -85,20 +188,87 @@
 }
 
 .hover-lift-sm:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px -2px rgba(31, 20, 16, 0.07);
+  transform: translateY(-1.5px);
+  box-shadow: 0 6px 16px -4px rgba(31, 20, 16, 0.08);
 }
 
-/* Micro-rebote al hacer clic / click press */
+/* Micro-rebote al hacer clic */
 .btn-press {
-  transition: transform 100ms ease-out, filter 150ms ease;
+  transition: transform 110ms ease-out, filter 150ms ease, background-color 150ms ease;
 }
 
 .btn-press:active {
-  transform: scale(0.96);
+  transform: scale(0.97);
 }
 
-/* Efectos sutiles */
+/* ==========================================================================
+   MESAS EN VIVO: DRAG & DROP + FUSIÓN VISUAL
+   ========================================================================== */
+
+.mesa-draggable {
+  cursor: grab;
+  transition: transform 220ms var(--ease-out-quint), filter 200ms ease, opacity 180ms ease;
+}
+
+.mesa-draggable:active {
+  cursor: grabbing;
+}
+
+.mesa-dragging {
+  opacity: 0.45;
+  transform: scale(0.94);
+  filter: saturate(0.8);
+}
+
+.mesa-drop-target {
+  transform: scale(1.09) !important;
+  filter: drop-shadow(0 0 18px rgba(225, 41, 39, 0.45));
+  z-index: 25;
+}
+
+.mesa-drop-target::after {
+  content: "Soltar para juntar";
+  position: absolute;
+  bottom: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1F1410;
+  color: #FFFFFF;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+  box-shadow: 0 6px 14px rgba(31, 20, 16, 0.25);
+  pointer-events: none;
+  z-index: 30;
+}
+
+@keyframes mesaMergePop {
+  0% {
+    transform: scale(0.88);
+    box-shadow: 0 0 0 0 rgba(225, 41, 39, 0.45);
+  }
+  55% {
+    transform: scale(1.06);
+    box-shadow: 0 0 0 14px rgba(225, 41, 39, 0);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(225, 41, 39, 0);
+  }
+}
+
+.mesa-merged-pop {
+  animation: mesaMergePop 420ms var(--ease-spring) forwards;
+}
+
+/* ==========================================================================
+   ANIMACIONES GENERALES
+   ========================================================================== */
+
 .badge-pulse {
   animation: pulse-border 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
@@ -114,7 +284,6 @@
   }
 }
 
-/* Animación de entrada y cambio de pestañas */
 @keyframes slideFadeIn {
   from {
     opacity: 0;
@@ -127,23 +296,18 @@
 }
 
 .animate-tab-slide {
-  animation: slideFadeIn 280ms var(--ease-out-quint) forwards;
+  animation: slideFadeIn 260ms var(--ease-out-quint) forwards;
 }
 
-/* Animaciones fluidas para Ventanas Modales */
 @keyframes modalBackdropFadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @keyframes modalContentZoomIn {
   from {
     opacity: 0;
-    transform: scale(0.94) translateY(12px);
+    transform: scale(0.95) translateY(10px);
   }
   to {
     opacity: 1;
@@ -152,32 +316,26 @@
 }
 
 .animate-modal-backdrop {
-  animation: modalBackdropFadeIn 200ms ease-out forwards;
+  animation: modalBackdropFadeIn 190ms ease-out forwards;
 }
 
 .animate-modal-card {
-  animation: modalContentZoomIn 280ms var(--ease-spring) forwards;
+  animation: modalContentZoomIn 260ms var(--ease-spring) forwards;
 }
 
-/* Animación de flotación orgánica suave */
 @keyframes floatSlow {
-  0%, 100% {
-    transform: translateY(0px) rotate(0deg);
-  }
-  50% {
-    transform: translateY(-8px) rotate(0.8deg);
-  }
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-6px) rotate(0.6deg); }
 }
 
 .animate-float-slow {
   animation: floatSlow 5s ease-in-out infinite;
 }
 
-/* Entrada escalonada de elementos (Stagger fade in) */
 @keyframes staggerFadeUp {
   from {
     opacity: 0;
-    transform: translateY(14px);
+    transform: translateY(12px);
   }
   to {
     opacity: 1;
@@ -186,21 +344,20 @@
 }
 
 .animate-fade-up {
-  animation: staggerFadeUp 320ms var(--ease-out-quint) both;
+  animation: staggerFadeUp 300ms var(--ease-out-quint) both;
 }
 
-.stagger-1 { animation-delay: 50ms; }
-.stagger-2 { animation-delay: 100ms; }
-.stagger-3 { animation-delay: 150ms; }
-.stagger-4 { animation-delay: 200ms; }
-.stagger-5 { animation-delay: 250ms; }
-.stagger-6 { animation-delay: 300ms; }
+.stagger-1 { animation-delay: 45ms; }
+.stagger-2 { animation-delay: 90ms; }
+.stagger-3 { animation-delay: 135ms; }
+.stagger-4 { animation-delay: 180ms; }
+.stagger-5 { animation-delay: 225ms; }
+.stagger-6 { animation-delay: 270ms; }
 
-/* Menú dropdown / popover fade & scale */
 @keyframes menuIn {
   from {
     opacity: 0;
-    transform: scale(0.95) translateY(-4px);
+    transform: scale(0.96) translateY(-4px);
   }
   to {
     opacity: 1;
@@ -212,7 +369,6 @@
   animation: menuIn 160ms var(--ease-out-quint) forwards;
 }
 
-/* Animación sutil de pulso vivo para indicadores en tiempo real */
 @keyframes liveDot {
   0%, 100% {
     opacity: 1;
@@ -228,28 +384,9 @@
   animation: liveDot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-/* Saludo animado */
-@keyframes handWave {
-  0%, 100% { transform: rotate(0deg); }
-  20%, 60% { transform: rotate(14deg); }
-  40%, 80% { transform: rotate(-10deg); }
-}
-
-.animate-wave {
-  display: inline-block;
-  transform-origin: 70% 70%;
-  animation: handWave 2s ease-in-out infinite;
-}
-
-
-/* Animaciones de Skeleton shimmer y barra de alertas Café Marfil */
 @keyframes marfil-shimmer {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
 
 .marfil-skeleton {
@@ -259,12 +396,8 @@
 }
 
 @keyframes marfil-toast-shrink {
-  from {
-    transform: scaleX(1);
-  }
-  to {
-    transform: scaleX(0);
-  }
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
 }
 
 .marfil-toast-progress {
@@ -274,7 +407,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .marfil-skeleton,
-  .marfil-toast-progress {
+  .marfil-toast-progress,
+  .mesa-merged-pop {
     animation: none;
   }
 }

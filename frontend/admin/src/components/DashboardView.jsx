@@ -75,8 +75,8 @@ export const DashboardView = ({
       {/* 1. Header con Saludo y Filtros */}
       <div className="flex items-center justify-between gap-3 shrink-0">
         <div>
-          <h1 className="font-display font-bold text-lg sm:text-xl text-[#1F1410] flex items-center gap-1.5 leading-none">
-            ¡Hola, Admin! <span className="animate-wave inline-block text-base">👋</span>
+          <h1 className="font-display font-bold text-lg sm:text-xl text-[#1F1410] leading-none">
+            Hola, Admin
           </h1>
           <p className="text-[11px] text-[#1F1410]/50 font-body mt-0.5">
             Monitoreo en tiempo real de reservaciones, aforo y validaciones QR en Café Marfil Durango.

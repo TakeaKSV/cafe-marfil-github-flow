@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import gsap from 'gsap';
 import {
   Calendar,
   Clock,
@@ -10,22 +11,39 @@ import {
   AlertTriangle,
   CalendarPlus,
   Plus,
-  Sparkles
+  Dice5,
+  FileText,
+  History
 } from 'lucide-react';
 import { sounds } from '../utils/audio';
 import QRModal from '../components/QRModal';
 
 export default function MyReservationsScreen({
-  reservaciones,
+  reservaciones = [],
   onCancelReservation,
   onNewReservation
 }) {
   const [activeTab, setActiveTab] = useState('proximas'); // proximas | historial
   const [selectedQRReservation, setSelectedQRReservation] = useState(null);
   const [reservationToCancel, setReservationToCancel] = useState(null);
+  const listRef = useRef(null);
 
   const proximas = reservaciones.filter((r) => !r.esHistorica && r.estado !== 'Cancelada');
   const historial = reservaciones.filter((r) => r.esHistorica || r.estado === 'Cancelada');
+
+  useEffect(() => {
+    if (!listRef.current) return undefined;
+    const cards = listRef.current.querySelectorAll('[data-res-card]');
+    if (!cards.length) return undefined;
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        cards,
+        { y: 20, opacity: 0, scale: 0.98 },
+        { y: 0, opacity: 1, scale: 1, duration: 0.45, stagger: 0.06, ease: 'power3.out', clearProps: 'transform' }
+      );
+    }, listRef);
+    return () => ctx.revert();
+  }, [activeTab, proximas.length, historial.length]);
 
   const handleOpenCancelModal = (res) => {
     sounds.playClick();
@@ -41,21 +59,23 @@ export default function MyReservationsScreen({
   };
 
   return (
-    <div className="flex flex-col gap-8 fade-in pb-16">
-      {/* Encabezado */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="flex flex-col gap-7 sm:gap-8 fade-in pb-16 pt-2">
+      {/* ====================================================================
+          ENCABEZADO EDITORIAL + CTA NUEVA RESERVACIÓN
+          ==================================================================== */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div className="max-w-xl text-left">
-
-          <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold text-[#1F1410] tracking-tight mb-2">
+          <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold text-[#1F1410] dark:text-[#FAF7F5] tracking-tight mb-2">
             Mis Reservaciones
           </h1>
-          <p className="font-body text-sm sm:text-base text-[#1F1410]/80 leading-relaxed font-medium">
-            Consulta tus mesas activas para desayunos, tardes de juegos con anfitrión y el historial de tus visitas a Café Marfil Durango.
+          <p className="font-body text-sm sm:text-base text-[#5A4840] dark:text-[#C5B4AE] leading-relaxed m-0">
+            Administra tus mesas activas, pases QR para eventos y el historial de tus visitas a Café Marfil Durango.
           </p>
         </div>
 
         <button
-          className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-md font-mono text-xs font-bold uppercase tracking-wider bg-[#E12927] hover:bg-[#C81E1C] active:scale-95 text-white shadow-md shadow-[#E12927]/30 hover:shadow-lg transition-all duration-200 cursor-pointer shrink-0 self-start sm:self-center"
+          type="button"
+          className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full text-xs sm:text-sm font-bold bg-[#E12927] hover:bg-[#C81E1C] active:scale-95 text-white shadow-md shadow-[#E12927]/25 transition-all cursor-pointer shrink-0 self-start sm:self-auto"
           onClick={() => {
             sounds.playClick();
             onNewReservation();
@@ -66,187 +86,296 @@ export default function MyReservationsScreen({
         </button>
       </div>
 
-      {/* Tabs HeroUI Style */}
-      <div className="inline-flex p-1.5 rounded-md bg-[#F5EFEB] border-2 border-stone-300 shadow-inner self-start font-mono text-xs font-bold">
+      {/* ====================================================================
+          PESTAÑAS LIMPIAS (PRÓXIMAS / HISTORIAL)
+          ==================================================================== */}
+      <div className="flex items-center gap-2.5 self-start">
         <button
-          className={`px-5 py-2.5 rounded-sm cursor-pointer transition-all duration-200 ${
+          type="button"
+          className={`px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold cursor-pointer transition-all ${
             activeTab === 'proximas'
-              ? 'bg-[#E12927] text-white border-2 border-[#E12927] shadow-md'
-              : 'text-[#1F1410] border-2 border-transparent hover:text-[#E12927] hover:bg-white'
+              ? 'bg-[#1F1410] dark:bg-[#E12927] text-white shadow-sm'
+              : 'bg-white dark:bg-[#1F1410] text-[#6B5A52] dark:text-[#C5B4AE] border border-black/10 dark:border-white/10 hover:text-[#1F1410] dark:hover:text-white'
           }`}
           onClick={() => {
             sounds.playClick();
             setActiveTab('proximas');
           }}
         >
-          Próximas Visitas ({proximas.length})
+          Próximas visitas ({proximas.length})
         </button>
         <button
-          className={`px-5 py-2.5 rounded-sm cursor-pointer transition-all duration-200 ${
+          type="button"
+          className={`px-5 py-2.5 rounded-full text-xs sm:text-sm font-semibold cursor-pointer transition-all ${
             activeTab === 'historial'
-              ? 'bg-[#E12927] text-white border-2 border-[#E12927] shadow-md'
-              : 'text-[#1F1410] border-2 border-transparent hover:text-[#E12927] hover:bg-white'
+              ? 'bg-[#1F1410] dark:bg-[#E12927] text-white shadow-sm'
+              : 'bg-white dark:bg-[#1F1410] text-[#6B5A52] dark:text-[#C5B4AE] border border-black/10 dark:border-white/10 hover:text-[#1F1410] dark:hover:text-white'
           }`}
           onClick={() => {
             sounds.playClick();
             setActiveTab('historial');
           }}
         >
-          Historial Pasado ({historial.length})
+          Historial ({historial.length})
         </button>
       </div>
 
-      {/* Lista de Reservaciones HeroUI Cards 100% Sólidas */}
-      {activeTab === 'proximas' && (
-        <div className="flex flex-col gap-6">
-          {proximas.length === 0 ? (
-            <div className="flex flex-col items-center justify-center text-center p-12 rounded-lg bg-white border-2 border-stone-300 gap-3 shadow-md">
-              <CalendarPlus size={36} className="text-[#E12927]" />
-              <h3 className="font-display text-xl font-bold text-[#1F1410]">No tienes reservaciones próximas</h3>
-              <p className="font-body text-sm text-[#5A4840] max-w-md">Aparta una mesa para desayunar chilaquiles con boneless o disfrutar una tarde de juegos de mesa en Durango.</p>
+      {/* ====================================================================
+          PRÓXIMAS VISITAS — TARJETAS ESTILO PASE / BOLETO
+          ==================================================================== */}
+      <div ref={listRef}>
+        {activeTab === 'proximas' && (
+          proximas.length === 0 ? (
+            <div className="flex flex-col items-center justify-center text-center p-10 sm:p-14 rounded-[28px] bg-white dark:bg-[#1F1410] border border-black/[0.06] dark:border-white/10 gap-3 shadow-xs">
+              <span className="w-14 h-14 rounded-2xl bg-[#FCEAE9] dark:bg-[#321B19] text-[#E12927] flex items-center justify-center">
+                <CalendarPlus size={28} />
+              </span>
+              <h3 className="font-display text-xl sm:text-2xl font-bold text-[#1F1410] dark:text-[#FAF7F5]">
+                No tienes reservaciones próximas
+              </h3>
+              <p className="text-xs sm:text-sm text-[#6B5A52] dark:text-[#B4A099] max-w-md m-0">
+                Aparta una mesa para desayunar, disfrutar una tarde de juegos de mesa o unirte a nuestros próximos eventos en Durango.
+              </p>
               <button
-                className="mt-2 px-7 py-3 rounded-md font-mono text-xs font-bold uppercase tracking-wider bg-[#E12927] text-white border-2 border-[#E12927] shadow-md shadow-[#E12927]/30 hover:bg-[#C81E1C] active:scale-95 transition-all duration-200 cursor-pointer"
-                onClick={onNewReservation}
+                type="button"
+                className="mt-2 px-7 py-3 rounded-full text-xs sm:text-sm font-bold bg-[#E12927] hover:bg-[#C81E1C] text-white shadow-md shadow-[#E12927]/25 active:scale-95 transition-all cursor-pointer"
+                onClick={() => {
+                  sounds.playClick();
+                  onNewReservation();
+                }}
               >
                 Reservar mesa ahora
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {proximas.map((res) => (
                 <article
                   key={res.id}
-                  className="bg-white rounded-lg border-2 border-stone-300 p-6 flex flex-col gap-4 shadow-md hover:shadow-2xl hover:border-[#E12927] transition-all duration-300"
+                  data-res-card
+                  className="rounded-[26px] overflow-hidden bg-white dark:bg-[#1F1410] border border-black/[0.07] dark:border-white/10 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col"
                 >
-                  <div className="flex items-center justify-between pb-3 border-b-2 border-stone-200">
-                    <span className="font-mono text-xs font-bold text-[#E12927] tracking-wider uppercase">
-                      FOLIO: {res.id}
-                    </span>
-                    <span className="px-3.5 py-1 rounded-sm font-mono text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border-2 border-emerald-300 shadow-xs">
-                      ● {res.estado}
+                  {/* Cabecera oscura estilo pase */}
+                  <div className="px-5 sm:px-6 py-4 bg-gradient-to-r from-[#1F1410] via-[#4D1618] to-[#8F191B] text-white flex items-start justify-between gap-3">
+                    <div className="text-left min-w-0">
+                      <span className="block text-[10px] uppercase tracking-widest text-white/70">
+                        Folio · {res.id}
+                      </span>
+                      <h3 className="font-display text-lg sm:text-xl font-bold text-white leading-snug mt-0.5 truncate">
+                        {res.tipo}
+                      </h3>
+                    </div>
+
+                    <span className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md border border-white/20 text-[11px] font-semibold text-white">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                      {res.estado}
                     </span>
                   </div>
 
-                  <h3 className="font-display text-xl font-bold text-[#1F1410] leading-snug">
-                    {res.tipo}
-                  </h3>
-
-                  <div className="grid grid-cols-2 gap-3 p-4 rounded-md bg-[#FCEAE9] border-2 border-[#E12927]/40 text-xs font-body shadow-xs">
-                    <div className="flex items-center gap-2">
-                      <Calendar size={15} className="text-[#E12927]" />
-                      <span className="font-mono font-bold text-[#1F1410]">{res.fecha}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Clock size={15} className="text-[#E12927]" />
-                      <span className="font-mono font-bold text-[#1F1410]">{res.hora}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <MapPin size={15} className="text-[#E12927]" />
-                      <span className="text-[#1F1410] font-semibold truncate">{res.sucursalNombre}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Users size={15} className="text-[#E12927]" />
-                      <span className="text-[#1F1410] font-semibold">{res.personas} comensales</span>
-                    </div>
+                  {/* Línea perforada de boleto */}
+                  <div className="relative h-4 bg-white dark:bg-[#1F1410] flex items-center justify-center">
+                    <span className="absolute -left-2.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-[#FAF7F5] dark:bg-[#150E0C] border-r border-black/10 dark:border-white/10" />
+                    <span className="absolute -right-2.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-[#FAF7F5] dark:bg-[#150E0C] border-l border-black/10 dark:border-white/10" />
+                    <div className="w-[84%] border-t border-dashed border-black/15 dark:border-white/15" />
                   </div>
 
-                  {res.juegoNombre && (
-                    <div className="p-3 rounded-md bg-[#FAF7F5] text-xs font-mono text-[#1F1410] border border-stone-300 font-semibold">
-                      🎲 Juego apartado: <strong className="text-[#E12927]">{res.juegoNombre}</strong>
+                  {/* Cuerpo del pase */}
+                  <div className="px-5 sm:px-6 pt-1 pb-5 flex flex-col flex-1 gap-3.5 text-left">
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <div className="p-3 rounded-2xl bg-[#FAF7F5] dark:bg-[#261A16] flex items-center gap-2.5">
+                        <Calendar size={15} className="text-[#E12927] shrink-0" />
+                        <div className="min-w-0">
+                          <span className="block text-[10px] text-[#8E7A74]">Fecha</span>
+                          <strong className="text-xs sm:text-sm text-[#1F1410] dark:text-[#FAF7F5] block truncate">
+                            {res.fecha}
+                          </strong>
+                        </div>
+                      </div>
+
+                      <div className="p-3 rounded-2xl bg-[#FAF7F5] dark:bg-[#261A16] flex items-center gap-2.5">
+                        <Clock size={15} className="text-[#E12927] shrink-0" />
+                        <div className="min-w-0">
+                          <span className="block text-[10px] text-[#8E7A74]">Horario</span>
+                          <strong className="text-xs sm:text-sm text-[#1F1410] dark:text-[#FAF7F5] block truncate">
+                            {res.hora}
+                          </strong>
+                        </div>
+                      </div>
+
+                      <div className="p-3 rounded-2xl bg-[#FAF7F5] dark:bg-[#261A16] flex items-center gap-2.5">
+                        <MapPin size={15} className="text-[#E12927] shrink-0" />
+                        <div className="min-w-0">
+                          <span className="block text-[10px] text-[#8E7A74]">Sucursal</span>
+                          <strong className="text-xs sm:text-sm text-[#1F1410] dark:text-[#FAF7F5] block truncate">
+                            {res.sucursalNombre}
+                          </strong>
+                        </div>
+                      </div>
+
+                      <div className="p-3 rounded-2xl bg-[#FAF7F5] dark:bg-[#261A16] flex items-center gap-2.5">
+                        <Users size={15} className="text-[#E12927] shrink-0" />
+                        <div className="min-w-0">
+                          <span className="block text-[10px] text-[#8E7A74]">Comensales</span>
+                          <strong className="text-xs sm:text-sm text-[#1F1410] dark:text-[#FAF7F5] block truncate">
+                            {res.personas} {res.personas === 1 ? 'persona' : 'personas'}
+                          </strong>
+                        </div>
+                      </div>
                     </div>
-                  )}
 
-                  {res.notas && (
-                    <div className="p-3.5 rounded-md bg-[#FCEAE9] text-xs font-body text-[#1F1410] border-l-4 border-l-[#E12927] border-2 border-[#E12927]/30 font-medium">
-                      <strong>Nota especial:</strong> {res.notas}
+                    {res.juegoNombre && (
+                      <div className="px-3.5 py-2.5 rounded-xl bg-[#FCEAE9]/65 dark:bg-[#321B19] flex items-center gap-2 text-xs text-[#1F1410] dark:text-[#FAF7F5]">
+                        <Dice5 size={15} className="text-[#E12927] shrink-0" />
+                        <span>
+                          Juego apartado: <strong className="text-[#E12927]">{res.juegoNombre}</strong>
+                        </span>
+                      </div>
+                    )}
+
+                    {res.notas && (
+                      <div className="px-3.5 py-2.5 rounded-xl bg-[#FAF7F5] dark:bg-[#261A16] flex items-start gap-2 text-xs text-[#5A4840] dark:text-[#C5B4AE]">
+                        <FileText size={14} className="text-[#8E7A74] shrink-0 mt-0.5" />
+                        <span>{res.notas}</span>
+                      </div>
+                    )}
+
+                    {/* Acciones */}
+                    <div className="mt-auto pt-3 border-t border-black/[0.06] dark:border-white/10 flex items-center justify-between gap-3">
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#1F1410] dark:bg-[#E12927] hover:bg-[#E12927] dark:hover:bg-[#C81E1C] active:scale-95 text-white text-xs sm:text-sm font-semibold transition-all cursor-pointer shadow-xs"
+                        onClick={() => {
+                          sounds.playClick();
+                          setSelectedQRReservation(res);
+                        }}
+                      >
+                        <QrCode size={15} />
+                        <span>Ver pase QR</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold text-[#8E7A74] hover:text-[#E12927] hover:bg-[#FCEAE9]/60 dark:hover:bg-[#321B19] transition-colors cursor-pointer"
+                        onClick={() => handleOpenCancelModal(res)}
+                      >
+                        <XCircle size={15} />
+                        <span>Cancelar</span>
+                      </button>
                     </div>
-                  )}
-
-                  <div className="mt-auto pt-4 flex items-center justify-between border-t-2 border-stone-200">
-                    <button
-                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-md font-mono text-xs font-bold uppercase tracking-wider bg-[#E12927] hover:bg-[#C81E1C] active:scale-95 text-white border-2 border-[#E12927] shadow-md shadow-[#E12927]/30 transition-all duration-200 cursor-pointer"
-                      onClick={() => {
-                        sounds.playClick();
-                        setSelectedQRReservation(res);
-                      }}
-                    >
-                      <QrCode size={15} />
-                      <span>Ver pase QR</span>
-                    </button>
-
-                    <button
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white border-2 border-stone-300 hover:border-red-400 font-mono text-xs font-bold text-stone-600 hover:text-[#E12927] shadow-xs transition-all cursor-pointer"
-                      onClick={() => handleOpenCancelModal(res)}
-                    >
-                      <XCircle size={15} />
-                      <span>Cancelar</span>
-                    </button>
                   </div>
                 </article>
               ))}
             </div>
-          )}
-        </div>
-      )}
+          )
+        )}
 
-      {/* Historial HeroUI Cards */}
-      {activeTab === 'historial' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 opacity-90">
-          {historial.map((res) => (
-            <article
-              key={res.id}
-              className="bg-white rounded-lg border-2 border-stone-300 p-6 flex flex-col gap-3 shadow-md"
-            >
-              <div className="flex items-center justify-between pb-2 border-b-2 border-stone-200">
-                <span className="font-mono text-xs text-[#8E7A74] font-semibold">FOLIO: {res.id}</span>
-                <span className="px-3 py-1 rounded-sm font-mono text-[10px] font-bold uppercase bg-stone-100 text-stone-600 border-2 border-stone-300">
-                  {res.estado}
-                </span>
-              </div>
-              <h3 className="font-display text-lg font-bold text-[#1F1410]">{res.tipo}</h3>
-              <div className="text-xs font-body text-[#1F1410] font-medium flex flex-wrap gap-x-4 gap-y-1">
-                <span>📅 {res.fecha}</span>
-                <span>⏰ {res.hora}</span>
-                <span>📍 {res.sucursalNombre}</span>
-              </div>
-            </article>
-          ))}
-        </div>
-      )}
+        {/* ==================================================================
+            HISTORIAL PASADO
+            ================================================================== */}
+        {activeTab === 'historial' && (
+          historial.length === 0 ? (
+            <div className="flex flex-col items-center justify-center text-center p-10 rounded-[28px] bg-white dark:bg-[#1F1410] border border-black/[0.06] dark:border-white/10 gap-2.5 shadow-xs">
+              <span className="w-12 h-12 rounded-2xl bg-[#FAF7F5] dark:bg-[#261A16] text-[#8E7A74] flex items-center justify-center">
+                <History size={24} />
+              </span>
+              <h3 className="font-display text-lg font-bold text-[#1F1410] dark:text-[#FAF7F5]">
+                Sin historial todavía
+              </h3>
+              <p className="text-xs sm:text-sm text-[#6B5A52] dark:text-[#B4A099] max-w-sm m-0">
+                Aquí aparecerán tus visitas completadas y reservaciones anteriores.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {historial.map((res) => {
+                const esCancelada = res.estado === 'Cancelada';
+                return (
+                  <article
+                    key={res.id}
+                    data-res-card
+                    className="rounded-2xl bg-white dark:bg-[#1F1410] border border-black/[0.06] dark:border-white/10 p-5 flex flex-col gap-3 text-left shadow-xs opacity-90"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] text-[#8E7A74]">Folio · {res.id}</span>
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                          esCancelada
+                            ? 'bg-rose-500/10 text-[#E12927]'
+                            : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+                        }`}
+                      >
+                        {res.estado}
+                      </span>
+                    </div>
+                    <h3 className="font-display text-base sm:text-lg font-bold text-[#1F1410] dark:text-[#FAF7F5] leading-snug">
+                      {res.tipo}
+                    </h3>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#6B5A52] dark:text-[#B4A099] pt-2 border-t border-black/[0.06] dark:border-white/10">
+                      <span className="inline-flex items-center gap-1">
+                        <Calendar size={12} /> {res.fecha}
+                      </span>
+                      <span className="inline-flex items-center gap-1">
+                        <Clock size={12} /> {res.hora}
+                      </span>
+                      <span className="inline-flex items-center gap-1 truncate">
+                        <MapPin size={12} /> {res.sucursalNombre}
+                      </span>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )
+        )}
+      </div>
 
-      {/* Modal QR */}
+      {/* Modal QR estilo Mobile Ticket */}
       {selectedQRReservation && (
         <QRModal
           isOpen={!!selectedQRReservation}
           onClose={() => setSelectedQRReservation(null)}
-          titulo={`Pase de Reservación: ${selectedQRReservation.tipo}`}
-          subtitulo={`${selectedQRReservation.sucursalNombre} · ${selectedQRReservation.fecha} a las ${selectedQRReservation.hora}`}
+          titulo={selectedQRReservation.tipo}
+          subtitulo={`${selectedQRReservation.sucursalNombre} · ${selectedQRReservation.fecha} · ${selectedQRReservation.hora}`}
           codigo={selectedQRReservation.qrCode || `MF-RES-${selectedQRReservation.id}`}
-          vigencia={`Válido para ${selectedQRReservation.personas} personas`}
+          vigencia={`${selectedQRReservation.personas} ${selectedQRReservation.personas === 1 ? 'persona' : 'personas'}`}
           instruccion="Muestra este código al host en la entrada para asignarte tu mesa directamente."
         />
       )}
 
-      {/* Modal de Cancelación */}
+      {/* Modal de Cancelación moderno */}
       {reservationToCancel && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-[#1F1410]/70 backdrop-blur-md">
-          <div className="bg-white rounded-lg max-w-md w-full p-6 sm:p-8 flex flex-col items-center text-center gap-4 shadow-2xl border-2 border-stone-400 animate-mh-rise">
-            <div className="w-14 h-14 rounded-md bg-[#FCEAE9] text-[#E12927] flex items-center justify-center shadow-xs border-2 border-[#E12927]/40">
-              <AlertTriangle size={28} />
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-[#120A08]/75 backdrop-blur-md"
+          onClick={() => setReservationToCancel(null)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white dark:bg-[#1F1410] rounded-[26px] max-w-sm w-full p-6 sm:p-7 flex flex-col items-center text-center gap-4 shadow-2xl border border-black/10 dark:border-white/10"
+          >
+            <div className="w-13 h-13 rounded-2xl bg-[#FCEAE9] dark:bg-[#321B19] text-[#E12927] flex items-center justify-center">
+              <AlertTriangle size={26} />
             </div>
-            <h3 className="font-display text-2xl font-bold text-[#1F1410]">¿Cancelar esta reservación?</h3>
-            <p className="font-body text-xs sm:text-sm text-[#5A4840] font-medium">
-              ¿Estás seguro de cancelar tu visita para <strong>{reservationToCancel.tipo}</strong> el {reservationToCancel.fecha}? Liberaremos tu mesa para otros comensales de Durango.
-            </p>
-            <div className="flex gap-3 w-full mt-2">
+            <div>
+              <h3 className="font-display text-xl sm:text-2xl font-bold text-[#1F1410] dark:text-[#FAF7F5]">
+                ¿Cancelar reservación?
+              </h3>
+              <p className="text-xs sm:text-sm text-[#5A4840] dark:text-[#C5B4AE] mt-1.5 leading-relaxed m-0">
+                Se liberará tu lugar para <strong>{reservationToCancel.tipo}</strong> el {reservationToCancel.fecha}.
+              </p>
+            </div>
+            <div className="flex gap-2.5 w-full mt-1">
               <button
-                className="flex-1 py-3 rounded-md font-mono text-xs font-bold uppercase tracking-wider border-2 border-[#1F1410] bg-white text-[#1F1410] hover:bg-stone-100 active:scale-95 transition-all cursor-pointer shadow-xs"
+                type="button"
+                className="flex-1 py-2.5 rounded-full border border-black/15 dark:border-white/15 text-xs font-bold text-[#1F1410] dark:text-[#FAF7F5] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
                 onClick={() => setReservationToCancel(null)}
               >
-                Mantener mesa
+                Mantener
               </button>
               <button
-                className="flex-1 py-3 rounded-md font-mono text-xs font-bold uppercase tracking-wider bg-[#E12927] hover:bg-[#C81E1C] active:scale-95 text-white border-2 border-[#E12927] shadow-md shadow-[#E12927]/30 transition-all cursor-pointer"
+                type="button"
+                className="flex-1 py-2.5 rounded-full bg-[#E12927] hover:bg-[#C81E1C] text-white text-xs font-bold shadow-md transition-colors cursor-pointer"
                 onClick={handleConfirmCancel}
               >
                 Sí, cancelar

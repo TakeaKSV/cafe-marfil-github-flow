@@ -151,6 +151,7 @@ export function aSeccionesDeMenu(productos = []) {
     return {
       id: `seccion-${idx + 1}`,
       slug: g.slug,
+      nombre: g.categoriaNombre,
       numero: `Seccion ${idx + 1}`,
       titulo: meta?.titulo || g.categoriaNombre,
       subtitulo: meta?.subtitulo || 'Preparados al momento en nuestras sucursales',
