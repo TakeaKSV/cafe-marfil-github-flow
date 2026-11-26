@@ -152,7 +152,9 @@ export async function invitarPersona(
   { email, rol = 'host', puesto = 'Colaborador', sucursalId = null, turnoInicio = null, turnoFin = null },
   adminId = null
 ) {
-  const correo = String(email || '').trim().toLowerCase();
+  const correo = String(email || '')
+    .trim()
+    .toLowerCase();
   await verificarDominioCorreo(correo);
   await exigirEmailLibre(correo);
   if (sucursalId) await exigirSucursal(sucursalId);

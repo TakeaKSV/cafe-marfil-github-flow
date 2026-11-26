@@ -8,7 +8,9 @@ import { config } from '../config.js';
 const CARPETAS_PERMITIDAS = new Set(['menu', 'actividades', 'promociones']);
 
 export function normalizarCarpeta(carpeta) {
-  const limpia = String(carpeta || 'menu').trim().toLowerCase();
+  const limpia = String(carpeta || 'menu')
+    .trim()
+    .toLowerCase();
   return CARPETAS_PERMITIDAS.has(limpia) ? limpia : 'menu';
 }
 

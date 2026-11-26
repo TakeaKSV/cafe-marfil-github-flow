@@ -62,7 +62,9 @@ function obtenerTransporte() {
  * Valida que el correo no sea temporal y que su dominio tenga registros MX válidos en DNS.
  */
 export async function verificarDominioCorreo(email, { forzar = false, resolverMx = null } = {}) {
-  const limpio = String(email || '').trim().toLowerCase();
+  const limpio = String(email || '')
+    .trim()
+    .toLowerCase();
   const partes = limpio.split('@');
   if (partes.length !== 2 || !partes[1]) {
     throw solicitudInvalida('Ingresa un correo electrónico válido.', [
@@ -317,14 +319,7 @@ export async function enviarConfirmacionReservacion({
   });
 }
 
-export async function enviarCancelacionReservacion({
-  email,
-  nombre,
-  folio,
-  sucursalNombre,
-  fechaTexto,
-  horaTexto
-}) {
+export async function enviarCancelacionReservacion({ email, nombre, folio, sucursalNombre, fechaTexto, horaTexto }) {
   const html = construirPlantillaHtml({
     preheader: `Tu reservación ${folio} fue cancelada.`,
     titulo: 'Reservación cancelada',

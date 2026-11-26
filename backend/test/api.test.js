@@ -725,11 +725,17 @@ test('menú: borradores ocultos al público, publicación, reorden y subida de i
   assert.equal((await api('GET', '/menu/productos?incluirBorradores=1')).status, 403);
   assert.equal((await api('GET', `/menu/productos/${borrador.datos.id}`)).status, 404);
   const publicoAntes = (await api('GET', '/menu/productos')).datos;
-  assert.equal(publicoAntes.some((p) => p.id === borrador.datos.id), false);
+  assert.equal(
+    publicoAntes.some((p) => p.id === borrador.datos.id),
+    false
+  );
 
   // El personal sí ve borradores cuando lo solicita.
   const conBorradores = (await api('GET', '/menu/productos?incluirBorradores=1', { token: sesion.host })).datos;
-  assert.equal(conBorradores.some((p) => p.id === borrador.datos.id && p.estado === 'borrador'), true);
+  assert.equal(
+    conBorradores.some((p) => p.id === borrador.datos.id && p.estado === 'borrador'),
+    true
+  );
 
   // Host no puede publicar; admin sí.
   assert.equal(
@@ -751,7 +757,12 @@ test('menú: borradores ocultos al público, publicación, reorden y subida de i
   const kinder = publicoAntes.find((p) => p.slug === 'frappe-kinder-bueno');
   const reordenado = await api('PATCH', '/menu/orden', {
     token: sesion.admin,
-    body: { items: [{ id: kinder.id, orden: 5 }, { id: borrador.datos.id, orden: 1 }] }
+    body: {
+      items: [
+        { id: kinder.id, orden: 5 },
+        { id: borrador.datos.id, orden: 1 }
+      ]
+    }
   });
   assert.equal(reordenado.status, 200);
   assert.equal(reordenado.datos.find((p) => p.id === kinder.id).orden, 5);
@@ -762,8 +773,7 @@ test('menú: borradores ocultos al público, publicación, reorden y subida de i
   // Subida de imágenes: validación de permisos, magic bytes y descarga estática.
   const origen = base.replace(/\/api$/, '');
   const pngValido = Buffer.from([
-    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
-    0x49, 0x48, 0x44, 0x52
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52
   ]);
 
   const formFalso = new FormData();
@@ -1260,7 +1270,8 @@ test('correos: verificación de registro, bloqueo de canje sin verificar, recupe
 
     // 4. Código incorrecto falla con 400; código válido verifica, entrega JWT, envía bienvenida y no puede reusarse.
     assert.equal(
-      (await api('POST', '/auth/verificar-codigo', { body: { email: 'camila.verif@example.com', codigo: '000000' } })).status,
+      (await api('POST', '/auth/verificar-codigo', { body: { email: 'camila.verif@example.com', codigo: '000000' } }))
+        .status,
       400
     );
 
@@ -1275,7 +1286,8 @@ test('correos: verificación de registro, bloqueo de canje sin verificar, recupe
 
     // Reutilizar el mismo código falla.
     assert.equal(
-      (await api('POST', '/auth/verificar-codigo', { body: { email: 'camila.verif@example.com', codigo: codigo6 } })).status,
+      (await api('POST', '/auth/verificar-codigo', { body: { email: 'camila.verif@example.com', codigo: codigo6 } }))
+        .status,
       400
     );
 
@@ -1314,7 +1326,8 @@ test('correos: verificación de registro, bloqueo de canje sin verificar, recupe
     assert.equal((await api('GET', '/auth/me', { token: verificado.datos.token })).status, 401);
     // El enlace de recuperación no se puede reutilizar.
     assert.equal(
-      (await api('POST', '/auth/password/restablecer', { body: { token: tokenReset, password: 'otraPassword88' } })).status,
+      (await api('POST', '/auth/password/restablecer', { body: { token: tokenReset, password: 'otraPassword88' } }))
+        .status,
       400
     );
     // Inicia sesión con la nueva contraseña.
@@ -1341,7 +1354,8 @@ test('correos: verificación de registro, bloqueo de canje sin verificar, recupe
 
     // 7. Invitación de empleado por correo (vigencia 12 h) y alta completada por el empleado.
     assert.equal(
-      (await api('POST', '/personal/invitar', { token: sesion.host, body: { email: 'nuevo.host@example.com' } })).status,
+      (await api('POST', '/personal/invitar', { token: sesion.host, body: { email: 'nuevo.host@example.com' } }))
+        .status,
       403
     );
     const inv = await api('POST', '/personal/invitar', {

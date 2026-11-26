@@ -8,7 +8,18 @@ function invitaciones() {
     .select('i.*', 's.nombre as sucursal_nombre', 'p.nombre as invitado_por_nombre');
 }
 
-export const crear = ({ email, rol, puesto, sucursalId, turnoInicio, turnoFin, tokenHash, invitadoPor, expiraEn, creadoEn }) =>
+export const crear = ({
+  email,
+  rol,
+  puesto,
+  sucursalId,
+  turnoInicio,
+  turnoFin,
+  tokenHash,
+  invitadoPor,
+  expiraEn,
+  creadoEn
+}) =>
   insertar('invitaciones_personal', {
     email,
     rol,
@@ -27,10 +38,7 @@ export const porHash = (tokenHash) => invitaciones().where('i.token_hash', token
 export const porId = (id) => invitaciones().where('i.id', id).first();
 
 export const listarPendientes = (ahora) =>
-  invitaciones()
-    .whereNull('i.usado_en')
-    .where('i.expira_en', '>', fechaBD(ahora))
-    .orderBy('i.id', 'desc');
+  invitaciones().whereNull('i.usado_en').where('i.expira_en', '>', fechaBD(ahora)).orderBy('i.id', 'desc');
 
 export const invalidarPorEmail = (email, ahora) =>
   consulta('invitaciones_personal')

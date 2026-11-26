@@ -8,12 +8,7 @@ export async function up(knex) {
   if (!(await knex.schema.hasTable('tokens_correo'))) {
     await knex.schema.createTable('tokens_correo', (t) => {
       t.increments('id').unsigned().primary();
-      t.integer('cliente_id')
-        .unsigned()
-        .notNullable()
-        .references('id')
-        .inTable('clientes')
-        .onDelete('CASCADE');
+      t.integer('cliente_id').unsigned().notNullable().references('id').inTable('clientes').onDelete('CASCADE');
       t.string('token_hash', 64).notNullable().unique();
       t.enu('tipo', ['verificacion', 'recuperacion']).notNullable();
       t.dateTime('expira_en', { precision: 3 }).notNullable();

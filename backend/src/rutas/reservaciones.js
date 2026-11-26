@@ -83,9 +83,7 @@ router.post('/', async (req, res) => {
     throw noAutenticado('Inicia sesión o crea tu cuenta para realizar una reservación.');
   }
   const datos = leer(esquemaCrear, req.body);
-  const contexto = esStaff(req)
-    ? { personalId: req.usuario.id }
-    : { clienteId: req.usuario.id };
+  const contexto = esStaff(req) ? { personalId: req.usuario.id } : { clienteId: req.usuario.id };
   res.status(201).json(await crearReservacion(datos, contexto));
 });
 

@@ -147,7 +147,11 @@ export async function verificarCodigoCorreo(email, codigo) {
   if (!/^\d{6}$/.test(codigoLimpio)) {
     throw solicitudInvalida('Ingresa el código de 6 dígitos que enviamos a tu correo.');
   }
-  const filaCliente = await repo.porEmail(String(email || '').trim().toLowerCase());
+  const filaCliente = await repo.porEmail(
+    String(email || '')
+      .trim()
+      .toLowerCase()
+  );
   if (!filaCliente) {
     throw solicitudInvalida('El código de verificación no es válido o ya expiró.');
   }
@@ -184,7 +188,11 @@ export async function verificarCodigoCorreo(email, codigo) {
 }
 
 export async function reenviarCodigoPorEmail(email) {
-  const fila = await repo.porEmail(String(email || '').trim().toLowerCase());
+  const fila = await repo.porEmail(
+    String(email || '')
+      .trim()
+      .toLowerCase()
+  );
   if (!fila || !fila.password_hash) return { yaVerificado: false, enviado: false };
   if (fila.email_verificado_en) return { yaVerificado: true, enviado: false };
   const { enviado } = await emitirVerificacionCorreo(fila.id);
@@ -295,11 +303,9 @@ export async function autenticarCliente(email, password) {
   const valido = await verificarPassword(password, fila?.password_hash);
   if (!valido) throw noAutenticado('Correo o contraseña incorrectos.');
   if (!fila.email_verificado_en) {
-    throw new HttpError(
-      403,
-      'Debes confirmar tu correo con el código de 6 dígitos antes de iniciar sesión.',
-      [{ campo: 'verificacion', mensaje: 'requiere_verificacion' }]
-    );
+    throw new HttpError(403, 'Debes confirmar tu correo con el código de 6 dígitos antes de iniciar sesión.', [
+      { campo: 'verificacion', mensaje: 'requiere_verificacion' }
+    ]);
   }
   return { cliente: aCliente(fila), version: fila.session_version };
 }

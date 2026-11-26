@@ -164,19 +164,7 @@ export async function consultarDisponibilidad({ sucursalId, fecha, personas = 2 
   await exigirSucursal(sucursalId);
   const candidatas = await repo.mesasDisponiblesSucursal(sucursalId, personas, false);
   const activas = await repo.reservasActivasSucursalFecha(sucursalId, fecha, 0);
-  const turnos = [
-    '08:30',
-    '09:30',
-    '10:30',
-    '11:00',
-    '12:00',
-    '13:30',
-    '15:00',
-    '16:30',
-    '18:00',
-    '19:30',
-    '20:30'
-  ];
+  const turnos = ['08:30', '09:30', '10:30', '11:00', '12:00', '13:30', '15:00', '16:30', '18:00', '19:30', '20:30'];
   return turnos.map((hora) => {
     const minutos = minutosDelDia(hora);
     const mesasLibres = candidatas.filter(

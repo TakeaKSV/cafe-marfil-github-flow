@@ -110,7 +110,10 @@ const esquemaCrearProducto = z.object({
 
 const esquemaEditarProducto = z.object({ ...camposProducto, vendidosHoy: zEntero() }).partial();
 const esquemaOrdenProductos = z.object({
-  items: z.array(z.object({ id: zId, orden: zEntero(0, 10000) })).min(1).max(200)
+  items: z
+    .array(z.object({ id: zId, orden: zEntero(0, 10000) }))
+    .min(1)
+    .max(200)
 });
 
 // Lo que cocina y barra pueden cambiar durante el turno sin ser gerencia.

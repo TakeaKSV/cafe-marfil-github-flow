@@ -267,7 +267,9 @@ const esquemaInvitarPersona = z.object({
   turnoFin: zHora.nullable().optional()
 });
 
-router.get('/personal', soloAdmin, async (req, res) => res.json(await listarPersonal(leer(filtrosPersonal, req.query))));
+router.get('/personal', soloAdmin, async (req, res) =>
+  res.json(await listarPersonal(leer(filtrosPersonal, req.query)))
+);
 
 router.get('/personal/invitaciones', soloAdmin, async (_req, res) => {
   res.json(await listarInvitacionesPendientes());

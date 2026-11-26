@@ -1,10 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import {
-  construirPlantillaHtml,
-  escaparHtml,
-  verificarDominioCorreo
-} from '../../src/servicios/correo.js';
+import { construirPlantillaHtml, escaparHtml, verificarDominioCorreo } from '../../src/servicios/correo.js';
 
 test('correo: rechaza dominios desechables y dominios sin MX real', async () => {
   // Dominio desechable siempre bloqueado incluso sin DNS.

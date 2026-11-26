@@ -14,12 +14,7 @@ import {
   verificarCodigoCorreo,
   verificarCorreoPorToken
 } from '../servicios/clientes.js';
-import {
-  autenticarStaff,
-  completarInvitacion,
-  consultarInvitacion,
-  obtenerPersona
-} from '../servicios/personal.js';
+import { autenticarStaff, completarInvitacion, consultarInvitacion, obtenerPersona } from '../servicios/personal.js';
 import { noAutenticado, solicitudInvalida } from '../utils/errores.js';
 import { leer, zEmail, zPassword, zPasswordLogin, zTexto, zTextoOpcional } from '../utils/validar.js';
 

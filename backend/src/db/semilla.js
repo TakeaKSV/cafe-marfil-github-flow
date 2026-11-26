@@ -635,139 +635,139 @@ export function sembrar({ soloCatalogo = false } = {}) {
 
     const cliente = {};
     if (!soloCatalogo) {
-    const tieneEmailVerificado = await conexion.schema.hasColumn('clientes', 'email_verificado_en');
-    for (const c of [
-      {
-        clave: 'paola',
-        codigo: 'MF-CLUB-77312',
-        nombre: 'Paola Santillán',
-        telefono: '618-912-3344',
-        sellos: 7,
-        puntos: 420,
-        visitas: 23,
-        ultima: hace(120),
-        habitual: PORRAS
-      },
-      {
-        clave: 'fernando',
-        codigo: 'MF-CLUB-88410',
-        nombre: 'Fernando Quiñones',
-        telefono: '618-456-7890',
-        sellos: 8,
-        puntos: 510,
-        visitas: 16,
-        ultima: hace(22 * 60),
-        habitual: CALVARIO
-      },
-      {
-        clave: 'mariana',
-        codigo: 'MF-CLUB-33109',
-        nombre: 'Mariana Corrales',
-        telefono: '618-234-5678',
-        sellos: 3,
-        puntos: 120,
-        visitas: 4,
-        ultima: haceDias(5),
-        habitual: CALVARIO
-      },
-      {
-        clave: 'sofia',
-        codigo: 'MF-CLUB-51420',
-        nombre: 'Sofía Navarro Morales',
-        telefono: '(618) 154-8920',
-        email: 'sofia.navarro@gmail.com',
-        ciudad: 'Durango, Dgo.',
-        sellos: 6,
-        puntos: 380,
-        visitas: 14,
-        ultima: haceDias(3),
-        habitual: PORRAS,
-        preferencias: {
-          platilloFavorito: 'Chilaquiles con boneless verdes',
-          frappeFavorito: 'Frappé Kinder Bueno 16oz',
-          bebidaFavorita: 'Flat White 12oz',
-          lechePreferida: 'Leche de avena'
+      const tieneEmailVerificado = await conexion.schema.hasColumn('clientes', 'email_verificado_en');
+      for (const c of [
+        {
+          clave: 'paola',
+          codigo: 'MF-CLUB-77312',
+          nombre: 'Paola Santillán',
+          telefono: '618-912-3344',
+          sellos: 7,
+          puntos: 420,
+          visitas: 23,
+          ultima: hace(120),
+          habitual: PORRAS
+        },
+        {
+          clave: 'fernando',
+          codigo: 'MF-CLUB-88410',
+          nombre: 'Fernando Quiñones',
+          telefono: '618-456-7890',
+          sellos: 8,
+          puntos: 510,
+          visitas: 16,
+          ultima: hace(22 * 60),
+          habitual: CALVARIO
+        },
+        {
+          clave: 'mariana',
+          codigo: 'MF-CLUB-33109',
+          nombre: 'Mariana Corrales',
+          telefono: '618-234-5678',
+          sellos: 3,
+          puntos: 120,
+          visitas: 4,
+          ultima: haceDias(5),
+          habitual: CALVARIO
+        },
+        {
+          clave: 'sofia',
+          codigo: 'MF-CLUB-51420',
+          nombre: 'Sofía Navarro Morales',
+          telefono: '(618) 154-8920',
+          email: 'sofia.navarro@gmail.com',
+          ciudad: 'Durango, Dgo.',
+          sellos: 6,
+          puntos: 380,
+          visitas: 14,
+          ultima: haceDias(3),
+          habitual: PORRAS,
+          preferencias: {
+            platilloFavorito: 'Chilaquiles con boneless verdes',
+            frappeFavorito: 'Frappé Kinder Bueno 16oz',
+            bebidaFavorita: 'Flat White 12oz',
+            lechePreferida: 'Leche de avena'
+          }
+        }
+      ]) {
+        cliente[c.clave] = await insertar('clientes', {
+          codigo_club: c.codigo,
+          nombre: c.nombre,
+          email: c.email ?? null,
+          telefono: c.telefono,
+          password_hash: c.email ? passwordHash : null,
+          ciudad: c.ciudad ?? null,
+          sellos_actuales: c.sellos,
+          puntos: c.puntos,
+          visitas_totales: c.visitas,
+          ultima_visita: c.ultima,
+          sucursal_habitual_id: c.habitual,
+          preferencias: json(c.preferencias ?? {}),
+          ...(tieneEmailVerificado ? { email_verificado_en: c.email ? ahoraISO : null } : {}),
+          creado_en: haceDias(150)
+        });
+        // Historial de sellos: una visita por renglón, la última coincide con ultima_visita.
+        for (let i = 0; i < c.visitas; i += 1) {
+          await insertar('movimientos_club', {
+            cliente_id: cliente[c.clave],
+            tipo: 'sello',
+            sellos: 1,
+            puntos: 50,
+            descripcion: 'Sello por visita',
+            sucursal_id: c.habitual,
+            personal_id: persona.valeria,
+            creado_en: i === 0 ? c.ultima : new Date(new Date(c.ultima).getTime() - entero(1, 120) * DIA).toISOString()
+          });
         }
       }
-    ]) {
-      cliente[c.clave] = await insertar('clientes', {
-        codigo_club: c.codigo,
-        nombre: c.nombre,
-        email: c.email ?? null,
-        telefono: c.telefono,
-        password_hash: c.email ? passwordHash : null,
-        ciudad: c.ciudad ?? null,
-        sellos_actuales: c.sellos,
-        puntos: c.puntos,
-        visitas_totales: c.visitas,
-        ultima_visita: c.ultima,
-        sucursal_habitual_id: c.habitual,
-        preferencias: json(c.preferencias ?? {}),
-        ...(tieneEmailVerificado ? { email_verificado_en: c.email ? ahoraISO : null } : {}),
-        creado_en: haceDias(150)
-      });
-      // Historial de sellos: una visita por renglón, la última coincide con ultima_visita.
-      for (let i = 0; i < c.visitas; i += 1) {
-        await insertar('movimientos_club', {
-          cliente_id: cliente[c.clave],
-          tipo: 'sello',
-          sellos: 1,
-          puntos: 50,
-          descripcion: 'Sello por visita',
-          sucursal_id: c.habitual,
-          personal_id: persona.valeria,
-          creado_en: i === 0 ? c.ultima : new Date(new Date(c.ultima).getTime() - entero(1, 120) * DIA).toISOString()
+
+      for (const b of [
+        {
+          cliente: 'sofia',
+          codigo: 'MF-FRAPPE-992',
+          titulo: 'Frappé de Confitería Gratis (16oz)',
+          subtitulo: 'A elegir: Kinder Bueno, Moka Avellana, Fresa Dubái o Mazapán',
+          icono: 'Sparkles',
+          vence: sumarDias(hoy, 14)
+        },
+        {
+          cliente: 'sofia',
+          codigo: 'MF-MAMUT-418',
+          titulo: 'Mollete Mamut con 50% de Descuento',
+          subtitulo: 'Aplica en tu siguiente visita a Café Marfil',
+          icono: 'Utensils',
+          vence: sumarDias(hoy, 45)
+        },
+        {
+          cliente: 'sofia',
+          codigo: 'MF-LUDO-880',
+          titulo: 'Pase Prioritario a Noche de Juegos de Mesa',
+          subtitulo: 'Entrada y mesa asegurada sin costo de ludoteca',
+          icono: 'Dices',
+          usado: haceDias(20)
+        },
+        {
+          cliente: 'fernando',
+          codigo: 'MF-DUBAI-410',
+          titulo: 'Copa Doble de Fresas Estilo Dubái GRATIS',
+          subtitulo: 'Premio por completar tus 8 sellos de visita',
+          icono: 'Gift',
+          origen: 'sellos'
+        }
+      ]) {
+        await insertar('beneficios', {
+          cliente_id: cliente[b.cliente],
+          codigo: b.codigo,
+          titulo: b.titulo,
+          subtitulo: b.subtitulo,
+          icono: b.icono,
+          origen: b.origen ?? 'manual',
+          estado: b.usado ? 'usado' : 'disponible',
+          vence_en: b.vence ?? null,
+          usado_en: b.usado ?? null,
+          creado_en: haceDias(25)
         });
       }
-    }
-
-    for (const b of [
-      {
-        cliente: 'sofia',
-        codigo: 'MF-FRAPPE-992',
-        titulo: 'Frappé de Confitería Gratis (16oz)',
-        subtitulo: 'A elegir: Kinder Bueno, Moka Avellana, Fresa Dubái o Mazapán',
-        icono: 'Sparkles',
-        vence: sumarDias(hoy, 14)
-      },
-      {
-        cliente: 'sofia',
-        codigo: 'MF-MAMUT-418',
-        titulo: 'Mollete Mamut con 50% de Descuento',
-        subtitulo: 'Aplica en tu siguiente visita a Café Marfil',
-        icono: 'Utensils',
-        vence: sumarDias(hoy, 45)
-      },
-      {
-        cliente: 'sofia',
-        codigo: 'MF-LUDO-880',
-        titulo: 'Pase Prioritario a Noche de Juegos de Mesa',
-        subtitulo: 'Entrada y mesa asegurada sin costo de ludoteca',
-        icono: 'Dices',
-        usado: haceDias(20)
-      },
-      {
-        cliente: 'fernando',
-        codigo: 'MF-DUBAI-410',
-        titulo: 'Copa Doble de Fresas Estilo Dubái GRATIS',
-        subtitulo: 'Premio por completar tus 8 sellos de visita',
-        icono: 'Gift',
-        origen: 'sellos'
-      }
-    ]) {
-      await insertar('beneficios', {
-        cliente_id: cliente[b.cliente],
-        codigo: b.codigo,
-        titulo: b.titulo,
-        subtitulo: b.subtitulo,
-        icono: b.icono,
-        origen: b.origen ?? 'manual',
-        estado: b.usado ? 'usado' : 'disponible',
-        vence_en: b.vence ?? null,
-        usado_en: b.usado ?? null,
-        creado_en: haceDias(25)
-      });
-    }
     }
 
     // ----------------------------------------------------------------------
@@ -1034,402 +1034,402 @@ export function sembrar({ soloCatalogo = false } = {}) {
     // ----------------------------------------------------------------------
 
     if (!soloCatalogo) {
-    const foliosUsados = new Set();
-    const folioNuevo = () => {
-      let folio;
-      do folio = `MF-RES-${entero(10000, 99999)}`;
-      while (foliosUsados.has(folio));
-      foliosUsados.add(folio);
-      return folio;
-    };
+      const foliosUsados = new Set();
+      const folioNuevo = () => {
+        let folio;
+        do folio = `MF-RES-${entero(10000, 99999)}`;
+        while (foliosUsados.has(folio));
+        foliosUsados.add(folio);
+        return folio;
+      };
 
-    const reservar = async (r) => {
-      foliosUsados.add(r.folio);
-      return await insertar('reservaciones', {
-        folio: r.folio,
-        token_qr: generarTokenQR(),
-        cliente_id: r.cliente ?? null,
-        nombre_contacto: r.comensal,
-        telefono_contacto: r.telefono,
-        email_contacto: r.email ?? null,
-        sucursal_id: r.sucursal,
-        mesa_id: r.mesa ? mesa[r.mesa].id : null,
-        actividad_id: r.actividad ?? null,
-        tipo: r.tipo ?? 'mesa',
-        tipo_nombre: r.tipoNombre ?? null,
-        fecha: r.fecha ?? hoy,
-        hora: r.hora,
-        personas: r.personas,
-        estado: r.estado,
-        notas: r.notas ?? null,
-        origen: r.origen ?? 'app',
-        registrada_por: r.origen === 'host' ? persona.valeria : null,
-        creado_en: r.creado ?? haceDias(2),
-        actualizado_en: ahoraISO
-      });
-    };
+      const reservar = async (r) => {
+        foliosUsados.add(r.folio);
+        return await insertar('reservaciones', {
+          folio: r.folio,
+          token_qr: generarTokenQR(),
+          cliente_id: r.cliente ?? null,
+          nombre_contacto: r.comensal,
+          telefono_contacto: r.telefono,
+          email_contacto: r.email ?? null,
+          sucursal_id: r.sucursal,
+          mesa_id: r.mesa ? mesa[r.mesa].id : null,
+          actividad_id: r.actividad ?? null,
+          tipo: r.tipo ?? 'mesa',
+          tipo_nombre: r.tipoNombre ?? null,
+          fecha: r.fecha ?? hoy,
+          hora: r.hora,
+          personas: r.personas,
+          estado: r.estado,
+          notas: r.notas ?? null,
+          origen: r.origen ?? 'app',
+          registrada_por: r.origen === 'host' ? persona.valeria : null,
+          creado_en: r.creado ?? haceDias(2),
+          actualizado_en: ahoraISO
+        });
+      };
 
-    /** Servicio de mesa. Sin `finHace` queda abierto y la mesa pasa a ocupada. */
-    const sentar = async ({
-      mesa: clave,
-      reservacion = null,
-      comensal,
-      personas,
-      notas = null,
-      ticket = null,
-      inicioHace,
-      finHace,
-      mesero = null
-    }) => {
-      await insertar('servicios_mesa', {
-        mesa_id: mesa[clave].id,
-        reservacion_id: reservacion,
+      /** Servicio de mesa. Sin `finHace` queda abierto y la mesa pasa a ocupada. */
+      const sentar = async ({
+        mesa: clave,
+        reservacion = null,
         comensal,
         personas,
-        notas,
-        ticket_total: ticket,
-        atendido_por: mesero,
-        inicio: hace(inicioHace),
-        fin: finHace === undefined ? null : hace(finHace)
-      });
-      if (finHace === undefined) await consulta('mesas').where('id', mesa[clave].id).update({ estado: 'ocupada' });
-    };
+        notas = null,
+        ticket = null,
+        inicioHace,
+        finHace,
+        mesero = null
+      }) => {
+        await insertar('servicios_mesa', {
+          mesa_id: mesa[clave].id,
+          reservacion_id: reservacion,
+          comensal,
+          personas,
+          notas,
+          ticket_total: ticket,
+          atendido_por: mesero,
+          inicio: hace(inicioHace),
+          fin: finHace === undefined ? null : hace(finHace)
+        });
+        if (finHace === undefined) await consulta('mesas').where('id', mesa[clave].id).update({ estado: 'ocupada' });
+      };
 
-    // Reservaciones de hoy que ya están en sala: reservación + servicio abierto.
-    for (const r of [
-      {
-        folio: 'MF-RES-88219',
-        comensal: 'Andrea Garza',
-        telefono: '618-123-4567',
-        email: 'andrea.garza@gmail.com',
-        sucursal: PORRAS,
-        mesa: 'P-M01',
-        personas: 2,
-        tipoNombre: 'Desayuno & Brunch',
-        notas: 'Celebran aniversario de novios. Solicitaron mesa con luz natural.',
-        minutos: 42,
-        ticket: 425,
-        mesero: persona.valeria
-      },
-      {
-        folio: 'MF-RES-66231',
-        comensal: 'Javier Domínguez',
-        telefono: '618-333-2211',
-        email: 'javier.d@gmail.com',
-        sucursal: PORRAS,
-        mesa: 'P-L01',
-        personas: 4,
-        tipo: 'juegos',
-        tipoNombre: 'Tarde de Juegos con Anfitrión',
-        notas: 'Solicitaron asesoría para Catan y Carcassonne.',
-        minutos: 95,
-        ticket: 540,
-        mesero: persona.alejandro
-      },
-      {
-        folio: 'MF-RES-88301',
-        comensal: 'Mariana Soto',
-        telefono: '618-444-9988',
-        email: 'mariana.soto@live.com',
-        sucursal: PORRAS,
-        mesa: 'P-L02',
-        personas: 5,
-        tipo: 'juegos',
-        tipoNombre: 'Tarde de Juegos con Anfitrión',
-        notas: 'Grupo escolar de preparatoria. Consumo libre.',
-        minutos: 50,
-        ticket: 710,
-        mesero: persona.alejandro
-      },
-      {
-        folio: 'MF-RES-77190',
-        comensal: 'Grupo Arquitectura Durango',
-        telefono: '618-555-7766',
-        email: 'contacto@arquidurango.com',
-        sucursal: PORRAS,
-        mesa: 'P-M08',
-        personas: 7,
-        tipoNombre: 'Reunión / Desayuno',
-        notas: 'Requieren factura electrónica y mesa con enchufes para laptops.',
-        minutos: 80,
-        ticket: 1450,
-        mesero: persona.sofia
-      },
-      {
-        folio: 'MF-RES-55102',
-        comensal: 'Diana Luna',
-        telefono: '618-222-3344',
-        email: 'diana.luna@gmail.com',
-        sucursal: CALVARIO,
-        mesa: 'C-M03',
-        personas: 3,
-        tipoNombre: 'Café & Dulce Dubái',
-        notas: 'Quieren probar las Fresas Dubái con pistache.',
-        minutos: 40,
-        ticket: 460,
-        mesero: persona.camila
-      },
-      {
-        folio: 'MF-RES-44319',
-        comensal: 'Rodrigo Peña',
-        telefono: '618-777-1122',
-        email: 'rodrigo.p@yahoo.com',
-        sucursal: CALVARIO,
-        mesa: 'C-M02',
-        personas: 4,
-        tipoNombre: 'Brunch en Terraza',
-        notas: 'Vienen con niños pequeños, solicitan sillita periquera.',
-        minutos: 55,
-        ticket: 620,
-        mesero: persona.camila
+      // Reservaciones de hoy que ya están en sala: reservación + servicio abierto.
+      for (const r of [
+        {
+          folio: 'MF-RES-88219',
+          comensal: 'Andrea Garza',
+          telefono: '618-123-4567',
+          email: 'andrea.garza@gmail.com',
+          sucursal: PORRAS,
+          mesa: 'P-M01',
+          personas: 2,
+          tipoNombre: 'Desayuno & Brunch',
+          notas: 'Celebran aniversario de novios. Solicitaron mesa con luz natural.',
+          minutos: 42,
+          ticket: 425,
+          mesero: persona.valeria
+        },
+        {
+          folio: 'MF-RES-66231',
+          comensal: 'Javier Domínguez',
+          telefono: '618-333-2211',
+          email: 'javier.d@gmail.com',
+          sucursal: PORRAS,
+          mesa: 'P-L01',
+          personas: 4,
+          tipo: 'juegos',
+          tipoNombre: 'Tarde de Juegos con Anfitrión',
+          notas: 'Solicitaron asesoría para Catan y Carcassonne.',
+          minutos: 95,
+          ticket: 540,
+          mesero: persona.alejandro
+        },
+        {
+          folio: 'MF-RES-88301',
+          comensal: 'Mariana Soto',
+          telefono: '618-444-9988',
+          email: 'mariana.soto@live.com',
+          sucursal: PORRAS,
+          mesa: 'P-L02',
+          personas: 5,
+          tipo: 'juegos',
+          tipoNombre: 'Tarde de Juegos con Anfitrión',
+          notas: 'Grupo escolar de preparatoria. Consumo libre.',
+          minutos: 50,
+          ticket: 710,
+          mesero: persona.alejandro
+        },
+        {
+          folio: 'MF-RES-77190',
+          comensal: 'Grupo Arquitectura Durango',
+          telefono: '618-555-7766',
+          email: 'contacto@arquidurango.com',
+          sucursal: PORRAS,
+          mesa: 'P-M08',
+          personas: 7,
+          tipoNombre: 'Reunión / Desayuno',
+          notas: 'Requieren factura electrónica y mesa con enchufes para laptops.',
+          minutos: 80,
+          ticket: 1450,
+          mesero: persona.sofia
+        },
+        {
+          folio: 'MF-RES-55102',
+          comensal: 'Diana Luna',
+          telefono: '618-222-3344',
+          email: 'diana.luna@gmail.com',
+          sucursal: CALVARIO,
+          mesa: 'C-M03',
+          personas: 3,
+          tipoNombre: 'Café & Dulce Dubái',
+          notas: 'Quieren probar las Fresas Dubái con pistache.',
+          minutos: 40,
+          ticket: 460,
+          mesero: persona.camila
+        },
+        {
+          folio: 'MF-RES-44319',
+          comensal: 'Rodrigo Peña',
+          telefono: '618-777-1122',
+          email: 'rodrigo.p@yahoo.com',
+          sucursal: CALVARIO,
+          mesa: 'C-M02',
+          personas: 4,
+          tipoNombre: 'Brunch en Terraza',
+          notas: 'Vienen con niños pequeños, solicitan sillita periquera.',
+          minutos: 55,
+          ticket: 620,
+          mesero: persona.camila
+        }
+      ]) {
+        const inicio = hace(r.minutos);
+        const id = await reservar({
+          ...r,
+          estado: 'en_curso',
+          fecha: fechaLocal(new Date(inicio)),
+          hora: horaDe(inicio)
+        });
+        await sentar({
+          mesa: r.mesa,
+          reservacion: id,
+          comensal: r.comensal,
+          personas: r.personas,
+          notas: r.notas,
+          ticket: r.ticket,
+          inicioHace: r.minutos,
+          mesero: r.mesero
+        });
       }
-    ]) {
-      const inicio = hace(r.minutos);
-      const id = await reservar({
-        ...r,
-        estado: 'en_curso',
-        fecha: fechaLocal(new Date(inicio)),
-        hora: horaDe(inicio)
+
+      // Reservaciones de hoy que aún no llegan (sus mesas se verán "reservadas").
+      await reservar({
+        folio: 'MF-RES-90142',
+        comensal: 'Familia Rivas',
+        telefono: '618-876-5432',
+        email: 'rivas.fam@outlook.com',
+        sucursal: PORRAS,
+        mesa: 'P-M04',
+        personas: 5,
+        tipoNombre: 'Desayuno & Brunch',
+        estado: 'confirmada',
+        hora: horaHoyEn(45),
+        notas: 'Cumpleaños número 30. Traen pastel propio, solicitan apoyo de velitas.'
+      });
+      await reservar({
+        folio: 'MF-RES-99441',
+        comensal: 'Torneo Exploding Kittens',
+        telefono: '618-999-0011',
+        email: 'torneos@cafemarfil.mx',
+        sucursal: PORRAS,
+        mesa: 'P-L04',
+        personas: 8,
+        tipo: 'juegos',
+        tipoNombre: 'Torneo Oficial de Ludoteca',
+        estado: 'confirmada',
+        hora: horaHoyEn(420),
+        origen: 'host',
+        notas: 'Mesa reservada para finalistas del torneo.'
+      });
+
+      // Una que ya terminó y una que no llegó.
+      const lucia = await reservar({
+        folio: 'MF-RES-31298',
+        comensal: 'Lucía Benítez',
+        telefono: '618-888-6655',
+        email: 'lucia.b@gmail.com',
+        sucursal: PORRAS,
+        mesa: 'P-M05',
+        personas: 2,
+        tipoNombre: 'Desayuno Temprano',
+        estado: 'asistida',
+        fecha: fechaLocal(new Date(hace(150))),
+        hora: horaDe(hace(150)),
+        notas: 'Pagado con tarjeta.'
       });
       await sentar({
-        mesa: r.mesa,
-        reservacion: id,
-        comensal: r.comensal,
-        personas: r.personas,
-        notas: r.notas,
-        ticket: r.ticket,
-        inicioHace: r.minutos,
-        mesero: r.mesero
+        mesa: 'P-M05',
+        reservacion: lucia,
+        comensal: 'Lucía Benítez',
+        personas: 2,
+        ticket: 360,
+        inicioHace: 150,
+        finHace: 75,
+        mesero: persona.valeria
       });
-    }
+      await reservar({
+        folio: 'MF-RES-20944',
+        comensal: 'Gerardo Villalobos',
+        telefono: '618-111-9900',
+        email: 'gerardo.v@gmail.com',
+        sucursal: PORRAS,
+        personas: 4,
+        tipoNombre: 'Desayuno Monumental',
+        estado: 'no_show',
+        fecha: fechaLocal(new Date(hace(120))),
+        hora: horaDe(hace(120)),
+        notas: 'Pasaron más de 20 minutos de tolerancia sin llamada de aviso.'
+      });
 
-    // Reservaciones de hoy que aún no llegan (sus mesas se verán "reservadas").
-    await reservar({
-      folio: 'MF-RES-90142',
-      comensal: 'Familia Rivas',
-      telefono: '618-876-5432',
-      email: 'rivas.fam@outlook.com',
-      sucursal: PORRAS,
-      mesa: 'P-M04',
-      personas: 5,
-      tipoNombre: 'Desayuno & Brunch',
-      estado: 'confirmada',
-      hora: horaHoyEn(45),
-      notas: 'Cumpleaños número 30. Traen pastel propio, solicitan apoyo de velitas.'
-    });
-    await reservar({
-      folio: 'MF-RES-99441',
-      comensal: 'Torneo Exploding Kittens',
-      telefono: '618-999-0011',
-      email: 'torneos@cafemarfil.mx',
-      sucursal: PORRAS,
-      mesa: 'P-L04',
-      personas: 8,
-      tipo: 'juegos',
-      tipoNombre: 'Torneo Oficial de Ludoteca',
-      estado: 'confirmada',
-      hora: horaHoyEn(420),
-      origen: 'host',
-      notas: 'Mesa reservada para finalistas del torneo.'
-    });
+      // Walk-ins en sala y una mesa recién desocupada (queda en limpieza).
+      await sentar({
+        mesa: 'P-M02',
+        comensal: 'Carlos Mendoza',
+        personas: 3,
+        notas: 'Walk-in directo. Pidieron Mollete Mamut.',
+        ticket: 680,
+        inicioHace: 65,
+        mesero: persona.valeria
+      });
+      await sentar({
+        mesa: 'P-M05',
+        comensal: 'Valeria & Daniel',
+        personas: 2,
+        notas: 'Pet friendly con perro beagle.',
+        ticket: 290,
+        inicioHace: 25,
+        mesero: persona.valeria
+      });
+      await sentar({
+        mesa: 'C-M01',
+        comensal: 'Esteban Ortiz',
+        personas: 1,
+        notas: 'Coworking con laptop.',
+        ticket: 180,
+        inicioHace: 35,
+        mesero: persona.camila
+      });
+      await sentar({
+        mesa: 'P-M06',
+        comensal: 'Familia Ontiveros',
+        personas: 3,
+        ticket: 510,
+        inicioHace: 70,
+        finHace: 5,
+        mesero: persona.valeria
+      });
+      await consulta('mesas').where('id', mesa['P-M06'].id).update({ estado: 'limpieza' });
 
-    // Una que ya terminó y una que no llegó.
-    const lucia = await reservar({
-      folio: 'MF-RES-31298',
-      comensal: 'Lucía Benítez',
-      telefono: '618-888-6655',
-      email: 'lucia.b@gmail.com',
-      sucursal: PORRAS,
-      mesa: 'P-M05',
-      personas: 2,
-      tipoNombre: 'Desayuno Temprano',
-      estado: 'asistida',
-      fecha: fechaLocal(new Date(hace(150))),
-      hora: horaDe(hace(150)),
-      notas: 'Pagado con tarjeta.'
-    });
-    await sentar({
-      mesa: 'P-M05',
-      reservacion: lucia,
-      comensal: 'Lucía Benítez',
-      personas: 2,
-      ticket: 360,
-      inicioHace: 150,
-      finHace: 75,
-      mesero: persona.valeria
-    });
-    await reservar({
-      folio: 'MF-RES-20944',
-      comensal: 'Gerardo Villalobos',
-      telefono: '618-111-9900',
-      email: 'gerardo.v@gmail.com',
-      sucursal: PORRAS,
-      personas: 4,
-      tipoNombre: 'Desayuno Monumental',
-      estado: 'no_show',
-      fecha: fechaLocal(new Date(hace(120))),
-      hora: horaDe(hace(120)),
-      notas: 'Pasaron más de 20 minutos de tolerancia sin llamada de aviso.'
-    });
+      // Reservaciones de la cuenta demo de la PWA: una próxima y una histórica.
+      await reservar({
+        folio: 'MF-RES-84920',
+        cliente: cliente.sofia,
+        comensal: 'Sofía Navarro Morales',
+        telefono: '(618) 154-8920',
+        email: 'sofia.navarro@gmail.com',
+        sucursal: PORRAS,
+        personas: 4,
+        tipo: 'juegos',
+        estado: 'confirmada',
+        fecha: sumarDias(hoy, 1),
+        hora: '19:30',
+        creado: hace(120),
+        notas: 'Queremos mesa cerca de la ludoteca. Pediremos combo Mamut y frappés.'
+      });
+      await reservar({
+        folio: 'MF-RES-73190',
+        cliente: cliente.sofia,
+        comensal: 'Sofía Navarro Morales',
+        telefono: '(618) 154-8920',
+        email: 'sofia.navarro@gmail.com',
+        sucursal: CALVARIO,
+        personas: 2,
+        tipoNombre: 'Desayunos & Degustación All-Day',
+        estado: 'asistida',
+        fecha: sumarDias(hoy, -28),
+        hora: '11:00',
+        creado: haceDias(32),
+        notas: 'Celebración de cumpleaños de mi amiga.'
+      });
 
-    // Walk-ins en sala y una mesa recién desocupada (queda en limpieza).
-    await sentar({
-      mesa: 'P-M02',
-      comensal: 'Carlos Mendoza',
-      personas: 3,
-      notas: 'Walk-in directo. Pidieron Mollete Mamut.',
-      ticket: 680,
-      inicioHace: 65,
-      mesero: persona.valeria
-    });
-    await sentar({
-      mesa: 'P-M05',
-      comensal: 'Valeria & Daniel',
-      personas: 2,
-      notas: 'Pet friendly con perro beagle.',
-      ticket: 290,
-      inicioHace: 25,
-      mesero: persona.valeria
-    });
-    await sentar({
-      mesa: 'C-M01',
-      comensal: 'Esteban Ortiz',
-      personas: 1,
-      notas: 'Coworking con laptop.',
-      ticket: 180,
-      inicioHace: 35,
-      mesero: persona.camila
-    });
-    await sentar({
-      mesa: 'P-M06',
-      comensal: 'Familia Ontiveros',
-      personas: 3,
-      ticket: 510,
-      inicioHace: 70,
-      finHace: 5,
-      mesero: persona.valeria
-    });
-    await consulta('mesas').where('id', mesa['P-M06'].id).update({ estado: 'limpieza' });
-
-    // Reservaciones de la cuenta demo de la PWA: una próxima y una histórica.
-    await reservar({
-      folio: 'MF-RES-84920',
-      cliente: cliente.sofia,
-      comensal: 'Sofía Navarro Morales',
-      telefono: '(618) 154-8920',
-      email: 'sofia.navarro@gmail.com',
-      sucursal: PORRAS,
-      personas: 4,
-      tipo: 'juegos',
-      estado: 'confirmada',
-      fecha: sumarDias(hoy, 1),
-      hora: '19:30',
-      creado: hace(120),
-      notas: 'Queremos mesa cerca de la ludoteca. Pediremos combo Mamut y frappés.'
-    });
-    await reservar({
-      folio: 'MF-RES-73190',
-      cliente: cliente.sofia,
-      comensal: 'Sofía Navarro Morales',
-      telefono: '(618) 154-8920',
-      email: 'sofia.navarro@gmail.com',
-      sucursal: CALVARIO,
-      personas: 2,
-      tipoNombre: 'Desayunos & Degustación All-Day',
-      estado: 'asistida',
-      fecha: sumarDias(hoy, -28),
-      hora: '11:00',
-      creado: haceDias(32),
-      notas: 'Celebración de cumpleaños de mi amiga.'
-    });
-
-    // Afluencia de hoy antes de lo anterior: walk-ins ya cerrados, hora por hora,
-    // para que el dashboard tenga ventas y distribución horaria que mostrar.
-    const AFLUENCIA = {
-      8: 0.3,
-      9: 0.55,
-      10: 0.85,
-      11: 0.75,
-      12: 0.45,
-      13: 0.5,
-      14: 0.7,
-      15: 0.5,
-      16: 0.35,
-      17: 0.6,
-      18: 0.7,
-      19: 0.8,
-      20: 0.65,
-      21: 0.5,
-      22: 0.3
-    };
-    const limite = ahora.getTime() - 160 * MINUTO; // no encimarse con los servicios de arriba
-    const meseros = [persona.valeria, persona.sofia, persona.camila];
-    for (const [hora, probabilidad] of Object.entries(AFLUENCIA)) {
-      const inicioHora = instanteLocal(hoy, `${dos(hora)}:00`).getTime();
-      if (inicioHora + 60 * MINUTO > limite) break;
-      for (const { id, capacidad } of Object.values(mesa)) {
-        if (azar() > probabilidad) continue;
-        const personas = entero(1, capacidad);
-        const inicio = inicioHora + entero(0, 10) * MINUTO;
-        await insertar('servicios_mesa', {
-          mesa_id: id,
-          comensal: 'Comensal Walk-in',
-          personas,
-          ticket_total: personas * entero(15, 23) * 10,
-          atendido_por: elegir(meseros),
-          inicio: new Date(inicio).toISOString(),
-          fin: new Date(inicio + entero(35, 48) * MINUTO).toISOString()
-        });
+      // Afluencia de hoy antes de lo anterior: walk-ins ya cerrados, hora por hora,
+      // para que el dashboard tenga ventas y distribución horaria que mostrar.
+      const AFLUENCIA = {
+        8: 0.3,
+        9: 0.55,
+        10: 0.85,
+        11: 0.75,
+        12: 0.45,
+        13: 0.5,
+        14: 0.7,
+        15: 0.5,
+        16: 0.35,
+        17: 0.6,
+        18: 0.7,
+        19: 0.8,
+        20: 0.65,
+        21: 0.5,
+        22: 0.3
+      };
+      const limite = ahora.getTime() - 160 * MINUTO; // no encimarse con los servicios de arriba
+      const meseros = [persona.valeria, persona.sofia, persona.camila];
+      for (const [hora, probabilidad] of Object.entries(AFLUENCIA)) {
+        const inicioHora = instanteLocal(hoy, `${dos(hora)}:00`).getTime();
+        if (inicioHora + 60 * MINUTO > limite) break;
+        for (const { id, capacidad } of Object.values(mesa)) {
+          if (azar() > probabilidad) continue;
+          const personas = entero(1, capacidad);
+          const inicio = inicioHora + entero(0, 10) * MINUTO;
+          await insertar('servicios_mesa', {
+            mesa_id: id,
+            comensal: 'Comensal Walk-in',
+            personas,
+            ticket_total: personas * entero(15, 23) * 10,
+            atendido_por: elegir(meseros),
+            inicio: new Date(inicio).toISOString(),
+            fin: new Date(inicio + entero(35, 48) * MINUTO).toISOString()
+          });
+        }
       }
-    }
 
-    // Lugares ya apartados en las actividades con fecha: grupos pequeños de invitados.
-    const NOMBRES = [
-      'Daniela',
-      'Luis',
-      'Fernanda',
-      'Jorge',
-      'Ximena',
-      'Ricardo',
-      'Karla',
-      'Emilio',
-      'Regina',
-      'Hugo',
-      'Natalia',
-      'Iván'
-    ];
-    const APELLIDOS = [
-      'Soto',
-      'Ávila',
-      'Gallegos',
-      'Rentería',
-      'Favela',
-      'Nájera',
-      'Cisneros',
-      'Meraz',
-      'Unzueta',
-      'Salas'
-    ];
-    for (const a of actividades) {
-      let restantes = a.ocupados ?? 0;
-      while (restantes > 0) {
-        const personas = Math.min(restantes, entero(1, 4));
-        restantes -= personas;
-        await reservar({
-          folio: folioNuevo(),
-          comensal: `${elegir(NOMBRES)} ${elegir(APELLIDOS)}`,
-          telefono: `618-${entero(100, 999)}-${entero(1000, 9999)}`,
-          sucursal: a.sucursal,
-          actividad: actividad[a.slug],
-          tipo: 'actividad',
-          personas,
-          estado: 'confirmada',
-          fecha: sumarDias(hoy, a.enDias),
-          hora: a.horas[0],
-          creado: haceDias(entero(1, 6))
-        });
+      // Lugares ya apartados en las actividades con fecha: grupos pequeños de invitados.
+      const NOMBRES = [
+        'Daniela',
+        'Luis',
+        'Fernanda',
+        'Jorge',
+        'Ximena',
+        'Ricardo',
+        'Karla',
+        'Emilio',
+        'Regina',
+        'Hugo',
+        'Natalia',
+        'Iván'
+      ];
+      const APELLIDOS = [
+        'Soto',
+        'Ávila',
+        'Gallegos',
+        'Rentería',
+        'Favela',
+        'Nájera',
+        'Cisneros',
+        'Meraz',
+        'Unzueta',
+        'Salas'
+      ];
+      for (const a of actividades) {
+        let restantes = a.ocupados ?? 0;
+        while (restantes > 0) {
+          const personas = Math.min(restantes, entero(1, 4));
+          restantes -= personas;
+          await reservar({
+            folio: folioNuevo(),
+            comensal: `${elegir(NOMBRES)} ${elegir(APELLIDOS)}`,
+            telefono: `618-${entero(100, 999)}-${entero(1000, 9999)}`,
+            sucursal: a.sucursal,
+            actividad: actividad[a.slug],
+            tipo: 'actividad',
+            personas,
+            estado: 'confirmada',
+            fecha: sumarDias(hoy, a.enDias),
+            hora: a.horas[0],
+            creado: haceDias(entero(1, 6))
+          });
+        }
       }
-    }
     }
 
     // ----------------------------------------------------------------------
@@ -1732,74 +1732,75 @@ export function sembrar({ soloCatalogo = false } = {}) {
     // ----------------------------------------------------------------------
 
     if (!soloCatalogo) {
-    for (const n of [
-      {
-        titulo: '¡Mesa confirmada en Sucursal Porras!',
-        mensaje:
-          'Tu reservación para 4 personas está lista para mañana a las 7:30 PM (folio MF-RES-84920). Chilaquiles y juegos esperándote.',
-        tipo: 'reservacion',
-        destino: 'mis_reservaciones',
-        creado: hace(120)
-      },
-      {
-        titulo: '¡Nuevo beneficio por tus visitas!',
-        mensaje: 'Desbloqueaste "Frappé de Confitería Gratis (16oz)". Válido en cualquier sucursal.',
-        tipo: 'beneficio',
-        destino: 'beneficios',
-        creado: haceDias(1)
-      },
-      {
-        titulo: 'Nuevo platillo en carta: Fresas Dubái',
-        mensaje: 'Ya puedes pedir fresas con crema pura de pistache siciliano y kataifi crocante en Porras y Calvario.',
-        tipo: 'promo',
-        destino: 'promociones',
-        leida: 1,
-        creado: haceDias(2)
+      for (const n of [
+        {
+          titulo: '¡Mesa confirmada en Sucursal Porras!',
+          mensaje:
+            'Tu reservación para 4 personas está lista para mañana a las 7:30 PM (folio MF-RES-84920). Chilaquiles y juegos esperándote.',
+          tipo: 'reservacion',
+          destino: 'mis_reservaciones',
+          creado: hace(120)
+        },
+        {
+          titulo: '¡Nuevo beneficio por tus visitas!',
+          mensaje: 'Desbloqueaste "Frappé de Confitería Gratis (16oz)". Válido en cualquier sucursal.',
+          tipo: 'beneficio',
+          destino: 'beneficios',
+          creado: haceDias(1)
+        },
+        {
+          titulo: 'Nuevo platillo en carta: Fresas Dubái',
+          mensaje:
+            'Ya puedes pedir fresas con crema pura de pistache siciliano y kataifi crocante en Porras y Calvario.',
+          tipo: 'promo',
+          destino: 'promociones',
+          leida: 1,
+          creado: haceDias(2)
+        }
+      ].reverse()) {
+        await insertar('notificaciones', {
+          cliente_id: cliente.sofia,
+          titulo: n.titulo,
+          mensaje: n.mensaje,
+          tipo: n.tipo,
+          screen_destino: n.destino,
+          leida: n.leida ?? 0,
+          creado_en: n.creado
+        });
       }
-    ].reverse()) {
-      await insertar('notificaciones', {
-        cliente_id: cliente.sofia,
-        titulo: n.titulo,
-        mensaje: n.mensaje,
-        tipo: n.tipo,
-        screen_destino: n.destino,
-        leida: n.leida ?? 0,
-        creado_en: n.creado
-      });
-    }
 
-    for (const e of [
-      {
-        codigo: 'MF-CLUB-33109',
-        tipo: 'club',
-        descripcion: 'Mariana Corrales · 3/8 sellos',
-        resultado: 'Sello acreditado (+50 pts)',
-        creado: haceDias(5)
-      },
-      {
-        codigo: 'MF-RES-88219',
-        tipo: 'reservacion',
-        descripcion: 'Andrea Garza (2 personas)',
-        resultado: 'Check-in realizado (Mesa M01)',
-        creado: hace(42)
-      },
-      {
-        codigo: 'MF-PROMO-2X1',
-        tipo: 'promocion',
-        descripcion: 'Jueves 2x1 en Frappés de Confitería',
-        resultado: 'Descuento aplicado al ticket',
-        creado: hace(12)
+      for (const e of [
+        {
+          codigo: 'MF-CLUB-33109',
+          tipo: 'club',
+          descripcion: 'Mariana Corrales · 3/8 sellos',
+          resultado: 'Sello acreditado (+50 pts)',
+          creado: haceDias(5)
+        },
+        {
+          codigo: 'MF-RES-88219',
+          tipo: 'reservacion',
+          descripcion: 'Andrea Garza (2 personas)',
+          resultado: 'Check-in realizado (Mesa M01)',
+          creado: hace(42)
+        },
+        {
+          codigo: 'MF-PROMO-2X1',
+          tipo: 'promocion',
+          descripcion: 'Jueves 2x1 en Frappés de Confitería',
+          resultado: 'Descuento aplicado al ticket',
+          creado: hace(12)
+        }
+      ]) {
+        await insertar('escaneos', {
+          codigo: e.codigo,
+          tipo: e.tipo,
+          descripcion: e.descripcion,
+          resultado: e.resultado,
+          personal_id: persona.valeria,
+          creado_en: e.creado
+        });
       }
-    ]) {
-      await insertar('escaneos', {
-        codigo: e.codigo,
-        tipo: e.tipo,
-        descripcion: e.descripcion,
-        resultado: e.resultado,
-        personal_id: persona.valeria,
-        creado_en: e.creado
-      });
-    }
     }
 
     const resumen = {};

@@ -26,7 +26,12 @@ export function listar({ sucursalId, categoria, incluirPasadas = false, incluirI
     });
   if (sucursalId) query.where('a.sucursal_id', sucursalId);
   if (categoria) query.where('a.categoria_slug', categoria);
-  return query.orderBy([{ column: 'a.activa', order: 'desc' }, { column: 'a.fecha', order: 'asc', nulls: 'last' }, 'a.hora_inicio', 'a.id']);
+  return query.orderBy([
+    { column: 'a.activa', order: 'desc' },
+    { column: 'a.fecha', order: 'asc', nulls: 'last' },
+    'a.hora_inicio',
+    'a.id'
+  ]);
 }
 export const buscar = (clave, hoy) =>
   actividades(hoy)

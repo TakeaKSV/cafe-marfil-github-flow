@@ -112,10 +112,7 @@ export async function actualizarActividad(id, cambios) {
     const cambioHora =
       (cambios.horaInicio !== undefined && cambios.horaInicio !== actual.hora_inicio) ||
       (cambios.horaFin !== undefined && cambios.horaFin !== actual.hora_fin);
-    if (
-      cambioHora &&
-      (cambios.horarioTexto === undefined || cambios.horarioTexto === actual.horario_texto)
-    ) {
+    if (cambioHora && (cambios.horarioTexto === undefined || cambios.horarioTexto === actual.horario_texto)) {
       cambiosFinales.horarioTexto = null;
     }
 

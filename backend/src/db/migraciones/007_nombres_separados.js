@@ -17,11 +17,13 @@ async function agregarColumnasNombre(knex, tabla) {
   for (const fila of filas) {
     if (fila.nombres) continue;
     const partes = dividirNombreCompleto(fila.nombre);
-    await knex(tabla).where({ id: fila.id }).update({
-      nombres: partes.nombres || null,
-      apellido_paterno: partes.apellidoPaterno || null,
-      apellido_materno: partes.apellidoMaterno || null
-    });
+    await knex(tabla)
+      .where({ id: fila.id })
+      .update({
+        nombres: partes.nombres || null,
+        apellido_paterno: partes.apellidoPaterno || null,
+        apellido_materno: partes.apellidoMaterno || null
+      });
   }
 }
 
