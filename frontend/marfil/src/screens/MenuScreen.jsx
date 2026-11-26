@@ -813,16 +813,16 @@ export default function MenuScreen({
           ==================================================================== */}
       {selectedProduct && createPortal(
         <div
-          className="fixed inset-0 z-[9999] flex items-end md:items-stretch md:justify-end bg-[#1F1410]/65 backdrop-blur-md transition-opacity animate-in fade-in duration-200 will-change-opacity"
+          className="fixed inset-0 z-[9999] flex items-end lg:items-stretch lg:justify-end bg-[#1F1410]/65 backdrop-blur-md transition-opacity animate-in fade-in duration-200 will-change-opacity"
           onClick={handleCloseModal}
           role="dialog"
           aria-modal="true"
         >
           {/* =========================================================
-              A) VISTA DESKTOP: IMAGEN DETRÁS Y BARRA LATERAL DELANTE
+              A) VISTA DESKTOP (lg+): IMAGEN DETRÁS Y BARRA LATERAL DELANTE
               ========================================================= */}
           {/* 1. IMAGEN GIGANTE FUERA DEL ASIDE - ESTRICTAMENTE DETRÁS (Z-10) OPTIMIZADA CON GPU */}
-          <div className="hidden md:flex absolute right-[320px] lg:right-[380px] top-1/2 -translate-y-1/2 w-[440px] lg:w-[560px] h-[540px] lg:h-[700px] pointer-events-none z-10 items-center justify-center animate-in fade-in duration-200 will-change-transform">
+          <div className="hidden lg:flex absolute right-[380px] top-1/2 -translate-y-1/2 w-[500px] xl:w-[560px] h-[580px] xl:h-[700px] pointer-events-none z-10 items-center justify-center animate-in fade-in duration-200 will-change-transform">
             <img
               src={selectedProduct.imagen}
               alt={selectedProduct.nombreCompleto}
@@ -835,7 +835,7 @@ export default function MenuScreen({
           {/* 2. BARRA LATERAL POR DELANTE CON TRANSICIÓN ULTRA SUAVE */}
           <aside
             style={{ backgroundColor: selectedProduct.colorCard || '#FFFFFF' }}
-            className="hidden md:flex relative w-[480px] lg:w-[520px] max-w-[92vw] h-full flex-col justify-between animate-in slide-in-from-right duration-250 z-30 select-none shadow-2xl will-change-transform"
+            className="hidden lg:flex relative w-[480px] xl:w-[520px] max-w-[92vw] h-full flex-col justify-between animate-in slide-in-from-right duration-250 z-30 select-none shadow-2xl will-change-transform"
             onClick={(e) => e.stopPropagation()}
           >
             {/* CORTINA DE DEGRADADO MÁS CORTA Y SUTIL HACIA LA IZQUIERDA */}
@@ -958,11 +958,11 @@ export default function MenuScreen({
           </aside>
 
           {/* =========================================================
-              B) VISTA MÓVIL: BOTTOM SHEET FLOTANTE
+              B) VISTA MÓVIL & TABLET (< lg): BOTTOM SHEET COMPACTO SIN RECORTAR IMAGEN
               ========================================================= */}
           <div
             style={{ backgroundColor: selectedProduct.colorCard || '#D9D9D9' }}
-            className="md:hidden relative w-full h-[88vh] max-h-[92vh] rounded-t-[36px] pt-32 pb-8 px-6 flex flex-col justify-between shadow-2xl animate-in slide-in-from-bottom duration-250 border-t border-white/40 select-none overflow-visible will-change-transform"
+            className="lg:hidden relative w-full max-w-2xl mx-auto max-h-[68vh] sm:max-h-[72vh] rounded-t-[32px] pt-20 sm:pt-24 pb-6 px-5 sm:px-7 flex flex-col justify-between shadow-2xl animate-in slide-in-from-bottom duration-250 border-t border-white/40 select-none overflow-visible will-change-transform"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Barra indicadora de deslizamiento para móvil */}
@@ -972,14 +972,14 @@ export default function MenuScreen({
             <button
               type="button"
               onClick={handleCloseModal}
-              className="absolute top-4 right-4 z-30 w-10 h-10 rounded-full bg-white/90 text-[#1F1410] hover:text-[#E12927] flex items-center justify-center shadow-xs cursor-pointer active:scale-90 transition-transform"
+              className="absolute top-4 right-4 z-30 w-9 h-9 rounded-full bg-white/90 text-[#1F1410] hover:text-[#E12927] flex items-center justify-center shadow-xs cursor-pointer active:scale-90 transition-transform"
               aria-label="Cerrar modal"
             >
-              <X size={22} className="stroke-[2.5]" />
+              <X size={20} className="stroke-[2.5]" />
             </button>
 
-            {/* Imagen flotante subida aún más para no estar pegada al título */}
-            <div className="absolute -top-48 sm:-top-52 left-1/2 -translate-x-1/2 w-64 h-68 flex items-center justify-center pointer-events-none z-20 will-change-transform">
+            {/* Imagen flotante con altura controlada para que nunca se recorte arriba */}
+            <div className="absolute -top-24 sm:-top-28 left-1/2 -translate-x-1/2 w-40 h-40 sm:w-48 sm:h-48 flex items-center justify-center pointer-events-none z-20 will-change-transform">
               <img
                 src={selectedProduct.imagen}
                 alt={selectedProduct.nombreCompleto}
@@ -989,25 +989,25 @@ export default function MenuScreen({
               />
             </div>
 
-            {/* CUERPO CON EXACTAMENTE LA MISMA ESTRUCTURA QUE DESKTOP - ULTRA LEGIBLE */}
-            <div className="flex-1 overflow-y-auto pr-1 pt-3 flex flex-col justify-start scrollbar-none text-left">
-              {/* 1. TÍTULO Y NOMBRES CON MÁXIMO CONTRASTE Y TAMAÑO */}
+            {/* CUERPO COMPACTO Y SCROLLEABLE */}
+            <div className="flex-1 min-h-0 overflow-y-auto pr-1 pt-2 flex flex-col justify-start scrollbar-none text-left">
+              {/* 1. TÍTULO Y NOMBRES */}
               <div>
-                <span className="font-mono text-xs sm:text-sm font-black text-[#E12927] uppercase tracking-wider block mb-1">
+                <span className="font-mono text-[11px] sm:text-xs font-black text-[#E12927] uppercase tracking-wider block mb-0.5">
                   {selectedProduct.categoria}
                 </span>
                 <h3
-                  className="font-normal text-4xl sm:text-5xl text-[#1F1410] tracking-tight leading-[1.1]"
+                  className="font-normal text-2xl sm:text-3xl text-[#1F1410] tracking-tight leading-[1.1]"
                   style={{ fontFamily: 'var(--font-menu-title)' }}
                 >
                   {selectedProduct.nombre}
                 </h3>
-                <p className="font-body text-base sm:text-lg text-[#1F1410]/80 font-bold mt-1.5 leading-snug">
+                <p className="font-body text-sm sm:text-base text-[#1F1410]/80 font-bold mt-1 leading-snug">
                   {selectedProduct.nombreCompleto}
                 </p>
 
-                {/* 2. DESCRIPCIÓN CON LETRA GRANDE */}
-                <p className="font-body text-base sm:text-lg text-[#1F1410] leading-relaxed mt-4 opacity-100 text-justify font-medium">
+                {/* 2. DESCRIPCIÓN */}
+                <p className="font-body text-xs sm:text-sm text-[#1F1410] leading-relaxed mt-2.5 opacity-100 text-justify font-medium">
                   {selectedProduct.descripcion ||
                     (selectedProduct.queTrae && selectedProduct.queTrae.length > 0
                       ? selectedProduct.queTrae.join(' ')
@@ -1016,13 +1016,13 @@ export default function MenuScreen({
               </div>
 
               {/* 3. SECCIÓN: TAMAÑO O PRESENTACIÓN */}
-              <div className="mt-6">
-                <span className="font-body font-black text-lg text-[#1F1410] block mb-3">
+              <div className="mt-4">
+                <span className="font-body font-black text-sm sm:text-base text-[#1F1410] block mb-2">
                   {selectedProduct.id?.startsWith('frappe') || selectedProduct.categoria?.toLowerCase().includes('bebida')
                     ? 'Tamaño'
                     : 'Presentación'}
                 </span>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                   {(selectedProduct.id?.startsWith('frappe') || selectedProduct.categoria?.toLowerCase().includes('bebida')
                     ? [
                       { label: 'Chico', desc: '12 oz' },
@@ -1044,13 +1044,13 @@ export default function MenuScreen({
                           sounds.playClick();
                           setSelectedSize(sizeItem.label);
                         }}
-                        className={`flex-1 py-3 px-3 rounded-full text-base sm:text-lg font-black transition-all duration-200 cursor-pointer border-2 text-center ${isSelected
+                        className={`flex-1 py-2 px-2.5 rounded-full text-xs sm:text-sm font-black transition-all duration-200 cursor-pointer border-2 text-center ${isSelected
                           ? 'bg-[#E12927] text-white border-[#E12927] shadow-md'
                           : 'bg-white/40 text-[#1F1410] border-[#1F1410]/20 hover:bg-[#FCEAE9]'
                           }`}
                       >
                         <span className={`block leading-tight font-body font-bold ${isSelected ? 'text-white' : 'text-[#1F1410]'}`}>{sizeItem.label}</span>
-                        <span className={`block text-xs sm:text-sm font-mono mt-1 ${isSelected ? 'text-white/90' : 'text-[#1F1410]/70 font-bold'}`}>
+                        <span className={`block text-[10px] sm:text-xs font-mono mt-0.5 ${isSelected ? 'text-white/90' : 'text-[#1F1410]/70 font-bold'}`}>
                           {sizeItem.desc}
                         </span>
                       </button>
@@ -1061,23 +1061,23 @@ export default function MenuScreen({
             </div>
 
             {/* 4. PRECIO & METADATOS INFERIORES */}
-            <div className="w-full flex items-baseline justify-between pt-4 mt-3 border-t-2 border-[#1F1410]/15 shrink-0">
+            <div className="w-full flex items-baseline justify-between pt-3 mt-3 border-t-2 border-[#1F1410]/15 shrink-0">
               <div>
-                <span className="font-mono text-xs sm:text-sm font-bold text-[#1F1410]/70 uppercase tracking-wider block">
+                <span className="font-mono text-[10px] sm:text-xs font-bold text-[#1F1410]/70 uppercase tracking-wider block">
                   Precio en sucursal
                 </span>
                 <span
-                  className="font-bold text-4xl sm:text-5xl text-[#1F1410] tracking-tight leading-none font-mono"
+                  className="font-bold text-2xl sm:text-3xl text-[#1F1410] tracking-tight leading-none font-mono"
                 >
                   {selectedProduct.precio}
                 </span>
               </div>
 
               <div className="text-right">
-                <span className="font-mono text-base font-black text-[#E12927] uppercase tracking-wider block">
+                <span className="font-mono text-xs sm:text-sm font-black text-[#E12927] uppercase tracking-wider block">
                   {selectedProduct.calorias}
                 </span>
-                <span className="font-mono text-xs sm:text-sm text-[#1F1410]/70 font-bold">
+                <span className="font-mono text-[10px] sm:text-xs text-[#1F1410]/70 font-bold">
                   En sala y para llevar
                 </span>
               </div>

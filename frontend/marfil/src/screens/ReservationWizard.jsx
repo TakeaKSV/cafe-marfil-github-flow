@@ -321,9 +321,9 @@ export default function ReservationWizard({
     }`;
 
   return (
-    <div className="flex flex-col gap-5 w-full text-left">
+    <div className="flex flex-col gap-5 w-full min-w-0 text-left pb-24 lg:pb-6">
       {/* Barra limpia de 3 pasos */}
-      <div className="flex items-center justify-between gap-2 bg-white dark:bg-[#1F1410] p-2 rounded-2xl border border-black/[0.06] dark:border-white/10">
+      <div className="grid grid-cols-3 gap-1.5 sm:gap-2 bg-white dark:bg-[#1F1410] p-1.5 sm:p-2 rounded-2xl border border-black/[0.06] dark:border-white/10">
         {PASOS.map((paso) => {
           const isCurrent = currentStep === paso.num;
           const isDone = currentStep > paso.num;
@@ -338,7 +338,7 @@ export default function ReservationWizard({
                   setCurrentStep(paso.num);
                 }
               }}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs sm:text-sm transition-all ${
+              className={`min-w-0 flex items-center justify-center gap-1.5 sm:gap-2 py-2 px-1.5 sm:px-3 rounded-xl text-[11px] sm:text-sm transition-all ${
                 isCurrent
                   ? 'bg-[#1F1410] dark:bg-[#E12927] text-white font-semibold shadow-xs'
                   : isDone
@@ -347,7 +347,7 @@ export default function ReservationWizard({
               }`}
             >
               <span
-                className={`w-5 h-5 rounded-full text-[11px] font-bold flex items-center justify-center shrink-0 ${
+                className={`w-5 h-5 rounded-full text-[10px] sm:text-[11px] font-bold flex items-center justify-center shrink-0 ${
                   isCurrent
                     ? 'bg-white/20 text-white'
                     : isDone
@@ -721,19 +721,19 @@ export default function ReservationWizard({
               )}
 
               {usarDatosCuenta && contacto ? (
-                <div className="p-4 rounded-2xl bg-white dark:bg-[#1F1410] border border-black/[0.06] dark:border-white/10 space-y-2 text-xs sm:text-sm">
-                  <div className="flex justify-between gap-2">
-                    <span className="text-[#8E7A74]">Titular</span>
-                    <strong className="text-[#1F1410] dark:text-[#FAF7F5]">{contacto.nombre}</strong>
+                <div className="p-4 rounded-2xl bg-white dark:bg-[#1F1410] border border-black/[0.06] dark:border-white/10 space-y-2.5 text-xs sm:text-sm min-w-0">
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 min-w-0">
+                    <span className="text-[#8E7A74] shrink-0">Titular</span>
+                    <strong className="text-[#1F1410] dark:text-[#FAF7F5] text-right break-words min-w-0">{contacto.nombre}</strong>
                   </div>
-                  <div className="flex justify-between gap-2">
-                    <span className="text-[#8E7A74]">Correo</span>
-                    <span className="text-[#1F1410] dark:text-[#FAF7F5]">{contacto.correo || '—'}</span>
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 min-w-0">
+                    <span className="text-[#8E7A74] shrink-0">Correo</span>
+                    <span className="text-[#1F1410] dark:text-[#FAF7F5] text-right break-all min-w-0">{contacto.correo || '—'}</span>
                   </div>
                   {contacto.telefono ? (
-                    <div className="flex justify-between gap-2">
-                      <span className="text-[#8E7A74]">Teléfono</span>
-                      <span className="text-[#1F1410] dark:text-[#FAF7F5]">{contacto.telefono}</span>
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 min-w-0">
+                      <span className="text-[#8E7A74] shrink-0">Teléfono</span>
+                      <span className="text-[#1F1410] dark:text-[#FAF7F5] text-right">{contacto.telefono}</span>
                     </div>
                   ) : (
                     <div className="pt-2 border-t border-black/10 dark:border-white/10 flex flex-col gap-1">

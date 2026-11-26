@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   LayoutDashboard,
   CalendarDays,
@@ -11,10 +12,10 @@ import {
   Building2,
   LogOut,
   Coffee,
-  CheckCircle2,
   ChevronDown,
   Check,
-  Sparkles
+  Sparkles,
+  X
 } from 'lucide-react';
 import { playSound } from '../utils/audioFeedback';
 import { ETIQUETA_ROL, puedeVerTab } from '../utils/permisos';
@@ -27,7 +28,9 @@ export const Sidebar = ({
   sucursales,
   soundEnabled,
   usuario,
-  onLogout
+  onLogout,
+  mobileOpen = false,
+  onCloseMobile
 }) => {
   const currentSucursalObj = sucursales.find(s => s.id === selectedSucursal);
   const currentSucursalLabel = selectedSucursal === 'todas'
@@ -66,25 +69,36 @@ export const Sidebar = ({
 
   const activeIndex = Math.max(0, menuItems.findIndex(item => item.id === activeTab));
 
-  return (
-    <aside className="admin-sidebar w-60 sm:w-64 md:w-68 bg-[#E12927] flex flex-col justify-between shrink-0 z-30 select-none h-full overflow-y-auto overflow-x-hidden pt-6 pb-5 font-body relative">
-
+  const renderContenido = (esDrawer = false) => (
+    <>
       {/* 1. SECCIÓN SUPERIOR: Marca & Sucursal Activa */}
       <div className="space-y-4">
 
-        {/* Título de Marca (Estilo eProduct de la referencia) */}
-        <div className="px-6 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-white/15 border border-white/25 flex items-center justify-center text-white shrink-0 shadow-xs">
-            <Coffee className="w-5 h-5 text-white" />
+        {/* Título de Marca */}
+        <div className="px-6 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-2xl bg-white/15 border border-white/25 flex items-center justify-center text-white shrink-0 shadow-xs">
+              <Coffee className="w-5 h-5 text-white" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="font-display font-bold text-xl sm:text-2xl text-white tracking-tight leading-none truncate">
+                Café Marfil
+              </h1>
+              <span className="text-[10px] font-mono text-white/80 font-medium tracking-wider uppercase block mt-1">
+                Urban Brunch & Bar
+              </span>
+            </div>
           </div>
-          <div className="min-w-0">
-            <h1 className="font-display font-bold text-xl sm:text-2xl text-white tracking-tight leading-none truncate">
-              Café Marfil
-            </h1>
-            <span className="text-[10px] font-mono text-white/80 font-medium tracking-wider uppercase block mt-1">
-              Urban Brunch & Bar
-            </span>
-          </div>
+          {esDrawer && onCloseMobile && (
+            <button
+              type="button"
+              onClick={onCloseMobile}
+              aria-label="Cerrar menú"
+              className="w-8 h-8 rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center shrink-0 cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
         {/* Selector de Sucursal Premium en cápsula moderna con menú desplegable flotante */}
@@ -210,6 +224,7 @@ export const Sidebar = ({
                   onClick={() => {
                     if (soundEnabled && !isActive) playSound('toggle');
                     onSelectTab(item.id);
+                    if (esDrawer && onCloseMobile) onCloseMobile();
                   }}
                   className={`h-[44px] w-[calc(100%-14px)] sm:w-[calc(100%-16px)] ml-3.5 sm:ml-4 flex items-center justify-between pl-4 pr-3.5 rounded-l-full cursor-pointer transition-colors duration-200 select-none ${isActive
                       ? 'text-[#E12927] font-bold'
@@ -254,7 +269,32 @@ export const Sidebar = ({
         </div>
 
       </div>
+    </>
+  );
 
-    </aside>
+  return (
+    <>
+      {/* Sidebar fijo en escritorio (lg+) */}
+      <aside className="hidden lg:flex w-64 xl:w-68 bg-[#E12927] flex-col justify-between shrink-0 z-30 select-none h-full overflow-y-auto overflow-x-hidden pt-6 pb-5 font-body relative">
+        {renderContenido(false)}
+      </aside>
+
+      {/* Drawer lateral en móvil y tablet (< lg) */}
+      {mobileOpen &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[9999] lg:hidden flex bg-[#1F1410]/70 backdrop-blur-md animate-in fade-in duration-150"
+            onClick={onCloseMobile}
+          >
+            <aside
+              className="w-72 max-w-[85vw] bg-[#E12927] flex flex-col justify-between h-full overflow-y-auto overflow-x-hidden pt-6 pb-5 font-body relative shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {renderContenido(true)}
+            </aside>
+          </div>,
+          document.body
+        )}
+    </>
   );
 };

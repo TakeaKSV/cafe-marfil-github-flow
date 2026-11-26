@@ -69,9 +69,9 @@ export default function Header({
             </div>
           </div>
 
-          {/* Navegación de Escritorio & Tablet */}
+          {/* Navegación de Escritorio (en móvil y tablet se usa la barra móvil inferior) */}
           <nav
-            className={`hidden md:flex items-center p-1 rounded-full ${
+            className={`hidden lg:flex items-center p-1 rounded-full ${
               isHeroOverlay
                 ? 'bg-black/20 border border-white/15 backdrop-blur-md'
                 : 'bg-black/5 border border-stone-200/50 backdrop-blur-sm'

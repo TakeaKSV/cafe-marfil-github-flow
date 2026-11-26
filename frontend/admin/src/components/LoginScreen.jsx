@@ -53,23 +53,35 @@ export const LoginScreen = ({ onLogin, soundEnabled = true }) => {
   };
 
   return (
-    <div className="h-screen w-screen bg-[#1F1410] flex flex-col lg:flex-row overflow-hidden font-body selection:bg-[#E12927] selection:text-white relative">
+    <div className="min-h-dvh w-full bg-[#1F1410] flex flex-col-reverse lg:flex-row lg:h-screen lg:overflow-hidden overflow-x-hidden font-body selection:bg-[#E12927] selection:text-white relative">
 
       {/* ========================================================= */}
-      {/* SECCIÓN IZQUIERDA: LONA BLANCA CON ONDA ORGÁNICA & HERO CUP */}
+      {/* SECCIÓN VISUAL: LONA BLANCA CON ONDA ORGÁNICA & HERO CUP  */}
+      {/* (Abajo en móvil/tablet · Izquierda en escritorio lg+)     */}
       {/* ========================================================= */}
-      <div className="w-full lg:w-[58%] h-full relative flex flex-col justify-between p-6 sm:p-10 lg:p-12 overflow-hidden shrink-0 z-10">
+      <div className="w-full lg:w-[58%] lg:h-full relative flex flex-col justify-between px-6 pb-8 pt-20 sm:px-10 sm:pt-24 lg:p-12 overflow-hidden shrink-0 z-10">
 
-          {/* Fondo Blanco con Corte Curvo Orgánico (SVG S-Curve) hacia la sección oscura */}
+          {/* Fondo Blanco con Corte Curvo Orgánico adaptado por orientación */}
           <div className="absolute inset-0 w-full h-full pointer-events-none -z-10">
+            {/* Onda vertical (escritorio lg+): apunta hacia la derecha hacia el formulario */}
             <svg
-              className="w-full h-full"
+              className="hidden lg:block w-full h-full"
               viewBox="0 0 1000 1000"
               preserveAspectRatio="none"
             >
-              {/* Onda orgánica: recta en extremos, arco convexo amplio y curva cóncava suave */}
               <path
                 d="M 0,0 L 720,0 C 780,180 1000,280 1000,500 C 1000,720 820,820 940,1000 L 0,1000 Z"
+                fill="#FFFFFF"
+              />
+            </svg>
+            {/* Onda horizontal (móvil y tablet < lg): apunta hacia arriba hacia Iniciar Sesión */}
+            <svg
+              className="lg:hidden w-full h-full"
+              viewBox="0 0 1000 1000"
+              preserveAspectRatio="none"
+            >
+              <path
+                d="M 0,85 C 240,10 520,145 780,60 C 895,22 955,40 1000,70 L 1000,1000 L 0,1000 Z"
                 fill="#FFFFFF"
               />
             </svg>
@@ -114,7 +126,7 @@ export const LoginScreen = ({ onLogin, soundEnabled = true }) => {
             <img
               src="/images/marfil_hero_cup.png"
               alt="Frappé Café Marfil Artesanal"
-              className="relative z-10 max-h-[300px] sm:max-h-[380px] md:max-h-[440px] lg:max-h-[480px] w-auto object-contain drop-shadow-[0_20px_30px_rgba(31,20,16,0.25)] animate-float-slow select-none pointer-events-none"
+              className="relative z-10 max-h-[240px] sm:max-h-[320px] md:max-h-[360px] lg:max-h-[480px] w-auto object-contain drop-shadow-[0_20px_30px_rgba(31,20,16,0.25)] animate-float-slow select-none pointer-events-none"
             />
 
           </div>
