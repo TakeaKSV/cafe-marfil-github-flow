@@ -300,7 +300,7 @@ export const ReservationsTableView = ({
       <div className="flex flex-wrap items-center justify-between gap-3">
         
         {/* Search Input con borde redondeado suave */}
-        <div className="relative min-w-[280px]">
+        <div className="relative min-w-0 w-full sm:min-w-[280px] sm:w-auto">
           <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#1F1410]/35" />
           <input
             type="text"

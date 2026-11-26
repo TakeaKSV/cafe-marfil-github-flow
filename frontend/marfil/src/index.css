@@ -790,3 +790,90 @@ select:focus-visible {
     animation: none;
   }
 }
+
+/* Base fluida para teléfonos, tablets y escritorios. */
+html,
+body,
+#root {
+  width: 100%;
+  min-width: 320px;
+  min-height: 100%;
+}
+
+body {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.app-container {
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: clip;
+}
+
+main,
+main > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+main :where(img, video, canvas, iframe) {
+  max-width: 100%;
+}
+
+main :where(input, select, textarea) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 767px) {
+  .main-content {
+    padding-inline: clamp(0.75rem, 4vw, 1.25rem);
+    padding-top: 0.5rem;
+    padding-bottom: calc(6rem + env(safe-area-inset-bottom));
+  }
+
+  .marfil-footer {
+    padding-bottom: calc(6rem + env(safe-area-inset-bottom));
+  }
+
+  main :where(.grid, .flex) {
+    min-width: 0;
+  }
+
+  main :where(button, a) {
+    touch-action: manipulation;
+  }
+}
+
+@media (max-width: 359px) {
+  .main-content {
+    padding-inline: 0.625rem;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1279px) {
+  .marfil-site-header-inner {
+    height: auto;
+    min-height: 4.5rem;
+    padding-block: 0.5rem;
+    flex-wrap: wrap;
+    column-gap: 0.75rem;
+    row-gap: 0.5rem;
+  }
+
+  .marfil-site-header-inner > nav {
+    order: 3;
+    flex: 1 0 100%;
+    min-width: 0;
+    max-width: 100%;
+    justify-content: flex-start;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .marfil-site-header-inner > nav::-webkit-scrollbar {
+    display: none;
+  }
+}

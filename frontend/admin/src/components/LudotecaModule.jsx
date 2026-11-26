@@ -209,7 +209,7 @@ export const LudotecaModule = ({
         </div>
 
         {/* Buscador */}
-        <div className="relative min-w-[280px]">
+        <div className="relative min-w-0 w-full sm:min-w-[280px] sm:w-auto">
           <Search className="w-4 h-4 absolute left-3 top-2.5 text-[#1F1410]/40" />
           <input
             type="text"

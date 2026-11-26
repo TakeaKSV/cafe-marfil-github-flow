@@ -41,13 +41,13 @@ export default function Header({
     <>
       {/* Navbar Principal: Transparente sobre el Hero al inicio / Sólida legible al scrollear */}
       <header
-        className={`${isFixedOverlay ? 'fixed top-0 inset-x-0' : 'sticky top-0'} z-40 ${
+        className={`marfil-site-header ${isFixedOverlay ? 'fixed top-0 inset-x-0' : 'sticky top-0'} z-40 ${
           isHeroOverlay
             ? 'bg-transparent border-b border-white/15 backdrop-blur-xs text-white'
             : 'bg-white/95 backdrop-blur-xl border-b border-stone-200/70 text-[#1F1410] shadow-sm'
         } transition-all duration-300`}
       >
-        <div className="max-w-[1240px] mx-auto px-4 sm:px-6 h-[72px] flex items-center justify-between gap-4">
+        <div className="marfil-site-header-inner max-w-[1240px] mx-auto px-2.5 sm:px-6 h-[72px] flex items-center justify-between gap-2 sm:gap-4">
           {/* Isotipo del Elefante + Logotipo */}
           <div
             className="flex items-center gap-3 cursor-pointer select-none group shrink-0"
@@ -60,7 +60,7 @@ export default function Header({
             </div>
             <div className="flex flex-col">
               <span
-                className={`font-display text-xl sm:text-2xl font-bold ${
+                className={`font-display text-lg sm:text-2xl font-bold ${
                   isHeroOverlay ? 'text-white' : 'text-[#1F1410]'
                 } leading-none tracking-tight drop-shadow-sm`}
               >
@@ -102,7 +102,7 @@ export default function Header({
           <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
             {/* Botón CTA Primario en Rojo Marfil */}
             <button
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-mono text-xs font-bold uppercase tracking-wider bg-[#E12927] hover:bg-[#C81E1C] active:scale-95 text-white shadow-md shadow-[#E12927]/30 hover:shadow-lg transition-all duration-200 cursor-pointer"
+              className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-5 py-2.5 rounded-full font-mono text-xs font-bold uppercase tracking-wider bg-[#E12927] hover:bg-[#C81E1C] active:scale-95 text-white shadow-md shadow-[#E12927]/30 hover:shadow-lg transition-all duration-200 cursor-pointer"
               onClick={() => handleNav('reservar')}
               aria-label="Reservar mesa en Café Marfil"
             >
@@ -151,7 +151,7 @@ export default function Header({
               </button>
             ) : (
               <button
-                className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full border font-mono text-xs font-bold uppercase tracking-wider active:scale-95 transition-all cursor-pointer shadow-xs ${
+                className={`inline-flex items-center gap-1.5 px-2.5 sm:px-4 py-2.5 rounded-full border font-mono text-xs font-bold uppercase tracking-wider active:scale-95 transition-all cursor-pointer shadow-xs ${
                   activeScreen === 'perfil'
                     ? 'bg-[#1F1410] text-white border-[#1F1410]'
                     : isHeroOverlay
@@ -162,7 +162,7 @@ export default function Header({
                 aria-label="Iniciar sesión en Café Marfil"
               >
                 <LogIn size={14} />
-                <span>Iniciar sesión</span>
+                <span className="hidden sm:inline">Iniciar sesión</span>
               </button>
             )}
           </div>

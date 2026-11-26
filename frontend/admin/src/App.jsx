@@ -616,7 +616,7 @@ export function App() {
   }
 
   return (
-    <div className="h-screen w-screen bg-[#F8F5F1] flex overflow-hidden font-body selection:bg-[#E12927] selection:text-white">
+    <div className="admin-app-shell w-full min-w-0 min-h-dvh flex flex-col lg:flex-row lg:h-dvh lg:overflow-hidden bg-[#F8F5F1] font-body selection:bg-[#E12927] selection:text-white">
 
       {/* Sidebar Lateral Fijo: Siempre visible al 100%, nunca cambia de posición con el scroll */}
       <Sidebar

@@ -67,7 +67,7 @@ export const Sidebar = ({
   const activeIndex = Math.max(0, menuItems.findIndex(item => item.id === activeTab));
 
   return (
-    <aside className="w-60 sm:w-64 md:w-68 bg-[#E12927] flex flex-col justify-between shrink-0 z-30 select-none h-full overflow-y-auto overflow-x-hidden pt-6 pb-5 font-body relative">
+    <aside className="admin-sidebar w-60 sm:w-64 md:w-68 bg-[#E12927] flex flex-col justify-between shrink-0 z-30 select-none h-full overflow-y-auto overflow-x-hidden pt-6 pb-5 font-body relative">
 
       {/* 1. SECCIÓN SUPERIOR: Marca & Sucursal Activa */}
       <div className="space-y-4">
