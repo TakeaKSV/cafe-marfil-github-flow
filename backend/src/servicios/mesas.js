@@ -9,6 +9,7 @@
 import { config } from '../config.js';
 import { bloquearFila, enTransaccion } from '../db/conexion.js';
 import * as repo from '../repositorios/mesas.js';
+import { exigirSucursal } from './sucursales.js';
 import { conflicto, noEncontrado } from '../utils/errores.js';
 import { ahoraISO, horaTexto, hoyLocal, minutosDesde } from '../utils/fechas.js';
 
@@ -27,7 +28,10 @@ function aMesa(fila, reserva) {
     zonaId: fila.zona_id,
     zona: fila.zona,
     capacidad: fila.capacidad,
-    forma: fila.forma
+    forma: fila.forma,
+    posX: fila.pos_x !== null && fila.pos_x !== undefined ? Number(fila.pos_x) : null,
+    posY: fila.pos_y !== null && fila.pos_y !== undefined ? Number(fila.pos_y) : null,
+    piso: fila.piso ?? null
   };
   const vacia = { comensal: null, personas: 0, tiempoMinutos: 0, ticketAprox: 0, reservaFolio: null, mesero: null };
 
@@ -91,11 +95,85 @@ export async function actualizarMesa(id, cambios) {
   });
 }
 
+export async function crearMesa({
+  sucursalId,
+  zonaId = null,
+  numero,
+  capacidad,
+  forma = 'squircle',
+  notas = null,
+  posX = null,
+  posY = null,
+  piso = null
+}) {
+  await exigirSucursal(sucursalId);
+  const numeroLimpio = String(numero || '').trim().toUpperCase();
+  if (!numeroLimpio) throw conflicto('Indica el número o clave de la mesa (ej. M09).');
+
+  if (zonaId) {
+    const zona = await repo.zona(zonaId);
+    if (!zona || zona.sucursal_id !== sucursalId) {
+      throw conflicto('Esa zona no pertenece a la sucursal seleccionada.');
+    }
+  }
+
+  return enTransaccion(async () => {
+    const existente = await repo.porSucursalYNumero(sucursalId, numeroLimpio);
+    if (existente) {
+      if (existente.activa === 1) {
+        throw conflicto(`Ya existe la mesa "${numeroLimpio}" en esta sucursal.`);
+      }
+      await repo.reactivarMesa(existente.id, {
+        zonaId,
+        capacidad,
+        forma,
+        notas,
+        posX,
+        posY,
+        piso
+      });
+      return obtenerMesa(existente.id);
+    }
+
+    const { id } = await repo.crearMesa({
+      sucursalId,
+      zonaId,
+      numero: numeroLimpio,
+      capacidad,
+      forma,
+      notas,
+      posX,
+      posY,
+      piso
+    });
+    return obtenerMesa(id);
+  });
+}
+
+export async function eliminarMesa(id) {
+  return enTransaccion(async () => {
+    await bloquearFila('mesas', id);
+    const mesa = await obtenerMesa(id);
+    if (mesa.estado === 'ocupada') {
+      throw conflicto(`La mesa ${mesa.numero} está ocupada. Libérala antes de eliminarla.`);
+    }
+    await repo.desactivarMesa(id);
+  });
+}
+
 /**
  * Sienta comensales en una mesa libre. Lo usan el walk-in (sin reservación) y
  * el check-in de reservaciones (con `reservacionId`).
  */
-export function abrirServicio({ mesaId, comensal, personas, notas = null, reservacionId = null, personalId = null }) {
+export function abrirServicio({
+  mesaId,
+  comensal,
+  personas,
+  notas = null,
+  reservacionId = null,
+  personalId = null,
+  ignorarCapacidad = false
+}) {
   return enTransaccion(async () => {
     await bloquearFila('mesas', mesaId); // dos hosts no pueden sentar gente en la misma mesa a la vez
     const mesa = await obtenerMesa(mesaId);
@@ -108,7 +186,7 @@ export function abrirServicio({ mesaId, comensal, personas, notas = null, reserv
         `La mesa ${mesa.numero} está reservada para las ${horaTexto(mesa.horaReserva)} (folio ${mesa.reservaFolio}).`
       );
     }
-    if (personas > mesa.capacidad) {
+    if (!ignorarCapacidad && personas > mesa.capacidad) {
       throw conflicto(`La mesa ${mesa.numero} es para ${mesa.capacidad} personas y el grupo es de ${personas}.`);
     }
 

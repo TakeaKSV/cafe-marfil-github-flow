@@ -17,7 +17,8 @@ function cuandoFue(iso) {
 
 export const aSucursal = (s) => ({
   ...s,
-  zonas: s.zonas.map((zona) => zona.nombre)
+  zonasDetalle: Array.isArray(s.zonas) ? s.zonas : [],
+  zonas: (Array.isArray(s.zonas) ? s.zonas : []).map((zona) => zona.nombre)
 });
 
 /** `hoy` es la fecha del día según el servidor ('AAAA-MM-DD'). */

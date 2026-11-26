@@ -29,6 +29,8 @@ import {
   abrirServicio,
   actualizarMesa,
   cerrarServicio,
+  crearMesa,
+  eliminarMesa,
   listarMesas,
   marcarLimpia,
   obtenerMesa
@@ -74,12 +76,31 @@ const esquemaWalkIn = z.object({
   notas: zTextoOpcional(500).optional()
 });
 
+const zFormaMesa = z.enum(['squircle', 'circle', 'rectangle_vertical', 'rectangle_horizontal']);
+const zPisoMesa = z.enum(['planta-baja', 'planta-alta']);
+
+const esquemaCrearMesa = z.object({
+  sucursalId: zSucursalId,
+  zonaId: zId.nullable().optional(),
+  numero: zTexto(10),
+  capacidad: zEntero(1, 60),
+  forma: zFormaMesa.default('squircle'),
+  notas: zTextoOpcional(500).nullable().optional(),
+  posX: z.coerce.number().min(4).max(96).nullable().optional(),
+  posY: z.coerce.number().min(6).max(94).nullable().optional(),
+  piso: zPisoMesa.nullable().optional()
+});
+
 const esquemaEditarMesa = z
   .object({
+    numero: zTexto(10),
     notas: zTextoOpcional(500).nullable(),
     capacidad: zEntero(1, 60),
     zonaId: zId.nullable(),
-    forma: z.enum(['squircle', 'circle', 'rectangle_vertical', 'rectangle_horizontal']),
+    forma: zFormaMesa,
+    posX: z.coerce.number().min(4).max(96).nullable(),
+    posY: z.coerce.number().min(6).max(94).nullable(),
+    piso: zPisoMesa.nullable(),
     ticketTotal: zPrecio // consumo acumulado del servicio abierto
   })
   .partial();
@@ -88,12 +109,21 @@ const esquemaLiberar = z.object({ ticketTotal: zPrecio.optional() });
 
 router.get('/mesas', async (req, res) => res.json(await listarMesas(leer(filtroSucursal, req.query))));
 
+router.post('/mesas', soloAdmin, async (req, res) => {
+  res.status(201).json(await crearMesa(leer(esquemaCrearMesa, req.body)));
+});
+
 router.get('/mesas/:id', async (req, res) => res.json(await obtenerMesa(leer(zId, req.params.id))));
 
 router.patch('/mesas/:id', async (req, res) => {
   const id = leer(zId, req.params.id);
   const cambios = leer(esquemaEditarMesa, req.body);
   res.json(await actualizarMesa(id, cambios));
+});
+
+router.delete('/mesas/:id', soloAdmin, async (req, res) => {
+  await eliminarMesa(leer(zId, req.params.id));
+  res.status(204).end();
 });
 
 // Sentar a un comensal sin reservación.

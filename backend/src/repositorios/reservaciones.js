@@ -1,5 +1,5 @@
 import { consulta } from '../db/conexion.js';
-import { insertar, actualizar, mapearCampos } from './base.js';
+import { insertar, actualizar, mapearCampos, aBit, aJSON } from './base.js';
 
 function reservaciones() {
   return consulta('reservaciones as r')
@@ -48,6 +48,8 @@ export const insertarReservacion = (datos) =>
     email_contacto: datos.email,
     sucursal_id: datos.sucursalId,
     mesa_id: datos.mesaId,
+    mesas_solicitadas: datos.mesasSolicitadas?.length ? aJSON(datos.mesasSolicitadas) : null,
+    solicita_union_mesas: aBit(datos.solicitaUnionMesas),
     actividad_id: datos.actividadId,
     juego_id: datos.juegoId ?? null,
     tipo: datos.tipo,
@@ -91,7 +93,21 @@ export const porCodigo = ({ clave }) =>
 export const porToken = (token) => reservaciones().where('r.token_qr', token).first();
 
 export const mesaBloqueada = (id) =>
-  consulta('mesas').select('numero', 'sucursal_id', 'capacidad').where({ id, activa: 1 }).forUpdate().first();
+  consulta('mesas as m')
+    .leftJoin('zonas as z', 'z.id', 'm.zona_id')
+    .select('m.id', 'm.numero', 'm.sucursal_id', 'm.capacidad', 'm.forma', 'm.pos_x', 'm.pos_y', 'm.piso', 'z.nombre as zona')
+    .where({ 'm.id': id, 'm.activa': 1 })
+    .forUpdate()
+    .first();
+
+export const mesasActivasSucursal = (sucursalId, bloquear = false) => {
+  const q = consulta('mesas as m')
+    .leftJoin('zonas as z', 'z.id', 'm.zona_id')
+    .select('m.id', 'm.numero', 'm.sucursal_id', 'm.capacidad', 'm.forma', 'm.pos_x', 'm.pos_y', 'm.piso', 'z.nombre as zona')
+    .where({ 'm.sucursal_id': sucursalId, 'm.activa': 1 })
+    .orderBy('m.id', 'asc');
+  return bloquear ? q.forUpdate() : q;
+};
 
 export const reservasDeMesa = (mesaId, fecha, excluirId) =>
   consulta('reservaciones')
@@ -112,7 +128,7 @@ export const mesasDisponiblesSucursal = (sucursalId, personas, bloquear = false)
 
 export const reservasActivasSucursalFecha = (sucursalId, fecha, excluirId = 0) =>
   consulta('reservaciones')
-    .select('id', 'folio', 'mesa_id', 'hora', 'personas', 'cliente_id')
+    .select('id', 'folio', 'mesa_id', 'mesas_solicitadas', 'hora', 'personas', 'cliente_id')
     .where({ sucursal_id: sucursalId, fecha })
     .whereNot('id', excluirId)
     .whereIn('estado', ['confirmada', 'en_curso']);

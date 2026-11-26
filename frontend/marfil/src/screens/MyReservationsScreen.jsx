@@ -13,7 +13,8 @@ import {
   Plus,
   Dice5,
   FileText,
-  History
+  History,
+  Link2
 } from 'lucide-react';
 import { sounds } from '../utils/audio';
 import QRModal from '../components/QRModal';
@@ -222,6 +223,21 @@ export default function MyReservationsScreen({
                         </div>
                       </div>
                     </div>
+
+                    {res.mesaAsignada && (
+                      <div className="px-3.5 py-2.5 rounded-xl bg-[#FAF7F5] dark:bg-[#261A16] flex flex-wrap items-center justify-between gap-2 text-xs text-[#1F1410] dark:text-[#FAF7F5]">
+                        <span>
+                          {res.mesasSolicitadas?.length > 1 ? 'Mesas: ' : 'Mesa: '}
+                          <strong>{res.mesaAsignada}</strong>
+                        </span>
+                        {res.solicitaUnionMesas && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#FCEAE9] dark:bg-[#321B19] text-[#E12927] text-[10px] font-bold">
+                            <Link2 size={11} />
+                            Solicitud de unión de mesas
+                          </span>
+                        )}
+                      </div>
+                    )}
 
                     {res.juegoNombre && (
                       <div className="px-3.5 py-2.5 rounded-xl bg-[#FCEAE9]/65 dark:bg-[#321B19] flex items-center gap-2 text-xs text-[#1F1410] dark:text-[#FAF7F5]">

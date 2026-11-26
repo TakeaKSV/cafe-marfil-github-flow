@@ -212,6 +212,8 @@ export const aReservacion = (r) => ({
   juegoId: r.juegoId ?? null,
   juegoNombre: r.juegoNombre ?? null,
   mesaAsignada: r.mesaAsignada ?? null,
+  mesasSolicitadas: Array.isArray(r.mesasSolicitadas) ? r.mesasSolicitadas : [],
+  solicitaUnionMesas: Boolean(r.solicitaUnionMesas),
   estado: ESTADOS_RESERVACION[r.estado],
   qrCode: r.tokenQR,
   esHistorica: r.esHistorica

@@ -395,6 +395,8 @@ export default function App() {
           comensal: nueva.nombreCliente,
           telefono: nueva.telefonoCliente,
           email: nueva.correoCliente || undefined,
+          mesasIds: nueva.mesasIds?.length ? nueva.mesasIds : undefined,
+          solicitaUnionMesas: Boolean(nueva.solicitaUnionMesas),
           juegoId: nueva.juegoId || undefined,
           notas: nueva.notas || undefined
         }

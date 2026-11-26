@@ -270,6 +270,39 @@ export function App() {
   const handleAssignWalkIn = ({ mesaId, comensal, personas, notas }) =>
     ejecutar(() => post(`/mesas/${mesaId}/walk-in`, { comensal, personas, notas }), 'Mesa asignada a comensal walk-in.');
 
+  const handleCreateMesa = (datos) =>
+    ejecutar(() => post('/mesas', datos), `Mesa ${datos.numero} agregada al plano.`);
+
+  const handleMoveMesa = async (mesaId, { posX, posY, piso }) => {
+    setMesas((prev) =>
+      prev.map((m) =>
+        m.id === mesaId
+          ? {
+              ...m,
+              posX,
+              posY,
+              ...(piso !== undefined ? { piso } : {})
+            }
+          : m
+      )
+    );
+    try {
+      await patch(`/mesas/${mesaId}`, {
+        posX,
+        posY,
+        ...(piso !== undefined ? { piso } : {})
+      });
+      return true;
+    } catch (error) {
+      mostrarError(error.message || 'No se pudo guardar la nueva ubicación de la mesa.');
+      cargarDatos().catch(() => {});
+      return false;
+    }
+  };
+
+  const handleDeleteMesa = (mesaId) =>
+    ejecutar(() => api(`/mesas/${mesaId}`, { metodo: 'DELETE' }), 'Mesa eliminada del plano.');
+
   // ------------------------------------------------------------------------
   // Reservaciones
   // ------------------------------------------------------------------------
@@ -726,7 +759,11 @@ export function App() {
               {activeTab === 'floorplan' && (
                 <FloorPlanModule
                   mesas={mesas}
+                  usuario={usuario}
                   onUpdateMesa={handleUpdateMesa}
+                  onCreateMesa={handleCreateMesa}
+                  onMoveMesa={handleMoveMesa}
+                  onDeleteMesa={handleDeleteMesa}
                   selectedSucursal={selectedSucursal}
                   sucursales={sucursales}
                   soundEnabled={soundEnabled}

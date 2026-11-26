@@ -13,7 +13,8 @@ import {
   Copy,
   Check,
   Download,
-  Dice5
+  Dice5,
+  Link2
 } from 'lucide-react';
 import { sounds } from '../utils/audio';
 import QRCodeImage from '../components/QRCodeImage';
@@ -211,6 +212,24 @@ export default function ReservationSuccessScreen({
               {reservation.personas} {reservation.personas === 1 ? 'persona' : 'personas'}
             </strong>
           </div>
+
+          {reservation.mesaAsignada && (
+            <div className="col-span-2 p-3 rounded-2xl bg-white dark:bg-[#1F1410] border border-black/[0.06] dark:border-white/10 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <MapPin size={14} className="text-[#E12927] shrink-0" />
+                <span className="text-xs text-[#1F1410] dark:text-[#FAF7F5]">
+                  {reservation.mesasSolicitadas?.length > 1 ? 'Mesas reservadas: ' : 'Mesa asignada: '}
+                  <strong>{reservation.mesaAsignada}</strong>
+                </span>
+              </div>
+              {reservation.solicitaUnionMesas && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#FCEAE9] dark:bg-[#321B19] text-[#E12927] text-[11px] font-bold">
+                  <Link2 size={12} />
+                  Solicitud de unión de mesas
+                </span>
+              )}
+            </div>
+          )}
 
           {reservation.juegoNombre && (
             <div className="col-span-2 p-3 rounded-2xl bg-[#FCEAE9]/70 dark:bg-[#321B19] border border-[#E12927]/25 flex items-center gap-2">

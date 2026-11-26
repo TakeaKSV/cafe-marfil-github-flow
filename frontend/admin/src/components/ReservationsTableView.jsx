@@ -15,7 +15,8 @@ import {
   ChevronDown,
   ArrowUpDown,
   Sparkles,
-  Ticket
+  Ticket,
+  Link2
 } from 'lucide-react';
 import { playSound } from '../utils/audioFeedback';
 import { reglas } from '../utils/validacion';
@@ -487,6 +488,12 @@ export const ReservationsTableView = ({
                       <span className="text-[11px] text-[#1F1410]/50 font-mono block">
                         {r.personas} personas · {r.mesaAsignada ? `Mesa ${r.mesaAsignada}` : 'Mesa por asignar'}
                       </span>
+                      {r.solicitaUnionMesas && (
+                        <span className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#FCEAE9] border border-[#E12927]/25 text-[#E12927] text-[10px] font-mono font-bold">
+                          <Link2 className="w-2.5 h-2.5" />
+                          Solicitud de unión de mesas
+                        </span>
+                      )}
                     </td>
 
                     {/* CREATED / HORA */}
@@ -661,9 +668,17 @@ export const ReservationsTableView = ({
                 <span className="font-bold text-[#E12927]">{qrModalItem.hora}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-[#1F1410]/60">Mesa asignada:</span>
+                <span className="text-[#1F1410]/60">
+                  {qrModalItem.mesasSolicitadas?.length > 1 ? 'Mesas reservadas:' : 'Mesa asignada:'}
+                </span>
                 <span className="font-bold">{qrModalItem.mesaAsignada || 'Por asignar'}</span>
               </div>
+              {qrModalItem.solicitaUnionMesas && (
+                <div className="mt-1.5 px-2.5 py-1.5 rounded-xl bg-[#FCEAE9] border border-[#E12927]/25 text-[#E12927] text-[11px] font-bold flex items-center justify-center gap-1.5">
+                  <Link2 className="w-3.5 h-3.5 shrink-0" />
+                  <span>Solicitud de unión de mesas ({qrModalItem.mesaAsignada})</span>
+                </div>
+              )}
               <div className="flex justify-between pt-1 border-t border-[#1F1410]/5">
                 <span className="text-[#1F1410]/60">Sucursal:</span>
                 <span className="font-semibold text-[11px] truncate max-w-[150px]">{qrModalItem.sucursalNombre}</span>

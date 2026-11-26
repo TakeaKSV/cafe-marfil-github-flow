@@ -7,6 +7,7 @@ import {
   cancelarReservacion,
   completarReservacion,
   consultarDisponibilidad,
+  consultarMesasDisponibles,
   crearReservacion,
   hacerCheckIn,
   listarReservaciones,
@@ -32,6 +33,8 @@ const esquemaCrear = z.object({
   telefono: zTexto(30).optional(),
   email: zEmail.optional(),
   mesaId: zId.optional(), // solo la toma en cuenta el panel
+  mesasIds: z.array(zId).max(6).optional(),
+  solicitaUnionMesas: z.boolean().optional(),
   juegoId: zId.nullable().optional(),
   notas: zTextoOpcional(500).optional()
 });
@@ -73,8 +76,18 @@ const esquemaDisponibilidad = z.object({
   personas: zEntero(1, 60).default(2)
 });
 
+const esquemaMesasDisponibles = z.object({
+  sucursalId: zTexto(60),
+  fecha: zFecha,
+  hora: zHora
+});
+
 router.get('/disponibilidad', async (req, res) => {
   res.json(await consultarDisponibilidad(leer(esquemaDisponibilidad, req.query)));
+});
+
+router.get('/mesas-disponibles', async (req, res) => {
+  res.json(await consultarMesasDisponibles(leer(esquemaMesasDisponibles, req.query)));
 });
 
 // Exige sesión autenticada (cliente de la PWA o personal del panel).

@@ -16,12 +16,15 @@ import {
   Coffee,
   Sparkles,
   PartyPopper,
-  Check
+  Check,
+  Link2
 } from 'lucide-react';
 import { sounds } from '../utils/audio';
 import { api } from '../api/cliente';
 import { fechaEnDias, fechasSugeridas as calcularFechasSugeridas } from '../api/adaptadores';
 import { reglas } from '../utils/validacion';
+import TablePickerStep from '../components/TablePickerStep';
+import { evaluarUnionMesas } from '../utils/mesasPlano';
 
 function separarNombre(contacto) {
   if (!contacto) return { nombres: '', apellidoPaterno: '', apellidoMaterno: '' };
@@ -83,11 +86,30 @@ const HORARIOS_DISPONIBLES = [
   { hora: '08:30 PM', turno: 'Noche' }
 ];
 
-const PASOS = [
+const PASOS_CON_MESA = [
+  { num: 1, label: 'Experiencia' },
+  { num: 2, label: 'Fecha y hora' },
+  { num: 3, label: 'Mesa (opcional)' },
+  { num: 4, label: 'Confirmar' }
+];
+
+const PASOS_ACTIVIDAD = [
   { num: 1, label: 'Experiencia' },
   { num: 2, label: 'Fecha y hora' },
   { num: 3, label: 'Confirmar' }
 ];
+
+function aHora24(texto) {
+  if (!texto) return '11:00';
+  const match = String(texto).trim().match(/^(\d{1,2}):(\d{2})(?:\s*(AM|PM))?$/i);
+  if (!match) return texto;
+  let h = Number(match[1]);
+  const m = match[2];
+  const suf = match[3]?.toUpperCase();
+  if (suf === 'PM' && h < 12) h += 12;
+  if (suf === 'AM' && h === 12) h = 0;
+  return `${String(h).padStart(2, '0')}:${m}`;
+}
 
 export default function ReservationWizard({
   sucursales = [],
@@ -112,6 +134,14 @@ export default function ReservationWizard({
   const [selectedJuegoId, setSelectedJuegoId] = useState('');
   const [disponibilidad, setDisponibilidad] = useState([]);
   const [cargandoDisp, setCargandoDisp] = useState(false);
+
+  // Fase opcional: selección de mesa(s) y solicitud de unión
+  const [mesasDisponibles, setMesasDisponibles] = useState([]);
+  const [cargandoMesas, setCargandoMesas] = useState(false);
+  const [errorMesas, setErrorMesas] = useState('');
+  const [mesasReloadTick, setMesasReloadTick] = useState(0);
+  const [selectedMesaIds, setSelectedMesaIds] = useState([]);
+  const [solicitaUnionMesas, setSolicitaUnionMesas] = useState(false);
 
   const [usarDatosCuenta, setUsarDatosCuenta] = useState(Boolean(contacto));
   const iniciales = separarNombre(contacto);
@@ -144,12 +174,22 @@ export default function ReservationWizard({
   }, [currentStep]);
 
   const fechasSugeridas = calcularFechasSugeridas();
-  const sucursalObj = sucursales.find((s) => s.id === selectedSucursalId) || sucursales[0];
+  const sucursalEfectivaId = selectedSucursalId || sucursales[0]?.id || '';
+  const sucursalObj = sucursales.find((s) => s.id === sucursalEfectivaId) || sucursales[0];
   const actividadObj = actividades.find((a) => String(a.id) === String(selectedActividadId));
   const juegoObj = juegos.find((j) => String(j.id) === String(selectedJuegoId));
   const esActividad = reservaTipo === 'actividad' && Boolean(actividadObj);
   const actividadTieneFechaFija = esActividad && Boolean(actividadObj?.fechaISO);
   const actividadTieneHorarioFijo = esActividad && Boolean(actividadObj?.horario);
+  const pasosActivos = esActividad ? PASOS_ACTIVIDAD : PASOS_CON_MESA;
+  const pasoConfirmar = esActividad ? 3 : 4;
+  const pasoSeleccionMesa = esActividad ? -1 : 3;
+
+  const mesasElegidas = selectedMesaIds
+    .map((id) => mesasDisponibles.find((m) => m.id === id))
+    .filter(Boolean);
+  const estadoUnion = evaluarUnionMesas(mesasElegidas, personas);
+  const unionActiva = estadoUnion.elegibleUnion && solicitaUnionMesas;
 
   const maxPersonas =
     esActividad && typeof actividadObj?.lugaresDisponibles === 'number'
@@ -196,6 +236,73 @@ export default function ReservationWizard({
     };
   }, [esActividad, selectedSucursalId, selectedDate, personas, selectedTime]);
 
+  // Cargar mesas disponibles para la fecha, hora y sucursal elegidas (fase opcional)
+  useEffect(() => {
+    if (esActividad || !sucursalEfectivaId || !selectedDate || !selectedTime) {
+      setMesasDisponibles([]);
+      setSelectedMesaIds([]);
+      setSolicitaUnionMesas(false);
+      setErrorMesas('');
+      return undefined;
+    }
+    let activo = true;
+    setCargandoMesas(true);
+    setErrorMesas('');
+    setSelectedMesaIds([]);
+    setSolicitaUnionMesas(false);
+
+    const params = new URLSearchParams({
+      sucursalId: sucursalEfectivaId,
+      fecha: selectedDate,
+      hora: aHora24(selectedTime)
+    });
+
+    api(`/reservaciones/mesas-disponibles?${params}`)
+      .then((lista) => {
+        if (!activo) return;
+        if (Array.isArray(lista)) {
+          setMesasDisponibles(lista);
+        } else {
+          setMesasDisponibles([]);
+        }
+      })
+      .catch((err) => {
+        if (activo) {
+          setMesasDisponibles([]);
+          setErrorMesas(err?.message || 'No se pudieron cargar las mesas disponibles.');
+        }
+      })
+      .finally(() => {
+        if (activo) setCargandoMesas(false);
+      });
+
+    return () => {
+      activo = false;
+    };
+  }, [esActividad, sucursalEfectivaId, selectedDate, selectedTime, mesasReloadTick]);
+
+  const handleToggleMesa = (mesa) => {
+    setValidationError('');
+    setSelectedMesaIds((prev) => {
+      const next = prev.includes(mesa.id)
+        ? prev.filter((id) => id !== mesa.id)
+        : prev.length >= 6
+        ? prev
+        : [...prev, mesa.id];
+
+      const nextMesas = next
+        .map((id) => mesasDisponibles.find((m) => m.id === id))
+        .filter(Boolean);
+      const evalNext = evaluarUnionMesas(nextMesas, personas);
+      if (evalNext.elegibleUnion && next.length >= 2 && prev.length < next.length) {
+        setSolicitaUnionMesas(true);
+      } else if (!evalNext.elegibleUnion) {
+        setSolicitaUnionMesas(false);
+      }
+      return next;
+    });
+  };
+
   const handleNext = () => {
     sounds.playClick();
     setValidationError('');
@@ -240,11 +347,22 @@ export default function ReservationWizard({
           return;
         }
       }
-      setCurrentStep(3);
+      setCurrentStep(esActividad ? 3 : 3);
       return;
     }
 
-    if (currentStep === 3) {
+    if (currentStep === pasoSeleccionMesa) {
+      if (selectedMesaIds.length > 0 && !estadoUnion.cubreGrupo) {
+        setValidationError(
+          `Las mesas seleccionadas suman ${estadoUnion.capacidadTotal} sillas y tu grupo es de ${personas}. Selecciona otra mesa o omite este paso.`
+        );
+        return;
+      }
+      setCurrentStep(pasoConfirmar);
+      return;
+    }
+
+    if (currentStep === pasoConfirmar) {
       const telEfectivo = usarDatosCuenta && contacto?.telefono ? contacto.telefono : telefono;
       const correoEfectivo = usarDatosCuenta && contacto?.correo ? contacto.correo : correo;
       const errs =
@@ -286,6 +404,9 @@ export default function ReservationWizard({
         fechaISO: selectedDate,
         hora: selectedTime,
         personas: Number(personas),
+        mesasIds: !esActividad && selectedMesaIds.length > 0 ? selectedMesaIds : [],
+        mesasSolicitadas: !esActividad ? mesasElegidas : [],
+        solicitaUnionMesas: !esActividad && unionActiva,
         juegoId: !esActividad && selectedJuegoId ? Number(selectedJuegoId) : null,
         juegoNombre: !esActividad && juegoObj ? juegoObj.nombre : null,
         nombreCliente: nombreCompleto,
@@ -322,9 +443,13 @@ export default function ReservationWizard({
 
   return (
     <div className="flex flex-col gap-5 w-full min-w-0 text-left pb-24 lg:pb-6">
-      {/* Barra limpia de 3 pasos */}
-      <div className="grid grid-cols-3 gap-1.5 sm:gap-2 bg-white dark:bg-[#1F1410] p-1.5 sm:p-2 rounded-2xl border border-black/[0.06] dark:border-white/10">
-        {PASOS.map((paso) => {
+      {/* Barra limpia de pasos */}
+      <div
+        className={`grid ${
+          pasosActivos.length === 4 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'
+        } gap-1.5 sm:gap-2 bg-white dark:bg-[#1F1410] p-1.5 sm:p-2 rounded-2xl border border-black/[0.06] dark:border-white/10`}
+      >
+        {pasosActivos.map((paso) => {
           const isCurrent = currentStep === paso.num;
           const isDone = currentStep > paso.num;
           return (
@@ -672,9 +797,35 @@ export default function ReservationWizard({
           )}
 
           {/* ================================================================
-              PASO 3: DATOS DE CONTACTO & NOTAS
+              PASO 3 (OPCIONAL): SELECCIÓN DE MESA(S) & SOLICITUD DE UNIÓN
               ================================================================ */}
-          {currentStep === 3 && (
+          {currentStep === pasoSeleccionMesa && (
+            <TablePickerStep
+              mesas={mesasDisponibles}
+              cargando={cargandoMesas}
+              error={errorMesas}
+              onRetry={() => setMesasReloadTick((t) => t + 1)}
+              personas={personas}
+              selectedMesaIds={selectedMesaIds}
+              solicitaUnionMesas={solicitaUnionMesas}
+              onToggleMesa={handleToggleMesa}
+              onClearMesas={() => {
+                setSelectedMesaIds([]);
+                setSolicitaUnionMesas(false);
+                setValidationError('');
+              }}
+              onToggleUnion={(val) => setSolicitaUnionMesas(val)}
+              onSkipStep={() => {
+                setValidationError('');
+                setCurrentStep(pasoConfirmar);
+              }}
+            />
+          )}
+
+          {/* ================================================================
+              PASO FINAL: DATOS DE CONTACTO & NOTAS
+              ================================================================ */}
+          {currentStep === pasoConfirmar && (
             <div className="flex flex-col gap-4">
               {contacto && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -910,6 +1061,25 @@ export default function ReservationWizard({
               </div>
             </div>
 
+            {!esActividad && mesasElegidas.length > 0 && (
+              <div className="pt-2 border-t border-black/[0.06] dark:border-white/10 space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] uppercase text-[#8E7A74]">
+                    {mesasElegidas.length === 1 ? 'Mesa elegida' : 'Mesas elegidas'}
+                  </span>
+                  <strong className="text-[#1F1410] dark:text-[#FAF7F5]">
+                    {mesasElegidas.map((m) => m.numero).join(' + ')} ({estadoUnion.capacidadTotal}p)
+                  </strong>
+                </div>
+                {unionActiva && (
+                  <div className="px-2.5 py-1.5 rounded-xl bg-[#FCEAE9] dark:bg-[#321B19] text-[#E12927] text-[11px] font-bold flex items-center gap-1.5">
+                    <Link2 size={13} className="shrink-0" />
+                    <span>Solicitud de unión de mesas incluida</span>
+                  </div>
+                )}
+              </div>
+            )}
+
             {!esActividad && juegoObj && (
               <div className="pt-2 border-t border-black/[0.06] dark:border-white/10 flex items-center gap-1.5 text-[#E12927]">
                 <Dice5 size={14} className="shrink-0" />
@@ -943,12 +1113,14 @@ export default function ReservationWizard({
           className="inline-flex items-center gap-2 px-6 sm:px-7 py-3 rounded-full bg-[#E12927] hover:bg-[#C81E1C] active:scale-95 disabled:opacity-60 text-white text-xs sm:text-sm font-bold shadow-md shadow-[#E12927]/25 transition-all cursor-pointer"
         >
           <span>
-            {currentStep === 3
+            {currentStep === pasoConfirmar
               ? enviando
                 ? 'Confirmando...'
                 : esActividad
                 ? 'Confirmar lugares'
                 : 'Confirmar reservación'
+              : currentStep === pasoSeleccionMesa && selectedMesaIds.length === 0
+              ? 'Continuar sin elegir mesa'
               : 'Continuar'}
           </span>
           <ArrowRight size={15} />

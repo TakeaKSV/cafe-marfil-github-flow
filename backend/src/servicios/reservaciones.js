@@ -11,7 +11,7 @@
 import { config } from '../config.js';
 import { bloquearFila, enTransaccion } from '../db/conexion.js';
 import * as repo from '../repositorios/reservaciones.js';
-import { codigoUnico, generarFolio, generarTokenQR } from '../utils/codigos.js';
+import { codigoUnico, generarFolio, generarTokenQR, leerJSON } from '../utils/codigos.js';
 import { conflicto, noEncontrado, solicitudInvalida } from '../utils/errores.js';
 import { ahoraISO, fechaEnFrase, fechaTexto, horaTexto, hoyLocal, minutosDelDia } from '../utils/fechas.js';
 
@@ -44,7 +44,27 @@ function totalEstimado(fila) {
   return fila.personas * config.ticketEstimadoPorPersona;
 }
 
+function parsearMesasSolicitadas(valor) {
+  const arr = leerJSON(valor, []);
+  return Array.isArray(arr) ? arr : [];
+}
+
+function idsMesasDeReserva(fila) {
+  const ids = new Set();
+  if (fila.mesa_id) ids.add(Number(fila.mesa_id));
+  for (const m of parsearMesasSolicitadas(fila.mesas_solicitadas)) {
+    if (m?.id) ids.add(Number(m.id));
+  }
+  return ids;
+}
+
 function aReservacion(fila) {
+  const mesasSolicitadas = parsearMesasSolicitadas(fila.mesas_solicitadas);
+  const mesasResumen =
+    mesasSolicitadas.length > 0
+      ? mesasSolicitadas.map((m) => m.numero).filter(Boolean).join(' + ')
+      : fila.mesa_numero;
+
   return {
     id: fila.id,
     folio: fila.folio,
@@ -61,7 +81,9 @@ function aReservacion(fila) {
     horaTexto: horaTexto(fila.hora),
     personas: fila.personas,
     mesaId: fila.mesa_id,
-    mesaAsignada: fila.mesa_numero,
+    mesaAsignada: mesasResumen,
+    mesasSolicitadas,
+    solicitaUnionMesas: Boolean(fila.solicita_union_mesas),
     tipo: fila.tipo,
     tipoNombre:
       fila.tipo_nombre ?? (fila.actividad_nombre ? `Actividad: ${fila.actividad_nombre}` : NOMBRES_TIPO[fila.tipo]),
@@ -124,19 +146,28 @@ function exigirEstado(fila, esperado, accion) {
   }
 }
 
+function buscarChoqueMesa(activas, mesaId, minutos) {
+  return activas.find(
+    (otra) =>
+      idsMesasDeReserva(otra).has(Number(mesaId)) &&
+      Math.abs(minutosDelDia(otra.hora) - minutos) < config.minutosEntreReservasMismaMesa
+  );
+}
+
 /** La mesa debe ser de la sucursal, tener capacidad y no chocar con otra reservación cercana. */
-async function validarMesa({ mesaId, sucursalId, fecha, hora, personas }, excluirReservacionId = 0) {
+async function validarMesa(
+  { mesaId, sucursalId, fecha, hora, personas, ignorarCapacidad = false },
+  excluirReservacionId = 0
+) {
   const mesa = await repo.mesaBloqueada(mesaId);
   if (!mesa) throw noEncontrado('No existe esa mesa.');
   if (mesa.sucursal_id !== sucursalId) throw conflicto(`La mesa ${mesa.numero} no pertenece a esa sucursal.`);
-  if (personas > mesa.capacidad) {
+  if (!ignorarCapacidad && personas > mesa.capacidad) {
     throw conflicto(`La mesa ${mesa.numero} es para ${mesa.capacidad} personas y el grupo es de ${personas}.`);
   }
 
-  const mismaFecha = await repo.reservasDeMesa(mesaId, fecha, excluirReservacionId);
-  const choque = mismaFecha.find(
-    (otra) => Math.abs(minutosDelDia(otra.hora) - minutosDelDia(hora)) < config.minutosEntreReservasMismaMesa
-  );
+  const activas = await repo.reservasActivasSucursalFecha(sucursalId, fecha, excluirReservacionId);
+  const choque = buscarChoqueMesa(activas, mesaId, minutosDelDia(hora));
   if (choque) {
     throw conflicto(
       `La mesa ${mesa.numero} ya está reservada a las ${horaTexto(choque.hora)} (folio ${choque.folio}).`
@@ -144,38 +175,77 @@ async function validarMesa({ mesaId, sucursalId, fecha, hora, personas }, exclui
   }
 }
 
-/** Busca la mejor mesa libre (capacidad >= personas) sin colisión de horario en esa sucursal y fecha. */
+/** Busca la mejor mesa libre (o combinación si el grupo excede mesas individuales) sin colisión de horario. */
 async function buscarMesaLibre({ sucursalId, fecha, hora, personas }, excluirReservacionId = 0, bloquear = true) {
-  const candidatas = await repo.mesasDisponiblesSucursal(sucursalId, personas, bloquear);
-  if (!candidatas.length) return { hayCapacidad: false, mesa: null };
+  const todas = await repo.mesasActivasSucursal(sucursalId, bloquear);
+  if (!todas.length) return { hayCapacidad: false, mesa: null, mesasCombinadas: [] };
+
   const activas = await repo.reservasActivasSucursalFecha(sucursalId, fecha, excluirReservacionId);
   const minutos = minutosDelDia(hora);
-  for (const mesa of candidatas) {
-    const ocupada = activas.some(
-      (r) => r.mesa_id === mesa.id && Math.abs(minutosDelDia(r.hora) - minutos) < config.minutosEntreReservasMismaMesa
-    );
-    if (!ocupada) return { hayCapacidad: true, mesa };
+  const libres = todas
+    .filter((mesa) => !buscarChoqueMesa(activas, mesa.id, minutos))
+    .sort((a, b) => a.capacidad - b.capacidad || a.id - b.id);
+
+  const individual = libres.find((m) => m.capacidad >= personas);
+  if (individual) return { hayCapacidad: true, mesa: individual, mesasCombinadas: [] };
+
+  const capacidadTotalSucursal = todas.reduce((acc, m) => acc + Number(m.capacidad || 0), 0);
+  if (capacidadTotalSucursal < personas) return { hayCapacidad: false, mesa: null, mesasCombinadas: [] };
+
+  // Si ninguna mesa individual alcanza, intentar sugerir combinación mínima disponible
+  const ordenadasDesc = [...libres].sort((a, b) => b.capacidad - a.capacidad || a.id - b.id);
+  const seleccion = [];
+  let suma = 0;
+  for (const m of ordenadasDesc) {
+    seleccion.push(m);
+    suma += Number(m.capacidad || 0);
+    if (suma >= personas) break;
   }
-  return { hayCapacidad: true, mesa: null };
+  if (suma >= personas) {
+    return { hayCapacidad: true, mesa: seleccion[0], mesasCombinadas: seleccion };
+  }
+  return { hayCapacidad: true, mesa: null, mesasCombinadas: [] };
 }
 
 /** Devuelve los horarios disponibles y ocupados para una sucursal, fecha y tamaño de grupo. */
 export async function consultarDisponibilidad({ sucursalId, fecha, personas = 2 }) {
   await exigirSucursal(sucursalId);
-  const candidatas = await repo.mesasDisponiblesSucursal(sucursalId, personas, false);
+  const todas = await repo.mesasActivasSucursal(sucursalId, false);
   const activas = await repo.reservasActivasSucursalFecha(sucursalId, fecha, 0);
   const turnos = ['08:30', '09:30', '10:30', '11:00', '12:00', '13:30', '15:00', '16:30', '18:00', '19:30', '20:30'];
   return turnos.map((hora) => {
     const minutos = minutosDelDia(hora);
-    const mesasLibres = candidatas.filter(
-      (mesa) =>
-        !activas.some(
-          (r) =>
-            r.mesa_id === mesa.id && Math.abs(minutosDelDia(r.hora) - minutos) < config.minutosEntreReservasMismaMesa
-        )
-    ).length;
-    return { hora, horaTexto: horaTexto(hora), disponible: mesasLibres > 0, mesasLibres };
+    const mesasLibres = todas.filter((mesa) => !buscarChoqueMesa(activas, mesa.id, minutos));
+    const individuales = mesasLibres.filter((m) => m.capacidad >= personas).length;
+    const capacidadLibreTotal = mesasLibres.reduce((acc, m) => acc + Number(m.capacidad || 0), 0);
+    const disponible = individuales > 0 || capacidadLibreTotal >= personas;
+    return {
+      hora,
+      horaTexto: horaTexto(hora),
+      disponible,
+      mesasLibres: mesasLibres.length,
+      requiereUnion: individuales === 0 && capacidadLibreTotal >= personas
+    };
   });
+}
+
+/** Devuelve el listado de mesas de la sucursal indicando cuáles están libres para una fecha y hora exactas. */
+export async function consultarMesasDisponibles({ sucursalId, fecha, hora }) {
+  await exigirSucursal(sucursalId);
+  const todas = await repo.mesasActivasSucursal(sucursalId, false);
+  const activas = await repo.reservasActivasSucursalFecha(sucursalId, fecha, 0);
+  const minutos = minutosDelDia(hora);
+  return todas.map((mesa) => ({
+    id: mesa.id,
+    numero: mesa.numero,
+    capacidad: mesa.capacidad,
+    forma: mesa.forma,
+    zona: mesa.zona || 'Salón Principal',
+    piso: mesa.piso ?? null,
+    posX: mesa.pos_x !== null && mesa.pos_x !== undefined ? Number(mesa.pos_x) : null,
+    posY: mesa.pos_y !== null && mesa.pos_y !== undefined ? Number(mesa.pos_y) : null,
+    disponible: !buscarChoqueMesa(activas, mesa.id, minutos)
+  }));
 }
 
 /** Bloquea la actividad mientras se revisa el cupo: dos reservas simultáneas no pueden sobrevenderla. */
@@ -250,19 +320,70 @@ export async function crearReservacion(datos, { clienteId = null, personalId = n
       }
     }
 
-    // Asignación y control de colisiones de mesa (día, hora y capacidad).
+    // Asignación y control de colisiones de mesa (individual o múltiple + solicitud de unión).
     let mesaId = personalId ? (datos.mesaId ?? null) : null;
-    if (mesaId) {
+    let mesasSolicitadas = [];
+    let solicitaUnionMesas = false;
+
+    const mesasIdsUnicos = Array.isArray(datos.mesasIds)
+      ? Array.from(new Set(datos.mesasIds.map(Number).filter((n) => Number.isInteger(n) && n > 0)))
+      : [];
+
+    if (mesasIdsUnicos.length > 0 && datos.tipo !== 'actividad') {
+      const activas = await repo.reservasActivasSucursalFecha(sucursalId, fecha, 0);
+      const minutos = minutosDelDia(hora);
+      const mesasValidas = [];
+
+      for (const mId of mesasIdsUnicos) {
+        const mesa = await repo.mesaBloqueada(mId);
+        if (!mesa) throw noEncontrado('Una de las mesas seleccionadas ya no existe.');
+        if (mesa.sucursal_id !== sucursalId) {
+          throw conflicto(`La mesa ${mesa.numero} no pertenece a esa sucursal.`);
+        }
+        const choque = buscarChoqueMesa(activas, mId, minutos);
+        if (choque) {
+          throw conflicto(
+            `La mesa ${mesa.numero} ya está reservada a las ${horaTexto(choque.hora)} (folio ${choque.folio}). Elige otra mesa.`
+          );
+        }
+        mesasValidas.push(mesa);
+      }
+
+      const capacidadTotal = mesasValidas.reduce((acc, m) => acc + Number(m.capacidad || 0), 0);
+      if (capacidadTotal < datos.personas) {
+        throw conflicto(
+          `Las mesas seleccionadas (${mesasValidas.map((m) => m.numero).join(' + ')}) tienen capacidad para ${capacidadTotal} personas y tu grupo es de ${datos.personas}.`
+        );
+      }
+
+      mesaId = mesasValidas[0].id;
+      mesasSolicitadas = mesasValidas.map((m) => ({
+        id: m.id,
+        numero: m.numero,
+        capacidad: m.capacidad,
+        zona: m.zona || 'Salón Principal'
+      }));
+
+      if (datos.solicitaUnionMesas && mesasValidas.length >= 2) {
+        const minPersonasUnion = Math.max(2, Math.ceil(capacidadTotal * 0.65));
+        if (datos.personas < minPersonasUnion) {
+          throw conflicto(
+            `Para solicitar unir ${mesasValidas.map((m) => m.numero).join(' + ')} (${capacidadTotal} sillas) se requieren al menos ${minPersonasUnion} personas.`
+          );
+        }
+        solicitaUnionMesas = true;
+      }
+    } else if (mesaId) {
       await validarMesa({ mesaId, sucursalId, fecha, hora, personas: datos.personas });
     } else if (datos.tipo !== 'actividad') {
-      const { hayCapacidad, mesa } = await buscarMesaLibre({
+      const { hayCapacidad, mesa, mesasCombinadas } = await buscarMesaLibre({
         sucursalId,
         fecha,
         hora,
         personas: datos.personas
       });
       if (!hayCapacidad) {
-        throw conflicto(`No contamos con una mesa individual para ${datos.personas} personas en esta sucursal.`);
+        throw conflicto(`No contamos con capacidad disponible para ${datos.personas} personas en esta sucursal.`);
       }
       if (!mesa) {
         throw conflicto(
@@ -270,6 +391,15 @@ export async function crearReservacion(datos, { clienteId = null, personalId = n
         );
       }
       mesaId = mesa.id;
+      if (mesasCombinadas.length >= 2) {
+        mesasSolicitadas = mesasCombinadas.map((m) => ({
+          id: m.id,
+          numero: m.numero,
+          capacidad: m.capacidad,
+          zona: m.zona || 'Salón Principal'
+        }));
+        solicitaUnionMesas = true;
+      }
     }
 
     const cliente = clienteId ? await repo.contacto(clienteId) : null;
@@ -288,6 +418,8 @@ export async function crearReservacion(datos, { clienteId = null, personalId = n
       email: datos.email ?? cliente?.email ?? null,
       sucursalId,
       mesaId,
+      mesasSolicitadas,
+      solicitaUnionMesas,
       actividadId: actividad?.id ?? null,
       juegoId: datos.juegoId ?? null,
       tipo: datos.tipo,
@@ -380,6 +512,7 @@ export function hacerCheckIn(folio, { mesaId } = {}, personalId = null) {
     }
 
     const mesaFinal = mesaId ?? fila.mesa_id;
+    const esGrupoMesas = parsearMesasSolicitadas(fila.mesas_solicitadas).length >= 2 || Boolean(fila.solicita_union_mesas);
     let numeroMesa = null;
     if (mesaFinal) {
       await validarMesa(
@@ -388,7 +521,8 @@ export function hacerCheckIn(folio, { mesaId } = {}, personalId = null) {
           sucursalId: fila.sucursal_id,
           fecha: fila.fecha,
           hora: fila.hora,
-          personas: fila.personas
+          personas: fila.personas,
+          ignorarCapacidad: esGrupoMesas
         },
         fila.id
       );
@@ -403,7 +537,8 @@ export function hacerCheckIn(folio, { mesaId } = {}, personalId = null) {
         personas: fila.personas,
         notas: fila.notas,
         reservacionId: fila.id,
-        personalId
+        personalId,
+        ignorarCapacidad: esGrupoMesas
       });
       numeroMesa = mesa.numero;
     }

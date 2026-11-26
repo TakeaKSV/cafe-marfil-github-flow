@@ -41,9 +41,51 @@ export const insertarServicio = ({ mesaId, reservacionId, comensal, personas, no
     inicio
   });
 
-const CAMPOS_MESAS = { notas: 'notas', capacidad: 'capacidad', zonaId: 'zona_id', forma: 'forma' };
+const CAMPOS_MESAS = {
+  notas: 'notas',
+  capacidad: 'capacidad',
+  zonaId: 'zona_id',
+  forma: 'forma',
+  numero: 'numero',
+  posX: 'pos_x',
+  posY: 'pos_y',
+  piso: 'piso'
+};
 
 export const actualizarMesas = (id, cambios) => actualizar('mesas', id, mapearCampos(cambios, CAMPOS_MESAS));
+
+export const porSucursalYNumero = (sucursalId, numero) =>
+  consulta('mesas').where({ sucursal_id: sucursalId, numero }).first();
+
+export const crearMesa = ({ sucursalId, zonaId = null, numero, capacidad, forma = 'squircle', notas = null, posX = null, posY = null, piso = null }) =>
+  insertar('mesas', {
+    sucursal_id: sucursalId,
+    zona_id: zonaId,
+    numero,
+    capacidad,
+    forma,
+    estado: 'libre',
+    notas,
+    pos_x: posX,
+    pos_y: posY,
+    piso,
+    activa: 1
+  });
+
+export const reactivarMesa = (id, { zonaId = null, capacidad, forma = 'squircle', notas = null, posX = null, posY = null, piso = null }) =>
+  actualizar('mesas', id, {
+    zona_id: zonaId,
+    capacidad,
+    forma,
+    estado: 'libre',
+    notas,
+    pos_x: posX,
+    pos_y: posY,
+    piso,
+    activa: 1
+  });
+
+export const desactivarMesa = (id) => actualizar('mesas', id, { activa: 0 });
 
 export const reservasDeHoy = (fecha) =>
   consulta('reservaciones')
