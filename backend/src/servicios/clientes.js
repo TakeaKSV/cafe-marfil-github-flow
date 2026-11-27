@@ -19,6 +19,7 @@ import {
   verificarDominioCorreo
 } from './correo.js';
 import { exigirSucursal } from './sucursales.js';
+import { vincularReservacionesDeInvitado } from './reservaciones.js';
 
 // recompensa_nombre: premio del pasaporte que el cliente ya ganó y aún no canjea.
 
@@ -113,6 +114,7 @@ export async function registrarCliente(datos) {
     sucursalHabitualId: datos.sucursalHabitualId ?? null,
     creadoEn: ahoraISO()
   });
+  await vincularReservacionesDeInvitado({ clienteId: id, email: datos.email ?? null, telefono: datos.telefono ?? null }).catch(() => {});
   return obtenerCliente(id);
 }
 
@@ -179,6 +181,7 @@ export async function verificarCodigoCorreo(email, codigo) {
     return obtenerCliente(actual.cliente_id);
   });
 
+  await vincularReservacionesDeInvitado({ clienteId: cliente.id, email: cliente.email, telefono: cliente.telefono }).catch(() => {});
   await enviarBienvenida({
     nombre: cliente.nombre,
     email: cliente.email,
@@ -307,7 +310,9 @@ export async function autenticarCliente(email, password) {
       { campo: 'verificacion', mensaje: 'requiere_verificacion' }
     ]);
   }
-  return { cliente: aCliente(fila), version: fila.session_version };
+  const cliente = aCliente(fila);
+  await vincularReservacionesDeInvitado({ clienteId: cliente.id, email: cliente.email, telefono: cliente.telefono }).catch(() => {});
+  return { cliente, version: fila.session_version };
 }
 
 export async function actualizarPerfil(id, cambios) {

@@ -1,23 +1,21 @@
 import React, { useState } from 'react';
 import {
-  MapPin,
-  Award,
   Calendar,
-  Gift,
-  Coffee,
-  Moon,
-  Sun,
-  Edit2,
   Check,
+  CheckCircle2,
   ChevronRight,
-  ShieldCheck,
-  Phone,
-  Mail,
+  Coffee,
+  Gift,
   LogOut,
-  Zap
+  Mail,
+  MapPin,
+  Moon,
+  Phone,
+  Sun,
+  X
 } from 'lucide-react';
 import { sounds } from '../utils/audio';
-import { reglas, useFormulario } from '../utils/validacion';
+import { reglas, useFormulario, sanitizar } from '../utils/validacion';
 
 function separarNombreFallback(perfil) {
   if (perfil.nombres || perfil.apellidoPaterno) {
@@ -48,7 +46,6 @@ export default function ProfileScreen({
   reservacionesCount = 0,
   beneficiosCount = 0
 }) {
-  const [activeTab, setActiveTab] = useState('resumen'); // 'resumen' | 'datos' | 'preferencias'
   const [isEditing, setIsEditing] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [errorGeneral, setErrorGeneral] = useState('');
@@ -86,7 +83,6 @@ export default function ProfileScreen({
     });
     setErrorGeneral('');
     setIsEditing(true);
-    setActiveTab('datos');
   };
 
   const handleSave = async (e) => {
@@ -124,8 +120,19 @@ export default function ProfileScreen({
     }
   };
 
-  const sellosActuales = perfil.sellosActuales ?? 0;
-  const sellosMeta = perfil.sellosTotalesParaMeta ?? 8;
+  const sellosActuales = Math.max(0, perfil.sellosActuales ?? 0);
+  const sellosMeta = Math.max(1, perfil.sellosTotalesParaMeta ?? 8);
+  const sellosFaltantes = Math.max(0, sellosMeta - sellosActuales);
+  const progresoSellosPct = Math.min(100, Math.round((sellosActuales / sellosMeta) * 100));
+
+  const camposCompletos = [
+    Boolean(perfil.nombre),
+    Boolean(perfil.correo),
+    Boolean(perfil.telefono),
+    Boolean(perfil.emailVerificado)
+  ].filter(Boolean).length;
+  const perfilCompletadoPct = Math.round((camposCompletos / 4) * 100);
+
   const iniciales = (perfil.nombre || 'CM')
     .split(' ')
     .filter(Boolean)
@@ -134,609 +141,464 @@ export default function ProfileScreen({
     .join('')
     .toUpperCase();
 
-  const bebidaFav = perfil.preferencias?.frappeFavorito || perfil.preferencias?.cafeFavorito || 'Flat White 12oz';
-  const platilloFav = perfil.preferencias?.platilloFavorito || 'Chilaquiles verdes con boneless';
-  const sucursalFav = perfil.preferencias?.sucursalFrecuente || 'Centro Histórico (Casona)';
+  const bebidaFav = perfil.preferencias?.frappeFavorito || perfil.preferencias?.cafeFavorito || bebida;
+  const sucursalFav = perfil.preferencias?.sucursalFrecuente || perfil.ciudad || 'Durango, Dgo.';
+
+  // Anillo abierto inferior (270° totales) reflejando los sellos
+  const radio = 64;
+  const circunferencia = 2 * Math.PI * radio;
+  const arcoTotal = circunferencia * 0.75;
+  const arcoActivo = arcoTotal * Math.max(0.06, progresoSellosPct / 100);
 
   return (
-    <div className="w-full min-h-[calc(100dvh-72px)] bg-[#FAF7F5] dark:bg-[#150E0C] overflow-x-clip fade-in pb-24 md:pb-12">
-      {/* ====================================================================
-          1. CABECERA CURVA ESTILO PERFIL REFERENCIA EN COLORES CAFÉ MARFIL
-          ==================================================================== */}
-      <div className="w-full bg-gradient-to-b from-[#8F191B] via-[#5E1416] to-[#1F1410] rounded-b-[40px] sm:rounded-b-[52px] text-white shadow-xl relative overflow-hidden">
-        {/* Halos suaves */}
-        <div className="pointer-events-none absolute -top-16 left-1/2 -translate-x-1/2 w-[420px] h-[260px] rounded-full bg-[#E12927]/30 blur-3xl" />
+    <div className="w-full min-h-[calc(100dvh-72px)] lg:h-[calc(100dvh-72px)] lg:overflow-hidden bg-[#FAF7F5] dark:bg-[#150E0C] px-4 sm:px-8 lg:px-10 py-4 sm:py-5 pb-20 lg:pb-5 flex flex-col justify-center fade-in">
+      <div className="max-w-5xl w-full mx-auto flex flex-col gap-4 sm:gap-5">
+        {/* ==================================================================
+            1. TARJETA PRINCIPAL DE SELLOS + AVATAR CON ANILLO
+            ================================================================== */}
+        <section className="bg-white dark:bg-[#1F1410] rounded-3xl border border-[#1F1410]/10 dark:border-white/10 shadow-[0_8px_30px_-18px_rgba(31,20,16,0.18)] p-5 sm:p-7 flex flex-col-reverse sm:flex-row items-start sm:items-center justify-between gap-5">
+          {/* Izquierda: Sellos grandes + subtítulo editorial + links */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-baseline gap-2">
+              <span className="font-display font-bold text-5xl sm:text-6xl text-[#1F1410] dark:text-[#FAF7F5] tracking-tight leading-none">
+                {sellosActuales}
+              </span>
+              <span className="font-mono text-sm font-semibold text-[#1F1410]/50 dark:text-[#FAF7F5]/55">
+                / {sellosMeta} sellos
+              </span>
+            </div>
 
-        <div className="max-w-5xl mx-auto px-5 sm:px-8 pt-6 pb-8 sm:pb-10 relative z-10 flex flex-col items-center">
-          {/* Botones circulares translúcidos en las esquinas superiores */}
-          <div className="w-full flex items-center justify-between mb-4">
+            <h1 className="font-body text-lg sm:text-xl text-[#1F1410]/85 dark:text-[#FAF7F5]/90 mt-2 leading-snug">
+              Hola,{' '}
+              <span className="font-semibold text-[#1F1410] dark:text-white underline decoration-[#1F1410]/70 dark:decoration-white/70 underline-offset-4">
+                {perfil.nombre}
+              </span>{' '}
+              · Nivel{' '}
+              <span className="font-semibold text-[#E12927] underline decoration-[#E12927]/70 underline-offset-4">
+                {perfil.nivelFidelidad || 'Club Marfil'}
+              </span>
+            </h1>
+
+            <p className="font-body text-xs sm:text-sm text-[#1F1410]/65 dark:text-[#C5B3AA] mt-1.5 max-w-xl leading-relaxed">
+              {sellosFaltantes === 0
+                ? '¡Completaste tu hoja de sellos! Ya tienes una cortesía lista para canjear en barra.'
+                : `¡Excelente! Te ${sellosFaltantes === 1 ? 'falta 1 visita' : `faltan ${sellosFaltantes} visitas`
+                } para completar tu hoja (${progresoSellosPct}%) y desbloquear tu próxima cortesía.`}
+            </p>
+
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 mt-3">
+              <button
+                type="button"
+                onClick={openEditor}
+                className="font-body text-xs font-medium text-[#1F1410]/70 dark:text-[#C5B3AA] hover:text-[#E12927] underline underline-offset-4 cursor-pointer bg-transparent border-none p-0 transition-colors"
+              >
+                Editar mis datos
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playClick();
+                  onViewBenefits();
+                }}
+                className="font-body text-xs font-medium text-[#1F1410]/70 dark:text-[#C5B3AA] hover:text-[#E12927] underline underline-offset-4 cursor-pointer bg-transparent border-none p-0 transition-colors"
+              >
+                Ver mi pasaporte de sellos
+              </button>
+              {onLogout && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    sounds.playClick();
+                    onLogout();
+                  }}
+                  className="inline-flex items-center gap-1 font-body text-xs font-medium text-[#E12927]/85 hover:text-[#E12927] underline underline-offset-4 cursor-pointer bg-transparent border-none p-0 transition-colors"
+                >
+                  <LogOut size={13} />
+                  Cerrar sesión
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Derecha: Anillo circular de sellos + Avatar centrado */}
+          <div className="relative w-32 h-32 sm:w-36 sm:h-36 shrink-0 self-center sm:self-auto flex items-center justify-center">
+            <svg viewBox="0 0 152 152" className="w-full h-full" aria-hidden="true">
+              <defs>
+                <linearGradient id="marfilRingGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#F48B89" />
+                  <stop offset="100%" stopColor="#E12927" />
+                </linearGradient>
+              </defs>
+              <circle
+                cx="76"
+                cy="76"
+                r={radio}
+                fill="none"
+                stroke="currentColor"
+                className="text-[#1F1410]/10 dark:text-white/12"
+                strokeWidth="8"
+                strokeLinecap="round"
+                strokeDasharray={`${arcoTotal} ${circunferencia}`}
+                transform="rotate(135 76 76)"
+              />
+              <circle
+                cx="76"
+                cy="76"
+                r={radio}
+                fill="none"
+                stroke="url(#marfilRingGrad)"
+                strokeWidth="8"
+                strokeLinecap="round"
+                strokeDasharray={`${arcoActivo} ${circunferencia}`}
+                transform="rotate(135 76 76)"
+              />
+            </svg>
+
+            <div className="absolute inset-[17px] rounded-full bg-[#FCEAE9] dark:bg-[#2C1C18] border border-[#E12927]/15 flex flex-col items-center justify-center shadow-inner select-none">
+              <span className="font-display font-bold text-2xl sm:text-3xl text-[#1F1410] dark:text-[#FAF7F5] leading-none">
+                {iniciales}
+              </span>
+              {perfil.codigoCliente && (
+                <span className="font-mono text-[9px] font-bold text-[#E12927] mt-1 tracking-wider">
+                  {perfil.codigoCliente}
+                </span>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* ==================================================================
+            2. CUADRÍCULA COMPACTA DE DATOS (3x2 SIN SCROLL EN ESCRITORIO)
+            ================================================================== */}
+        <section className="flex flex-col gap-3">
+          <div>
+            <h2 className="font-display font-bold text-lg sm:text-xl text-[#1F1410] dark:text-[#FAF7F5] tracking-tight">
+              Tu cuenta Club Marfil
+            </h2>
+            <p className="font-body text-xs sm:text-sm text-[#1F1410]/60 dark:text-[#C5B3AA]">
+              Consulta y administra tus datos, reservaciones, cupones y favoritos en barra.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {/* 1. Perfil completado */}
+            <button
+              type="button"
+              onClick={openEditor}
+              className="group text-left bg-white dark:bg-[#1F1410] rounded-2xl border border-[#1F1410]/10 dark:border-white/10 hover:border-[#E12927]/45 p-4 shadow-2xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between gap-2"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="font-body font-semibold text-xs sm:text-sm text-[#1F1410] dark:text-[#FAF7F5]">
+                    Perfil completado
+                  </span>
+                  <span className="px-2 py-0.5 rounded-md bg-[#FCEAE9] dark:bg-[#E12927]/20 text-[#E12927] font-mono text-[9px] font-bold uppercase tracking-wider">
+                    EDITABLE
+                  </span>
+                </div>
+                <ChevronRight size={15} className="text-[#1F1410]/35 dark:text-white/35 group-hover:text-[#E12927] transition-colors shrink-0" />
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 size={17} className="text-emerald-600 shrink-0" />
+                <span className="font-display font-bold text-2xl text-[#1F1410] dark:text-[#FAF7F5]">
+                  {perfilCompletadoPct}%
+                </span>
+              </div>
+            </button>
+
+            {/* 2. Correo electrónico */}
+            <button
+              type="button"
+              onClick={openEditor}
+              className="group text-left bg-white dark:bg-[#1F1410] rounded-2xl border border-[#1F1410]/10 dark:border-white/10 hover:border-[#E12927]/45 p-4 shadow-2xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between gap-2"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="font-body font-semibold text-xs sm:text-sm text-[#1F1410] dark:text-[#FAF7F5]">
+                    Correo electrónico
+                  </span>
+                  <span
+                    className={`px-2 py-0.5 rounded-md font-mono text-[9px] font-bold uppercase tracking-wider ${perfil.emailVerificado
+                        ? 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                        : 'bg-[#FCEAE9] dark:bg-[#E12927]/20 text-[#E12927]'
+                      }`}
+                  >
+                    {perfil.emailVerificado ? 'VERIFICADO' : 'PENDIENTE'}
+                  </span>
+                </div>
+                <ChevronRight size={15} className="text-[#1F1410]/35 dark:text-white/35 group-hover:text-[#E12927] transition-colors shrink-0" />
+              </div>
+              <div className="flex items-center gap-2 min-w-0">
+                <Mail size={15} className="text-[#E12927] shrink-0" />
+                <span className="font-body font-semibold text-sm text-[#1F1410] dark:text-[#FAF7F5] truncate">
+                  {perfil.correo || 'Sin correo'}
+                </span>
+              </div>
+            </button>
+
+            {/* 3. Teléfono registrado */}
+            <button
+              type="button"
+              onClick={openEditor}
+              className="group text-left bg-white dark:bg-[#1F1410] rounded-2xl border border-[#1F1410]/10 dark:border-white/10 hover:border-[#E12927]/45 p-4 shadow-2xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between gap-2"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="font-body font-semibold text-xs sm:text-sm text-[#1F1410] dark:text-[#FAF7F5]">
+                    Teléfono
+                  </span>
+                  <span className="px-2 py-0.5 rounded-md bg-[#FCEAE9] dark:bg-[#E12927]/20 text-[#E12927] font-mono text-[9px] font-bold uppercase tracking-wider">
+                    RESERVAS
+                  </span>
+                </div>
+                <ChevronRight size={15} className="text-[#1F1410]/35 dark:text-white/35 group-hover:text-[#E12927] transition-colors shrink-0" />
+              </div>
+              <div className="flex items-center gap-2">
+                <Phone size={15} className="text-[#E12927] shrink-0" />
+                <span className="font-mono font-bold text-base text-[#1F1410] dark:text-[#FAF7F5]">
+                  {perfil.telefono || 'Sin registrar'}
+                </span>
+              </div>
+            </button>
+
+            {/* 4. Mis reservaciones */}
             <button
               type="button"
               onClick={() => {
                 sounds.playClick();
-                toggleTheme();
+                onViewReservations();
               }}
-              aria-label="Cambiar modo oscuro o claro"
-              title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-              className="w-11 h-11 rounded-full bg-white/15 hover:bg-white/25 backdrop-blur-md border border-white/20 text-white flex items-center justify-center transition-all cursor-pointer active:scale-95"
+              className="group text-left bg-white dark:bg-[#1F1410] rounded-2xl border border-[#1F1410]/10 dark:border-white/10 hover:border-[#E12927]/45 p-4 shadow-2xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between gap-2"
             >
-              {theme === 'dark' ? <Sun size={18} className="text-amber-300" /> : <Moon size={18} />}
-            </button>
-
-            {onLogout && (
-              <button
-                type="button"
-                onClick={() => {
-                  sounds.playClick();
-                  onLogout();
-                }}
-                aria-label="Cerrar sesión"
-                title="Cerrar sesión"
-                className="w-11 h-11 rounded-full bg-white/15 hover:bg-[#E12927] backdrop-blur-md border border-white/20 text-white flex items-center justify-center transition-all cursor-pointer active:scale-95"
-              >
-                <LogOut size={17} />
-              </button>
-            )}
-          </div>
-
-          {/* Medallón Avatar centrado */}
-          <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-white/15 backdrop-blur-md border-4 border-white/25 shadow-2xl flex items-center justify-center font-display text-4xl sm:text-5xl font-bold text-white select-none mb-6">
-            {iniciales}
-          </div>
-
-          {/* Fila inferior del banner curvo: Nombre + Nivel a la izquierda / 3 botones circulares blancos a la derecha */}
-          <div className="w-full flex flex-col sm:flex-row sm:items-end justify-between gap-5">
-            <div className="text-left">
-              <h1 className="font-display text-3xl sm:text-4xl font-bold text-white leading-tight">
-                {perfil.nombre}
-              </h1>
-              <div className="flex flex-wrap items-center gap-2.5 mt-1.5 text-xs sm:text-sm text-white/80">
-                <span>{perfil.nivelFidelidad || 'Club Marfil'}</span>
-                <span>·</span>
-                <span className="inline-flex items-center gap-1">
-                  <MapPin size={13} className="text-[#FCEAE9]" />
-                  {perfil.ciudad}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="font-body font-semibold text-xs sm:text-sm text-[#1F1410] dark:text-[#FAF7F5]">
+                    Mis reservaciones
+                  </span>
+                  <span className="px-2 py-0.5 rounded-md bg-[#FAF7F5] dark:bg-white/10 text-[#1F1410]/70 dark:text-[#C5B3AA] font-mono text-[9px] font-bold uppercase tracking-wider">
+                    HISTORIAL
+                  </span>
+                </div>
+                <ChevronRight size={15} className="text-[#1F1410]/35 dark:text-white/35 group-hover:text-[#E12927] transition-colors shrink-0" />
+              </div>
+              <div className="flex items-center gap-2">
+                <Calendar size={16} className="text-[#E12927] shrink-0" />
+                <span className="font-display font-bold text-2xl text-[#1F1410] dark:text-[#FAF7F5]">
+                  {reservacionesCount}
                 </span>
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/15 text-white text-xs font-semibold">
-                  <Zap size={11} className="fill-current text-amber-300" />
-                  {perfil.puntosFidelidad ?? 0} pts
+                <span className="font-body text-xs text-[#1F1410]/55 dark:text-[#C5B3AA]">
+                  {reservacionesCount === 1 ? 'activa' : 'activas'}
                 </span>
               </div>
-            </div>
+            </button>
 
-            {/* 3 botones circulares blancos estilo referencia (Editar · Reservaciones · Beneficios) */}
-            <div className="flex items-center gap-3 self-start sm:self-end">
-              <button
-                type="button"
-                onClick={openEditor}
-                title="Editar perfil"
-                aria-label="Editar perfil"
-                className="w-12 h-12 rounded-full bg-white dark:bg-[#2A1B18] text-[#1F1410] dark:text-white hover:bg-[#FCEAE9] hover:text-[#E12927] shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer"
-              >
-                <Edit2 size={18} />
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  sounds.playClick();
-                  onViewReservations();
-                }}
-                title="Mis reservaciones"
-                aria-label="Mis reservaciones"
-                className="w-12 h-12 rounded-full bg-white dark:bg-[#2A1B18] text-[#1F1410] dark:text-white hover:bg-[#FCEAE9] hover:text-[#E12927] shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer"
-              >
-                <Calendar size={18} />
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  sounds.playClick();
-                  onViewBenefits();
-                }}
-                title="Mis beneficios y sellos"
-                aria-label="Mis beneficios y sellos"
-                className="w-12 h-12 rounded-full bg-white dark:bg-[#2A1B18] text-[#1F1410] dark:text-white hover:bg-[#FCEAE9] hover:text-[#E12927] shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer"
-              >
-                <Gift size={18} />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ====================================================================
-          2. FRANJA SUAVE CURVA DE 3 ESTADÍSTICAS (COMO 8 YEARS · 2.7K+ · 4.8)
-          ==================================================================== */}
-      <div className="max-w-5xl mx-auto px-4 sm:px-8 -mt-4 relative z-0">
-        <div className="rounded-b-[32px] bg-[#FCEAE9]/80 dark:bg-[#251815] pt-8 pb-5 px-5 sm:px-8 grid grid-cols-3 gap-3 sm:gap-6 shadow-xs border-x border-b border-[#E12927]/10 dark:border-white/10">
-          <div className="flex items-center justify-center sm:justify-start gap-2.5 sm:gap-3.5">
-            <span className="w-10 h-10 rounded-full bg-white dark:bg-[#1F1410] text-[#E12927] flex items-center justify-center shadow-2xs shrink-0">
-              <Coffee size={18} />
-            </span>
-            <div className="text-left min-w-0">
-              <strong className="block text-sm sm:text-lg font-bold text-[#1F1410] dark:text-[#FAF7F5] leading-tight">
-                {perfil.visitasRealizadas ?? 0} visitas
-              </strong>
-              <span className="block text-[11px] sm:text-xs text-[#6B5A52] dark:text-[#B4A099] truncate">
-                Experiencia
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-center sm:justify-start gap-2.5 sm:gap-3.5">
-            <span className="w-10 h-10 rounded-full bg-white dark:bg-[#1F1410] text-[#E12927] flex items-center justify-center shadow-2xs shrink-0">
-              <Award size={18} />
-            </span>
-            <div className="text-left min-w-0">
-              <strong className="block text-sm sm:text-lg font-bold text-[#1F1410] dark:text-[#FAF7F5] leading-tight">
-                {perfil.puntosFidelidad ?? 0}
-              </strong>
-              <span className="block text-[11px] sm:text-xs text-[#6B5A52] dark:text-[#B4A099] truncate">
-                Puntos Club
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-center sm:justify-start gap-2.5 sm:gap-3.5">
-            <span className="w-10 h-10 rounded-full bg-white dark:bg-[#1F1410] text-[#E12927] flex items-center justify-center shadow-2xs shrink-0">
-              <Gift size={18} />
-            </span>
-            <div className="text-left min-w-0">
-              <strong className="block text-sm sm:text-lg font-bold text-[#1F1410] dark:text-[#FAF7F5] leading-tight">
-                {sellosActuales}/{sellosMeta}
-              </strong>
-              <span className="block text-[11px] sm:text-xs text-[#6B5A52] dark:text-[#B4A099] truncate">
-                Sellos Marfil
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ====================================================================
-          3. SECCIÓN DE PESTAÑAS SUAVES + CONTENIDO COMPLETO DEL PERFIL
-          ==================================================================== */}
-      <div className="max-w-5xl mx-auto px-5 sm:px-8 pt-7 flex flex-col gap-6">
-        {/* Pestañas estilo selector de mes de la referencia */}
-        <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto pb-1">
-          {[
-            { id: 'resumen', label: 'Resumen' },
-            { id: 'datos', label: 'Mis datos' },
-            { id: 'preferencias', label: 'Preferencias & Ajustes' }
-          ].map((tab) => {
-            const isCurrent = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => {
-                  sounds.playClick();
-                  setActiveTab(tab.id);
-                }}
-                className={`px-5 py-2.5 rounded-full text-xs sm:text-sm whitespace-nowrap transition-all cursor-pointer ${
-                  isCurrent
-                    ? 'bg-[#FCEAE9] dark:bg-[#3A1E1C] text-[#E12927] font-bold shadow-2xs'
-                    : 'text-[#8E7A74] dark:text-[#A9968F] hover:text-[#1F1410] dark:hover:text-[#FAF7F5]'
-                }`}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* ==================================================================
-            4. CONTENIDO POR PESTAÑA
-            ================================================================== */}
-        {activeTab === 'resumen' && (
-          <div className="flex flex-col gap-6">
-            {/* Tarjetas de acceso rápido limpias */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
-              {/* Card 1: Mis Reservaciones */}
-              <button
-                type="button"
-                onClick={() => {
-                  sounds.playClick();
-                  onViewReservations();
-                }}
-                className="group text-left p-5 rounded-[24px] bg-white dark:bg-[#1F1410] border border-black/[0.06] dark:border-white/10 shadow-xs hover:shadow-md hover:-translate-y-1 transition-all cursor-pointer flex flex-col justify-between gap-4"
-              >
-                <div className="flex items-center justify-between w-full">
-                  <span className="w-11 h-11 rounded-2xl bg-[#FCEAE9] dark:bg-[#321B19] text-[#E12927] flex items-center justify-center">
-                    <Calendar size={20} />
-                  </span>
-                  <span className="px-3 py-1 rounded-full bg-[#1F1410] dark:bg-[#E12927] text-white text-xs font-bold">
-                    {reservacionesCount} activas
-                  </span>
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-[#1F1410] dark:text-[#FAF7F5] group-hover:text-[#E12927] transition-colors">
-                    Mis Reservaciones
-                  </h3>
-                  <p className="text-xs text-[#6B5A52] dark:text-[#B4A099] mt-0.5">
-                    Consulta tus mesas, actividades y pases QR.
-                  </p>
-                </div>
-              </button>
-
-              {/* Card 2: Pasaporte de Sellos */}
-              <button
-                type="button"
-                onClick={() => {
-                  sounds.playClick();
-                  onViewBenefits();
-                }}
-                className="group text-left p-5 rounded-[24px] bg-white dark:bg-[#1F1410] border border-black/[0.06] dark:border-white/10 shadow-xs hover:shadow-md hover:-translate-y-1 transition-all cursor-pointer flex flex-col justify-between gap-4"
-              >
-                <div className="flex items-center justify-between w-full">
-                  <span className="w-11 h-11 rounded-2xl bg-[#FCEAE9] dark:bg-[#321B19] text-[#E12927] flex items-center justify-center">
-                    <Gift size={20} />
-                  </span>
-                  <span className="text-xs font-bold text-[#E12927]">
-                    {beneficiosCount} premios
-                  </span>
-                </div>
-                <div className="w-full">
-                  <h3 className="text-base font-bold text-[#1F1410] dark:text-[#FAF7F5] group-hover:text-[#E12927] transition-colors">
-                    Beneficios & Sellos
-                  </h3>
-                  <div className="grid grid-cols-8 gap-1 mt-2.5">
-                    {Array.from({ length: sellosMeta }).map((_, i) => (
-                      <span
-                        key={i}
-                        className={`h-2 rounded-full ${
-                          i < sellosActuales ? 'bg-[#E12927]' : 'bg-[#1F1410]/15 dark:bg-white/15'
-                        }`}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </button>
-
-              {/* Card 3: Preferencias */}
-              <button
-                type="button"
-                onClick={() => {
-                  sounds.playClick();
-                  setActiveTab('preferencias');
-                }}
-                className="group text-left p-5 rounded-[24px] bg-white dark:bg-[#1F1410] border border-black/[0.06] dark:border-white/10 shadow-xs hover:shadow-md hover:-translate-y-1 transition-all cursor-pointer flex flex-col justify-between gap-4"
-              >
-                <div className="flex items-center justify-between w-full">
-                  <span className="w-11 h-11 rounded-2xl bg-[#FCEAE9] dark:bg-[#321B19] text-[#E12927] flex items-center justify-center">
-                    <Coffee size={20} />
-                  </span>
-                  <ChevronRight size={18} className="text-[#8E7A74] group-hover:text-[#E12927] group-hover:translate-x-0.5 transition-all" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-[#1F1410] dark:text-[#FAF7F5] group-hover:text-[#E12927] transition-colors">
-                    Tus Favoritos
-                  </h3>
-                  <p className="text-xs text-[#6B5A52] dark:text-[#B4A099] mt-0.5 truncate">
-                    {bebidaFav} · {sucursalFav}
-                  </p>
-                </div>
-              </button>
-            </div>
-
-            {/* Contacto rápido */}
-            <div className="flex flex-wrap items-center gap-4 px-5 py-4 rounded-2xl bg-white dark:bg-[#1F1410] border border-black/[0.06] dark:border-white/10 text-xs sm:text-sm text-[#5A4840] dark:text-[#C5B4AE]">
-              {perfil.correo && (
-                <span className="inline-flex items-center gap-2">
-                  <Mail size={15} className="text-[#E12927]" />
-                  {perfil.correo}
-                </span>
-              )}
-              {perfil.telefono && (
-                <span className="inline-flex items-center gap-2">
-                  <Phone size={15} className="text-[#E12927]" />
-                  {perfil.telefono}
-                </span>
-              )}
-              <span className="inline-flex items-center gap-2 ml-auto text-xs text-[#8E7A74]">
-                <ShieldCheck size={15} className="text-[#E12927]" />
-                Datos protegidos en Café Marfil Durango
-              </span>
-            </div>
-
-            {/* Botón CTA ancho completo estilo referencia (Book Appointment) */}
+            {/* 5. Beneficios canjeables */}
             <button
               type="button"
               onClick={() => {
                 sounds.playClick();
                 onViewBenefits();
               }}
-              className="w-full py-4 px-6 rounded-full bg-[#E12927] hover:bg-[#C81E1C] active:scale-[0.99] text-white text-sm sm:text-base font-bold shadow-lg shadow-[#E12927]/25 transition-all cursor-pointer"
+              className="group text-left bg-white dark:bg-[#1F1410] rounded-2xl border border-[#1F1410]/10 dark:border-white/10 hover:border-[#E12927]/45 p-4 shadow-2xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between gap-2"
             >
-              Ver mi Pasaporte de Sellos · {sellosActuales} de {sellosMeta}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="font-body font-semibold text-xs sm:text-sm text-[#1F1410] dark:text-[#FAF7F5]">
+                    Beneficios
+                  </span>
+                  <span className="px-2 py-0.5 rounded-md bg-[#FCEAE9] dark:bg-[#E12927]/20 text-[#E12927] font-mono text-[9px] font-bold uppercase tracking-wider">
+                    CUPONES
+                  </span>
+                </div>
+                <ChevronRight size={15} className="text-[#1F1410]/35 dark:text-white/35 group-hover:text-[#E12927] transition-colors shrink-0" />
+              </div>
+              <div className="flex items-center gap-2">
+                <Gift size={16} className="text-[#E12927] shrink-0" />
+                <span className="font-display font-bold text-2xl text-[#1F1410] dark:text-[#FAF7F5]">
+                  {beneficiosCount}
+                </span>
+                <span className="font-body text-xs text-[#1F1410]/55 dark:text-[#C5B3AA]">
+                  {beneficiosCount === 1 ? 'disponible' : 'disponibles'}
+                </span>
+              </div>
             </button>
-          </div>
-        )}
 
-        {activeTab === 'datos' && (
-          <div className="mt-6 max-w-2xl text-left">
-            <div className="flex items-center justify-between mb-4">
+            {/* 6. Favoritos en barra & Sucursal */}
+            <div className="bg-white dark:bg-[#1F1410] rounded-2xl border border-[#1F1410]/10 dark:border-white/10 p-4 shadow-2xs flex flex-col justify-between gap-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="font-body font-semibold text-xs sm:text-sm text-[#1F1410] dark:text-[#FAF7F5]">
+                    Favoritos en barra
+                  </span>
+                  <span className="px-2 py-0.5 rounded-md bg-[#FAF7F5] dark:bg-white/10 text-[#1F1410]/70 dark:text-[#C5B3AA] font-mono text-[9px] font-bold uppercase tracking-wider">
+                    GUSTOS
+                  </span>
+                </div>
+                <Coffee size={15} className="text-[#1F1410]/35 dark:text-white/35 shrink-0" />
+              </div>
+              <div className="flex flex-col gap-0.5 min-w-0">
+                <span className="font-body font-semibold text-sm text-[#1F1410] dark:text-[#FAF7F5] truncate">
+                  {bebidaFav}
+                </span>
+                <span className="inline-flex items-center gap-1 text-[11px] text-[#1F1410]/60 dark:text-[#C5B3AA] truncate">
+                  <MapPin size={11} className="text-[#E12927] shrink-0" />
+                  {sucursalFav}
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      {/* Modal compacto de edición de datos (sin scroll en la página) */}
+      {isEditing && (
+        <div
+          className="fixed inset-0 z-50 bg-[#1F1410]/65 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setIsEditing(false)}
+        >
+          <div
+            className="bg-white dark:bg-[#1F1410] rounded-3xl border border-[#1F1410]/15 dark:border-white/15 shadow-2xl max-w-xl w-full p-6 animate-fade-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3 pb-3.5 mb-4 border-b border-[#1F1410]/10 dark:border-white/10">
               <div>
-                <h2 className="text-lg font-bold text-[#1F1410] dark:text-[#FAF7F5]">
-                  Información personal
+                <h2 className="font-display font-bold text-lg text-[#1F1410] dark:text-[#FAF7F5]">
+                  Editar datos personales
                 </h2>
-                <p className="text-xs text-[#8E7A74] dark:text-[#A9968F]">
-                  Mantén tus datos al día para agilizar tus reservaciones y acumular sellos.
-                </p>
-              </div>
-              {!isEditing && (
-                <button
-                  type="button"
-                  onClick={openEditor}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#1F1410] dark:bg-[#FAF7F5] text-white dark:text-[#1F1410] text-xs font-semibold cursor-pointer"
-                >
-                  <Edit2 size={13} />
-                  <span>Editar</span>
-                </button>
-              )}
-            </div>
-
-            {isEditing ? (
-              <form onSubmit={handleSave} noValidate className="flex flex-col gap-4">
-                <div className="flex flex-col gap-1">
-                  <label htmlFor="perfil-nombres" className="text-xs font-semibold text-[#6B5A52] dark:text-[#C5B4AE]">
-                    Nombre(s) *
-                  </label>
-                  <input
-                    id="perfil-nombres"
-                    type="text"
-                    value={form.valores.nombres}
-                    onChange={(e) => form.setCampo('nombres', e.target.value)}
-                    className={`px-4 py-2.5 rounded-xl border bg-[#FAF7F5] dark:bg-[#261A16] text-sm text-[#1F1410] dark:text-[#FAF7F5] focus:outline-none ${
-                      form.errores.nombres ? 'border-[#E12927]' : 'border-black/15 dark:border-white/15 focus:border-[#E12927]'
-                    }`}
-                    {...form.propsCampo('nombres')}
-                  />
-                  {form.errores.nombres && (
-                    <p id="error-nombres" role="alert" className="text-xs font-semibold text-[#E12927]">
-                      {form.errores.nombres}
-                    </p>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="flex flex-col gap-1">
-                    <label htmlFor="perfil-ap-paterno" className="text-xs font-semibold text-[#6B5A52] dark:text-[#C5B4AE]">
-                      Apellido paterno *
-                    </label>
-                    <input
-                      id="perfil-ap-paterno"
-                      type="text"
-                      value={form.valores.apellidoPaterno}
-                      onChange={(e) => form.setCampo('apellidoPaterno', e.target.value)}
-                      className={`px-4 py-2.5 rounded-xl border bg-[#FAF7F5] dark:bg-[#261A16] text-sm text-[#1F1410] dark:text-[#FAF7F5] focus:outline-none ${
-                        form.errores.apellidoPaterno ? 'border-[#E12927]' : 'border-black/15 dark:border-white/15 focus:border-[#E12927]'
-                      }`}
-                      {...form.propsCampo('apellidoPaterno')}
-                    />
-                    {form.errores.apellidoPaterno && (
-                      <p id="error-apellidoPaterno" role="alert" className="text-xs font-semibold text-[#E12927]">
-                        {form.errores.apellidoPaterno}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col gap-1">
-                    <label htmlFor="perfil-ap-materno" className="text-xs font-semibold text-[#6B5A52] dark:text-[#C5B4AE]">
-                      Apellido materno
-                    </label>
-                    <input
-                      id="perfil-ap-materno"
-                      type="text"
-                      value={form.valores.apellidoMaterno}
-                      onChange={(e) => form.setCampo('apellidoMaterno', e.target.value)}
-                      placeholder="Opcional"
-                      className={`px-4 py-2.5 rounded-xl border bg-[#FAF7F5] dark:bg-[#261A16] text-sm text-[#1F1410] dark:text-[#FAF7F5] focus:outline-none ${
-                        form.errores.apellidoMaterno ? 'border-[#E12927]' : 'border-black/15 dark:border-white/15 focus:border-[#E12927]'
-                      }`}
-                      {...form.propsCampo('apellidoMaterno')}
-                    />
-                    {form.errores.apellidoMaterno && (
-                      <p id="error-apellidoMaterno" role="alert" className="text-xs font-semibold text-[#E12927]">
-                        {form.errores.apellidoMaterno}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="flex flex-col gap-1">
-                    <label htmlFor="perfil-telefono" className="text-xs font-semibold text-[#6B5A52] dark:text-[#C5B4AE]">
-                      Teléfono de contacto
-                    </label>
-                    <input
-                      id="perfil-telefono"
-                      type="tel"
-                      value={form.valores.telefono}
-                      onChange={(e) => form.setCampo('telefono', e.target.value)}
-                      placeholder="(618) 123-4567"
-                      className={`px-4 py-2.5 rounded-xl border bg-[#FAF7F5] dark:bg-[#261A16] text-sm text-[#1F1410] dark:text-[#FAF7F5] focus:outline-none ${
-                        form.errores.telefono ? 'border-[#E12927]' : 'border-black/15 dark:border-white/15 focus:border-[#E12927]'
-                      }`}
-                      {...form.propsCampo('telefono')}
-                    />
-                    {form.errores.telefono && (
-                      <p id="error-telefono" role="alert" className="text-xs font-semibold text-[#E12927]">
-                        {form.errores.telefono}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col gap-1">
-                    <label htmlFor="perfil-correo" className="text-xs font-semibold text-[#6B5A52] dark:text-[#C5B4AE]">
-                      Correo electrónico *
-                    </label>
-                    <input
-                      id="perfil-correo"
-                      type="email"
-                      value={form.valores.correo}
-                      onChange={(e) => form.setCampo('correo', e.target.value)}
-                      className={`px-4 py-2.5 rounded-xl border bg-[#FAF7F5] dark:bg-[#261A16] text-sm text-[#1F1410] dark:text-[#FAF7F5] focus:outline-none ${
-                        form.errores.correo ? 'border-[#E12927]' : 'border-black/15 dark:border-white/15 focus:border-[#E12927]'
-                      }`}
-                      {...form.propsCampo('correo')}
-                    />
-                    {form.errores.correo && (
-                      <p id="error-correo" role="alert" className="text-xs font-semibold text-[#E12927]">
-                        {form.errores.correo}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                {errorGeneral && (
-                  <p role="alert" className="text-xs font-semibold text-[#E12927] bg-[#FCEAE9] dark:bg-[#3A1C1A] px-3 py-2 rounded-xl">
-                    {errorGeneral}
-                  </p>
-                )}
-
-                <div className="flex justify-end gap-2.5 mt-2">
-                  <button
-                    type="button"
-                    className="px-5 py-2.5 rounded-xl border border-black/15 dark:border-white/15 text-xs font-semibold text-[#1F1410] dark:text-[#FAF7F5] cursor-pointer"
-                    onClick={() => {
-                      const p = separarNombreFallback(perfil);
-                      form.resetear({
-                        nombres: p.nombres,
-                        apellidoPaterno: p.apellidoPaterno,
-                        apellidoMaterno: p.apellidoMaterno,
-                        telefono: perfil.telefono || '',
-                        correo: perfil.correo || ''
-                      });
-                      setIsEditing(false);
-                    }}
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={guardando}
-                    className="inline-flex items-center gap-1.5 px-6 py-2.5 rounded-xl bg-[#E12927] hover:bg-[#C81E1C] text-white text-xs font-semibold cursor-pointer disabled:opacity-60 shadow-sm"
-                  >
-                    <Check size={15} />
-                    <span>{guardando ? 'Guardando...' : 'Guardar cambios'}</span>
-                  </button>
-                </div>
-              </form>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                <div className="p-4 rounded-2xl bg-[#FAF7F5] dark:bg-[#261A16]">
-                  <span className="block text-[11px] text-[#8E7A74] dark:text-[#A9968F]">Nombre completo</span>
-                  <strong className="text-sm text-[#1F1410] dark:text-[#FAF7F5]">{perfil.nombre}</strong>
-                </div>
-                <div className="p-4 rounded-2xl bg-[#FAF7F5] dark:bg-[#261A16]">
-                  <span className="block text-[11px] text-[#8E7A74] dark:text-[#A9968F]">Nivel Club Marfil</span>
-                  <strong className="inline-flex items-center gap-1.5 text-sm text-[#1F1410] dark:text-[#FAF7F5]">
-                    <Award size={14} className="text-[#E12927]" />
-                    {perfil.nivelFidelidad}
-                  </strong>
-                </div>
-                <div className="p-4 rounded-2xl bg-[#FAF7F5] dark:bg-[#261A16]">
-                  <span className="block text-[11px] text-[#8E7A74] dark:text-[#A9968F]">Correo electrónico</span>
-                  <strong className="text-sm text-[#1F1410] dark:text-[#FAF7F5]">{perfil.correo || 'Sin registrar'}</strong>
-                </div>
-                <div className="p-4 rounded-2xl bg-[#FAF7F5] dark:bg-[#261A16]">
-                  <span className="block text-[11px] text-[#8E7A74] dark:text-[#A9968F]">Teléfono</span>
-                  <strong className="text-sm text-[#1F1410] dark:text-[#FAF7F5]">{perfil.telefono || 'Sin registrar'}</strong>
-                </div>
-                <div className="p-4 rounded-2xl bg-[#FAF7F5] dark:bg-[#261A16]">
-                  <span className="block text-[11px] text-[#8E7A74] dark:text-[#A9968F]">Ciudad</span>
-                  <strong className="inline-flex items-center gap-1 text-sm text-[#1F1410] dark:text-[#FAF7F5]">
-                    <MapPin size={13} className="text-[#E12927]" /> {perfil.ciudad}
-                  </strong>
-                </div>
-                {perfil.codigoCliente && (
-                  <div className="p-4 rounded-2xl bg-[#FAF7F5] dark:bg-[#261A16]">
-                    <span className="block text-[11px] text-[#8E7A74] dark:text-[#A9968F]">Código Club Marfil</span>
-                    <strong className="text-sm text-[#1F1410] dark:text-[#FAF7F5]">{perfil.codigoCliente}</strong>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeTab === 'preferencias' && (
-          <div className="mt-6 flex flex-col gap-6 text-left">
-            <div>
-              <h2 className="text-lg font-bold text-[#1F1410] dark:text-[#FAF7F5] mb-1">
-                Mis Preferencias Gastronómicas
-              </h2>
-              <p className="text-xs text-[#8E7A74] dark:text-[#A9968F]">
-                Personalizamos tus bebidas y recomendaciones de cocina al ordenar en Durango.
-              </p>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 mt-4">
-                <div className="p-4 rounded-2xl bg-[#FAF7F5] dark:bg-[#261A16]">
-                  <span className="block text-[10px] font-bold text-[#E12927] uppercase tracking-wider mb-1">
-                    Bebida favorita
-                  </span>
-                  <strong className="text-sm text-[#1F1410] dark:text-[#FAF7F5]">{bebidaFav}</strong>
-                </div>
-
-                <div className="p-4 rounded-2xl bg-[#FAF7F5] dark:bg-[#261A16]">
-                  <span className="block text-[10px] font-bold text-[#E12927] uppercase tracking-wider mb-1">
-                    Platillo estrella
-                  </span>
-                  <strong className="text-sm text-[#1F1410] dark:text-[#FAF7F5]">{platilloFav}</strong>
-                </div>
-
-                <div className="p-4 rounded-2xl bg-[#FAF7F5] dark:bg-[#261A16]">
-                  <span className="block text-[10px] font-bold text-[#E12927] uppercase tracking-wider mb-1">
-                    Experiencia preferida
-                  </span>
-                  <strong className="text-sm text-[#1F1410] dark:text-[#FAF7F5]">Noche de Juegos de Mesa (+60 títulos)</strong>
-                </div>
-
-                <div className="p-4 rounded-2xl bg-[#FAF7F5] dark:bg-[#261A16]">
-                  <span className="block text-[10px] font-bold text-[#E12927] uppercase tracking-wider mb-1">
-                    Sucursal frecuente
-                  </span>
-                  <strong className="text-sm text-[#1F1410] dark:text-[#FAF7F5]">{sucursalFav}</strong>
-                </div>
-              </div>
-            </div>
-
-            {/* Ajuste de Modo Oscuro / Claro */}
-            <div className="p-5 rounded-2xl bg-[#FAF7F5] dark:bg-[#261A16] flex items-center justify-between gap-4">
-              <div>
-                <h3 className="text-sm sm:text-base font-bold text-[#1F1410] dark:text-[#FAF7F5]">
-                  Apariencia del sistema ({theme === 'dark' ? 'Modo oscuro' : 'Modo claro'})
-                </h3>
-                <p className="text-xs text-[#8E7A74] dark:text-[#A9968F] mt-0.5">
-                  Adapta la paleta visual de toda la app para lectura diurna o nocturna.
+                <p className="text-xs text-[#1F1410]/60 dark:text-[#C5B3AA] mt-0.5">
+                  Actualiza tu correo y teléfono para vincular tus reservaciones y cupones.
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  sounds.playClick();
-                  toggleTheme();
-                }}
-                aria-label="Cambiar modo de apariencia"
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white dark:bg-[#1C1310] border border-black/15 dark:border-white/15 text-xs font-semibold text-[#1F1410] dark:text-[#FAF7F5] hover:border-[#E12927] transition-all cursor-pointer shrink-0"
+                onClick={() => setIsEditing(false)}
+                aria-label="Cerrar edición"
+                className="w-8 h-8 rounded-full bg-[#FAF7F5] dark:bg-white/10 hover:bg-[#FCEAE9] text-[#1F1410]/60 dark:text-white/70 hover:text-[#E12927] flex items-center justify-center cursor-pointer transition-colors"
               >
-                {theme === 'dark' ? (
-                  <>
-                    <Sun size={15} className="text-amber-400" />
-                    <span>Cambiar a claro</span>
-                  </>
-                ) : (
-                  <>
-                    <Moon size={15} />
-                    <span>Cambiar a oscuro</span>
-                  </>
-                )}
+                <X size={15} />
               </button>
             </div>
+
+            <form onSubmit={handleSave} noValidate className="space-y-3.5">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block font-mono text-[10px] font-bold uppercase text-[#1F1410]/70 dark:text-[#C5B3AA] mb-1">
+                    Nombre(s) *
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={80}
+                    value={form.valores.nombres}
+                    onChange={(e) => form.setCampo('nombres', sanitizar.nombrePersona(e.target.value, 80))}
+                    className={`w-full px-3 py-2 text-xs rounded-xl border bg-white dark:bg-[#261A16] text-[#1F1410] dark:text-[#FAF7F5] focus:outline-hidden ${form.errores.nombres ? 'border-[#E12927]' : 'border-[#1F1410]/15 dark:border-white/15 focus:border-[#E12927]'
+                      }`}
+                    {...form.propsCampo('nombres')}
+                  />
+                  {form.errores.nombres && (
+                    <p role="alert" className="text-[11px] text-[#E12927] font-semibold mt-0.5">{form.errores.nombres}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block font-mono text-[10px] font-bold uppercase text-[#1F1410]/70 dark:text-[#C5B3AA] mb-1">
+                    Apellido paterno *
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={60}
+                    value={form.valores.apellidoPaterno}
+                    onChange={(e) => form.setCampo('apellidoPaterno', sanitizar.nombrePersona(e.target.value, 60))}
+                    className={`w-full px-3 py-2 text-xs rounded-xl border bg-white dark:bg-[#261A16] text-[#1F1410] dark:text-[#FAF7F5] focus:outline-hidden ${form.errores.apellidoPaterno ? 'border-[#E12927]' : 'border-[#1F1410]/15 dark:border-white/15 focus:border-[#E12927]'
+                      }`}
+                    {...form.propsCampo('apellidoPaterno')}
+                  />
+                  {form.errores.apellidoPaterno && (
+                    <p role="alert" className="text-[11px] text-[#E12927] font-semibold mt-0.5">{form.errores.apellidoPaterno}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block font-mono text-[10px] font-bold uppercase text-[#1F1410]/70 dark:text-[#C5B3AA] mb-1">
+                    Apellido materno
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={60}
+                    value={form.valores.apellidoMaterno}
+                    onChange={(e) => form.setCampo('apellidoMaterno', sanitizar.nombrePersona(e.target.value, 60))}
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-[#1F1410]/15 dark:border-white/15 bg-white dark:bg-[#261A16] text-[#1F1410] dark:text-[#FAF7F5] focus:outline-hidden focus:border-[#E12927]"
+                    {...form.propsCampo('apellidoMaterno')}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-mono text-[10px] font-bold uppercase text-[#1F1410]/70 dark:text-[#C5B3AA] mb-1">
+                    Correo electrónico *
+                  </label>
+                  <input
+                    type="email"
+                    maxLength={120}
+                    value={form.valores.correo}
+                    onChange={(e) => form.setCampo('correo', sanitizar.email(e.target.value))}
+                    className={`w-full px-3 py-2 text-xs rounded-xl border bg-white dark:bg-[#261A16] text-[#1F1410] dark:text-[#FAF7F5] focus:outline-hidden ${form.errores.correo ? 'border-[#E12927]' : 'border-[#1F1410]/15 dark:border-white/15 focus:border-[#E12927]'
+                      }`}
+                    {...form.propsCampo('correo')}
+                  />
+                  {form.errores.correo && (
+                    <p role="alert" className="text-[11px] text-[#E12927] font-semibold mt-0.5">{form.errores.correo}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block font-mono text-[10px] font-bold uppercase text-[#1F1410]/70 dark:text-[#C5B3AA] mb-1">
+                    Teléfono (10 dígitos)
+                  </label>
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    maxLength={10}
+                    value={form.valores.telefono}
+                    onChange={(e) => form.setCampo('telefono', sanitizar.telefono(e.target.value))}
+                    placeholder="6181234567"
+                    className={`w-full px-3 py-2 text-xs font-mono rounded-xl border bg-white dark:bg-[#261A16] text-[#1F1410] dark:text-[#FAF7F5] focus:outline-hidden ${form.errores.telefono ? 'border-[#E12927]' : 'border-[#1F1410]/15 dark:border-white/15 focus:border-[#E12927]'
+                      }`}
+                    {...form.propsCampo('telefono')}
+                  />
+                  {form.errores.telefono && (
+                    <p role="alert" className="text-[11px] text-[#E12927] font-semibold mt-0.5">{form.errores.telefono}</p>
+                  )}
+                </div>
+              </div>
+
+              {errorGeneral && (
+                <p role="alert" className="text-xs font-semibold text-[#E12927] bg-[#FCEAE9] dark:bg-[#E12927]/15 px-3 py-2 rounded-xl">
+                  {errorGeneral}
+                </p>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEditing(false)}
+                  className="px-4 py-2 rounded-full text-xs font-semibold text-[#1F1410]/70 dark:text-[#C5B3AA] hover:bg-[#FAF7F5] dark:hover:bg-white/10 cursor-pointer transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={guardando}
+                  className="inline-flex items-center gap-1.5 px-5 py-2 rounded-full bg-[#E12927] hover:bg-[#c9201f] disabled:opacity-60 text-white text-xs font-mono font-bold uppercase tracking-wider cursor-pointer shadow-sm transition-colors"
+                >
+                  <Check size={14} />
+                  {guardando ? 'Guardando...' : 'Guardar'}
+                </button>
+              </div>
+            </form>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

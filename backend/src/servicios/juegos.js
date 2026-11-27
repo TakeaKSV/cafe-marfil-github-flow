@@ -23,6 +23,7 @@ function aJuego(fila) {
     duracion: fila.duracion,
     dificultad: fila.dificultad,
     piezasEstado: fila.piezas_estado,
+    imagen: fila.imagen ?? null,
     reposicionRequerida: fila.reposicion_requerida === 1,
     sucursalId: fila.sucursal_id,
     estado: enMesa ? 'en_mesa' : 'disponible',

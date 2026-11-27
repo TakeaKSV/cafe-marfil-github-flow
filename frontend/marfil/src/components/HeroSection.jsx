@@ -229,7 +229,7 @@ export default function HeroSection({ productos = [], onOrderNow }) {
             {/* ====================================================================
             4. CONTENEDOR INFERIOR CURVO (CREMA / OFF-WHITE) A PANTALLA COMPLETA
             ==================================================================== */}
-            <div className="relative z-30 w-full bg-[#FAF6F0] rounded-t-[34px] sm:rounded-t-[44px] px-6 sm:px-12 py-6 sm:py-7 text-[#1F1410] shadow-[0_-10px_30px_rgba(0,0,0,0.08)] border-t border-white/60">
+            <div className="relative z-30 w-full bg-[#FAF8F5] dark:bg-[#150E0C] rounded-t-[34px] sm:rounded-t-[44px] px-6 sm:px-12 py-6 sm:py-7 text-[#1F1410] dark:text-[#FAF7F5] shadow-[0_-10px_30px_rgba(0,0,0,0.08)] dark:shadow-[0_-10px_30px_rgba(0,0,0,0.45)] border-t border-white/60 dark:border-white/10 transition-colors duration-300">
 
             </div>
 

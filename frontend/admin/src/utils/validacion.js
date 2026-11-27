@@ -5,6 +5,46 @@ const NOMBRE_RE = /^[A-Za-zÁÉÍÓÚáéíóúÑñÜü0-9'’.\-&() ]+$/;
 const CODIGO_RE = /^[A-Z0-9][A-Z0-9-]{2,39}$/;
 const IMAGEN_RE = /^(?:\/(?:images|uploads)\/[^\s<>"]+|https?:\/\/[^\s<>"]+)$/i;
 
+/** Sanitizadores en tiempo real para bloquear caracteres inválidos y excesos desde el input. */
+export const sanitizar = {
+  telefono: (v) => String(v ?? '').replace(/\D/g, '').slice(0, 10),
+  nombrePersona: (v, max = 80) =>
+    String(v ?? '')
+      .replace(/[^A-Za-zÁÉÍÓÚáéíóúÑñÜü ]/g, '')
+      .replace(/\s{2,}/g, ' ')
+      .slice(0, max),
+  nombreItem: (v, max = 120) =>
+    String(v ?? '')
+      .replace(/[^A-Za-zÁÉÍÓÚáéíóúÑñÜü0-9'’.\-&() ]/g, '')
+      .slice(0, max),
+  codigo: (v, max = 40) =>
+    String(v ?? '')
+      .toUpperCase()
+      .replace(/[^A-Z0-9-]/g, '')
+      .slice(0, max),
+  claveMesa: (v) =>
+    String(v ?? '')
+      .toUpperCase()
+      .replace(/[^A-Z0-9-]/g, '')
+      .slice(0, 10),
+  entero: (v, max = 99999) => {
+    const digitos = String(v ?? '').replace(/\D/g, '');
+    if (!digitos) return '';
+    return String(Math.min(max, Number(digitos)));
+  },
+  precio: (v, max = 100000) => {
+    const limpio = String(v ?? '').replace(/[^0-9.]/g, '');
+    const partes = limpio.split('.');
+    const entero = partes[0].slice(0, 6);
+    const dec = partes.length > 1 ? `.${partes.slice(1).join('').slice(0, 2)}` : '';
+    const resultado = `${entero}${dec}`;
+    if (resultado && Number(resultado) > max) return String(max);
+    return resultado;
+  },
+  email: (v) => String(v ?? '').replace(/\s/g, '').slice(0, 190),
+  texto: (v, max = 300) => String(v ?? '').slice(0, max)
+};
+
 export const reglas = {
   requerido: (valor, mensaje = 'Este campo es obligatorio.') => {
     const texto = valor === null || valor === undefined ? '' : String(valor).trim();

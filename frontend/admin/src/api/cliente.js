@@ -13,9 +13,12 @@ export const ORIGEN_API = (() => {
   }
 })();
 
+const BASE_PUBLICA = import.meta.env.BASE_URL || '/';
+
 export function resolverUrlImagen(url) {
-  if (!url) return '/images/Menu/vaso-principal.png';
+  if (!url) return `${BASE_PUBLICA}images/Menu/vaso-principal.png`;
   if (url.startsWith('/uploads/') && ORIGEN_API) return `${ORIGEN_API}${url}`;
+  if (url.startsWith('/images/')) return `${BASE_PUBLICA}${url.slice(1)}`;
   return url;
 }
 

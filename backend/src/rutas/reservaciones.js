@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { esStaff, requiereStaff } from '../middleware/auth.js';
-import { noAutenticado } from '../utils/errores.js';
 import {
   actualizarReservacion,
   cancelarReservacion,
@@ -90,13 +89,14 @@ router.get('/mesas-disponibles', async (req, res) => {
   res.json(await consultarMesasDisponibles(leer(esquemaMesasDisponibles, req.query)));
 });
 
-// Exige sesión autenticada (cliente de la PWA o personal del panel).
+// Permite reservar con sesión (cliente o staff) o como invitado sin cuenta.
 router.post('/', async (req, res) => {
-  if (!esStaff(req) && req.usuario?.tipo !== 'cliente') {
-    throw noAutenticado('Inicia sesión o crea tu cuenta para realizar una reservación.');
-  }
   const datos = leer(esquemaCrear, req.body);
-  const contexto = esStaff(req) ? { personalId: req.usuario.id } : { clienteId: req.usuario.id };
+  const contexto = esStaff(req)
+    ? { personalId: req.usuario.id }
+    : req.usuario?.tipo === 'cliente'
+      ? { clienteId: req.usuario.id }
+      : {};
   res.status(201).json(await crearReservacion(datos, contexto));
 });
 

@@ -10,7 +10,7 @@ import {
   marcarNotificacionesLeidas,
   obtenerCliente
 } from '../servicios/clientes.js';
-import { cancelarReservacion, listarReservaciones } from '../servicios/reservaciones.js';
+import { cancelarReservacion, listarReservaciones, vincularReservacionesDeInvitado } from '../servicios/reservaciones.js';
 import { leer, zEmail, zId, zTexto, zTextoOpcional } from '../utils/validar.js';
 
 const router = Router();
@@ -38,6 +38,12 @@ router.patch('/perfil', async (req, res) => {
 });
 
 router.get('/reservaciones', async (req, res) => {
+  const cliente = await obtenerCliente(req.usuario.id);
+  await vincularReservacionesDeInvitado({
+    clienteId: cliente.id,
+    email: cliente.email,
+    telefono: cliente.telefono
+  }).catch(() => {});
   res.json(await listarReservaciones({ clienteId: req.usuario.id }));
 });
 

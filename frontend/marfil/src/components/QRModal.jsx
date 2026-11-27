@@ -62,7 +62,7 @@ export default function QRModal({ isOpen, onClose, titulo, subtitulo, codigo, vi
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-[#120A08]/85 backdrop-blur-md overflow-y-auto"
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-[#120A08]/85 backdrop-blur-md"
       onClick={onClose}
       role="dialog"
       aria-modal="true"

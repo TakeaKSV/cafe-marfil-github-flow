@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { flushSync } from 'react-dom';
 import Header from './components/Header';
 import BottomNav from './components/BottomNav';
 import NotificationsDrawer from './components/NotificationsDrawer';
@@ -124,8 +125,56 @@ export default function App() {
     localStorage.setItem('marfil_theme', theme);
   }, [theme]);
 
-  const toggleTheme = () => {
-    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  const toggleTheme = (event) => {
+    const nextTheme = theme === 'dark' ? 'light' : 'dark';
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+
+    if (!document.startViewTransition || reduceMotion) {
+      setTheme(nextTheme);
+      return;
+    }
+
+    let x = window.innerWidth - 48;
+    let y = 36;
+    if (event?.currentTarget && typeof event.currentTarget.getBoundingClientRect === 'function') {
+      const rect = event.currentTarget.getBoundingClientRect();
+      x = rect.left + rect.width / 2;
+      y = rect.top + rect.height / 2;
+    } else if (typeof event?.clientX === 'number' && typeof event?.clientY === 'number') {
+      x = event.clientX;
+      y = event.clientY;
+    }
+
+    const endRadius = Math.hypot(
+      Math.max(x, window.innerWidth - x),
+      Math.max(y, window.innerHeight - y)
+    );
+
+    const transition = document.startViewTransition(() => {
+      document.documentElement.setAttribute('data-theme', nextTheme);
+      localStorage.setItem('marfil_theme', nextTheme);
+      flushSync(() => {
+        setTheme(nextTheme);
+      });
+    });
+
+    transition.ready
+      .then(() => {
+        document.documentElement.animate(
+          {
+            clipPath: [
+              `circle(0px at ${x}px ${y}px)`,
+              `circle(${endRadius}px at ${x}px ${y}px)`
+            ]
+          },
+          {
+            duration: 550,
+            easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+            pseudoElement: '::view-transition-new(root)'
+          }
+        );
+      })
+      .catch(() => {});
   };
 
   // 4. Catálogo público (sucursales, actividades, promociones, menú y juegos)
@@ -395,8 +444,6 @@ export default function App() {
           comensal: nueva.nombreCliente,
           telefono: nueva.telefonoCliente,
           email: nueva.correoCliente || undefined,
-          mesasIds: nueva.mesasIds?.length ? nueva.mesasIds : undefined,
-          solicitaUnionMesas: Boolean(nueva.solicitaUnionMesas),
           juegoId: nueva.juegoId || undefined,
           notas: nueva.notas || undefined
         }
@@ -485,7 +532,7 @@ export default function App() {
       )}
 
       {/* Contenido Principal con Enrutador React */}
-      <main className={activeScreen === 'hero' || activeScreen === 'inicio' || activeScreen === 'menu' || activeScreen === 'promociones' || activeScreen === 'perfil' || (activeScreen === 'beneficios' && Boolean(perfil)) ? 'w-full p-0 m-0 max-w-none flex-1' : 'main-content'} id="main-content">
+      <main className={activeScreen === 'hero' || activeScreen === 'inicio' || activeScreen === 'menu' || activeScreen === 'promociones' || activeScreen === 'perfil' || activeScreen === 'beneficios' ? 'w-full p-0 m-0 max-w-none flex-1' : 'main-content'} id="main-content">
         {!catalogoListo && activeScreen !== 'hero' && (
           errorCatalogo ? (
             <div className="max-w-lg mx-auto my-24 px-4">
@@ -727,7 +774,8 @@ export default function App() {
         )}
       </main>
 
-      {/* Footer Compacto Café Marfil */}
+      {/* Footer Compacto Café Marfil (oculto en Perfil para ajustar 100% a pantalla sin scroll) */}
+      {!(activeScreen === 'perfil' && perfil) && (
       <footer className="marfil-footer">
         <div className="footer-inner">
           <div className="footer-top-row">
@@ -770,6 +818,7 @@ export default function App() {
           </div>
         </div>
       </footer>
+      )}
 
       {/* Navegación Móvil Inferior con botón Reservar Elevado */}
       <BottomNav
@@ -821,7 +870,7 @@ export default function App() {
           />
         ) : !catalogoListo ? (
           <SkeletonList filas={4} />
-        ) : perfil ? (
+        ) : (
           <ReservationWizard
             key={reservationWizardInitialData?.actividadId || reservationWizardInitialData?.sucursalId || 'mesa'}
             sucursales={sucursales}
@@ -834,19 +883,6 @@ export default function App() {
               setReservationModalSuccess(false);
             }}
             onCompleteReservation={handleCompleteReservation}
-          />
-        ) : (
-          <AuthScreen
-            modoInicial="registrar"
-            onLogin={iniciarSesion}
-            onRegister={crearCuenta}
-            onVerifyCode={verificarCodigoCuenta}
-            onResendCode={reenviarCodigoCuenta}
-            onForgotPassword={() => {
-              setReservationModalOpen(false);
-              navigateTo('olvide_password');
-            }}
-            motivo="Para apartar tu mesa o lugar en una actividad necesitas una cuenta Club Marfil. Crea tu cuenta (o inicia sesión) y continuaremos automáticamente con tu reservación."
           />
         )}
       </ReservationModal>

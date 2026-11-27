@@ -56,16 +56,16 @@ export default function ReservationModal({
       <div
         ref={cardRef}
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-4xl max-h-[94dvh] sm:max-h-[90dvh] bg-[#FAF7F5] dark:bg-[#17100D] rounded-t-[28px] sm:rounded-[28px] shadow-2xl border border-black/10 dark:border-white/10 overflow-hidden flex flex-col"
+        className="relative w-full max-w-4xl max-h-[94dvh] bg-[#FAF7F5] dark:bg-[#17100D] rounded-t-[28px] sm:rounded-[28px] shadow-2xl border border-black/10 dark:border-white/10 overflow-hidden flex flex-col"
       >
         {/* Cabecera elegante del modal */}
-        <div className="relative px-5 sm:px-7 py-4 sm:py-5 bg-gradient-to-r from-[#1F1410] via-[#4A1517] to-[#8F191B] text-white flex items-center justify-between gap-4 shrink-0">
+        <div className="relative px-5 sm:px-6 py-3.5 sm:py-4 bg-gradient-to-r from-[#1F1410] via-[#4A1517] to-[#8F191B] text-white flex items-center justify-between gap-4 shrink-0">
           <div className="flex items-center gap-3 min-w-0 text-left">
-            <span className="w-10 h-10 rounded-2xl bg-white/15 backdrop-blur-md border border-white/20 flex items-center justify-center shrink-0">
-              <CalendarDays size={19} />
+            <span className="w-9 h-9 rounded-2xl bg-white/15 backdrop-blur-md border border-white/20 flex items-center justify-center shrink-0">
+              <CalendarDays size={18} />
             </span>
             <div className="min-w-0">
-              <h2 className="font-display text-lg sm:text-xl font-bold text-white leading-tight truncate">
+              <h2 className="font-display text-base sm:text-lg font-bold text-white leading-tight truncate">
                 {titulo}
               </h2>
               <p className="text-xs text-white/75 truncate m-0 mt-0.5">
@@ -84,8 +84,8 @@ export default function ReservationModal({
           </button>
         </div>
 
-        {/* Cuerpo deslizable con el flujo completo */}
-        <div className="flex-1 overflow-y-auto px-4 sm:px-7 py-5 sm:py-6">
+        {/* Cuerpo compacto sin recortes */}
+        <div className="px-4 sm:px-6 py-3 sm:py-4 overflow-y-auto">
           {children}
         </div>
       </div>

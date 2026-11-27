@@ -88,12 +88,12 @@ export default function BenefitsScreen({
   return (
     <div
       ref={containerRef}
-      className="w-full min-h-[calc(100dvh-72px)] mt-[72px] bg-[#FAF7F5] dark:bg-[#14100E] px-4 sm:px-8 lg:px-12 xl:px-16 py-6 sm:py-8 pb-16 flex flex-col gap-8 sm:gap-10"
+      className="w-full min-h-[calc(100dvh-72px)] bg-[#FAF7F5] dark:bg-[#14100E] flex flex-col"
     >
       {/* ====================================================================
-          1. HERO PASAPORTE DE SELLOS (ESTILO EDITORIAL + HOJA DE SELLOS)
+          1. HERO PASAPORTE DE SELLOS (PANTALLA COMPLETA DE BORDE A BORDE)
           ==================================================================== */}
-      <section className="benefits-hero-reveal relative overflow-hidden rounded-[28px] bg-gradient-to-br from-[#FCEAE9]/70 via-[#FFF9F7] to-[#F7EFE6]/80 dark:from-[#261614] dark:via-[#1B1411] dark:to-[#221714] border border-[#E12927]/20 dark:border-white/10 shadow-xl shadow-stone-200/50 dark:shadow-black/40 p-5 sm:p-8 lg:p-10">
+      <section className="benefits-hero-reveal relative w-full min-h-[calc(100dvh-72px)] flex flex-col justify-center overflow-hidden bg-gradient-to-br from-[#FCEAE9]/75 via-[#FFF9F7] to-[#F7EFE6]/85 dark:from-[#261614] dark:via-[#1B1411] dark:to-[#221714] border-b border-[#E12927]/15 dark:border-white/10 px-4 sm:px-8 lg:px-14 xl:px-20 py-8 sm:py-10">
         {/* Halos y geometría editorial igual al inicio */}
         <div className="absolute -top-16 -right-16 w-72 h-72 sm:w-96 sm:h-96 rounded-full bg-[#E12927]/10 dark:bg-[#E12927]/15 blur-3xl pointer-events-none" />
         <div className="hidden lg:block w-64 h-64 rounded-full bg-[#E12927] opacity-90 absolute -right-14 -top-12 pointer-events-none shadow-2xl shadow-[#E12927]/30" />
@@ -260,6 +260,7 @@ export default function BenefitsScreen({
         </div>
       </section>
 
+      <div className="w-full px-4 sm:px-8 lg:px-14 xl:px-20 py-8 sm:py-10 pb-16 flex flex-col gap-8 sm:gap-10">
       {/* ====================================================================
           2. BANNER DE VERIFICACIÓN DE CORREO (PRESERVADO)
           ==================================================================== */}
@@ -524,6 +525,7 @@ export default function BenefitsScreen({
           </div>
         </section>
       )}
+      </div>
 
       {/* Modal QR para Canjear Beneficio */}
       {selectedBenefit && (

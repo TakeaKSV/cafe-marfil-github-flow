@@ -16,6 +16,10 @@ import {
 } from 'lucide-react';
 import { playSound } from '../utils/audioFeedback';
 import { reglas } from '../utils/validacion';
+import { sanitizar } from '../utils/validacion';
+import { TablePagination } from './ui/TablePagination';
+
+const STAFF_POR_PAGINA = 6;
 
 const ROLES_OPCIONES = [
   { id: 'host', label: 'Host — Con acceso al panel (Recepción, mesas y escáner)', puestoDefault: 'Host de Piso' },
@@ -62,6 +66,14 @@ export const StaffSettingsModule = ({
   const [broadcastError, setBroadcastError] = useState('');
   const [broadcastSent, setBroadcastSent] = useState(false);
   const [enviandoBroadcast, setEnviandoBroadcast] = useState(false);
+  const [paginaStaff, setPaginaStaff] = useState(1);
+
+  const totalPaginasStaff = Math.max(1, Math.ceil(staff.length / STAFF_POR_PAGINA));
+  const paginaStaffActual = Math.min(paginaStaff, totalPaginasStaff);
+  const staffPaginado = staff.slice(
+    (paginaStaffActual - 1) * STAFF_POR_PAGINA,
+    paginaStaffActual * STAFF_POR_PAGINA
+  );
 
   // Modal invitar empleado (el admin define turno, rol, puesto y sucursal)
   const [modalInvitar, setModalInvitar] = useState(false);
@@ -279,8 +291,9 @@ export const StaffSettingsModule = ({
                 No hay empleados activos registrados.
               </p>
             ) : (
-              <div className="divide-y divide-[#1F1410]/10">
-                {staff.map((person) => (
+              <>
+                <div className="divide-y divide-[#1F1410]/10">
+                  {staffPaginado.map((person) => (
                   <div
                     key={person.id}
                     className="py-3.5 px-2 rounded-xl flex flex-wrap items-center justify-between gap-3 hover:bg-[#FAF7F5] transition-all"
@@ -350,7 +363,19 @@ export const StaffSettingsModule = ({
                     </div>
                   </div>
                 ))}
-              </div>
+                </div>
+                {staff.length > STAFF_POR_PAGINA && (
+                  <div className="-mx-6 -mb-6 mt-2 overflow-hidden rounded-b-2xl">
+                    <TablePagination
+                      page={paginaStaffActual}
+                      totalItems={staff.length}
+                      pageSize={STAFF_POR_PAGINA}
+                      onPageChange={setPaginaStaff}
+                      itemLabel="miembros"
+                    />
+                  </div>
+                )}
+              </>
             )}
           </div>
 
@@ -669,14 +694,15 @@ export const StaffSettingsModule = ({
                 </button>
               </div>
 
-              <form onSubmit={handleGuardarEdicion} noValidate className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
+              <form onSubmit={handleGuardarEdicion} noValidate className="space-y-3">
                 <div>
                   <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1">Nombre(s) *</label>
                   <input
                     type="text"
+                    maxLength={80}
                     value={editForm.nombres}
                     onChange={(e) => {
-                      setEditForm({ ...editForm, nombres: e.target.value });
+                      setEditForm({ ...editForm, nombres: sanitizar.nombrePersona(e.target.value, 80) });
                       setEditErrors((p) => ({ ...p, nombres: null }));
                     }}
                     className="w-full px-3.5 py-2 text-xs border border-[#1F1410]/15 rounded-xl focus:outline-hidden focus:border-[#E12927]"
@@ -689,9 +715,10 @@ export const StaffSettingsModule = ({
                     <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1">Apellido Paterno *</label>
                     <input
                       type="text"
+                      maxLength={60}
                       value={editForm.apellidoPaterno}
                       onChange={(e) => {
-                        setEditForm({ ...editForm, apellidoPaterno: e.target.value });
+                        setEditForm({ ...editForm, apellidoPaterno: sanitizar.nombrePersona(e.target.value, 60) });
                         setEditErrors((p) => ({ ...p, apellidoPaterno: null }));
                       }}
                       className="w-full px-3.5 py-2 text-xs border border-[#1F1410]/15 rounded-xl focus:outline-hidden focus:border-[#E12927]"
@@ -704,9 +731,10 @@ export const StaffSettingsModule = ({
                     <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1">Apellido Materno</label>
                     <input
                       type="text"
+                      maxLength={60}
                       value={editForm.apellidoMaterno}
                       onChange={(e) => {
-                        setEditForm({ ...editForm, apellidoMaterno: e.target.value });
+                        setEditForm({ ...editForm, apellidoMaterno: sanitizar.nombrePersona(e.target.value, 60) });
                         setEditErrors((p) => ({ ...p, apellidoMaterno: null }));
                       }}
                       placeholder="Opcional"

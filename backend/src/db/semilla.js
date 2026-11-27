@@ -1700,6 +1700,7 @@ export function sembrar({ soloCatalogo = false } = {}) {
         duracion: j.duracion,
         dificultad: j.dificultad,
         piezas_estado: j.piezas,
+        imagen: j.imagen ?? '/images/board_games.jpg',
         reposicion_requerida: j.reposicion ?? 0,
         sucursal_id: PORRAS,
         creado_en: haceDias(200)

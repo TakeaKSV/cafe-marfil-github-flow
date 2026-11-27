@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, CalendarDays, User, LogIn } from 'lucide-react';
+import { Bell, CalendarDays, User, LogIn, Sun, Moon } from 'lucide-react';
 import ElephantLogo from './ElephantLogo';
 import { sounds } from '../utils/audio';
 
@@ -8,7 +8,9 @@ export default function Header({
   setActiveScreen,
   unreadCount,
   openNotifications,
-  isLoggedIn = false
+  isLoggedIn = false,
+  theme = 'light',
+  toggleTheme
 }) {
   const [isScrolled, setIsScrolled] = useState(false);
 
@@ -44,7 +46,7 @@ export default function Header({
         className={`marfil-site-header ${isFixedOverlay ? 'fixed top-0 inset-x-0' : 'sticky top-0'} z-40 ${
           isHeroOverlay
             ? 'bg-transparent border-b border-white/15 backdrop-blur-xs text-white'
-            : 'bg-white/95 backdrop-blur-xl border-b border-stone-200/70 text-[#1F1410] shadow-sm'
+            : 'bg-white/95 dark:bg-[#1A120F]/95 backdrop-blur-xl border-b border-stone-200/70 dark:border-white/10 text-[#1F1410] dark:text-[#FAF7F5] shadow-sm'
         } transition-all duration-300`}
       >
         <div className="marfil-site-header-inner max-w-[1240px] mx-auto px-2.5 sm:px-6 h-[72px] flex items-center justify-between gap-2 sm:gap-4">
@@ -110,6 +112,28 @@ export default function Header({
               <span className="hidden sm:inline">Reservar Mesa</span>
               <span className="sm:hidden">Reservar</span>
             </button>
+
+            {/* Botón Modo Claro / Oscuro */}
+            {toggleTheme && (
+              <button
+                type="button"
+                className={`w-10 h-10 rounded-full border ${
+                  isHeroOverlay
+                    ? 'border-white/25 bg-black/20 hover:bg-black/35 text-white backdrop-blur-md'
+                    : 'border-stone-200/80 dark:border-white/15 bg-white/60 dark:bg-white/10 text-[#1F1410] dark:text-[#FAF7F5] hover:bg-[#FCEAE9] dark:hover:bg-[#321B19] hover:border-[#E12927]'
+                } flex items-center justify-center active:scale-95 transition-all cursor-pointer shadow-xs`}
+                onClick={(e) => {
+                  sounds.playClick();
+                  toggleTheme(e);
+                }}
+                aria-label={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+                title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
+              >
+                <span className="transition-transform duration-300 ease-out inline-flex items-center justify-center">
+                  {theme === 'dark' ? <Sun size={18} className="text-amber-300" /> : <Moon size={18} />}
+                </span>
+              </button>
+            )}
 
             {/* Notificaciones */}
             <button

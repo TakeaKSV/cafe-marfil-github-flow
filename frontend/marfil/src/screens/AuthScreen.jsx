@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { AlertCircle, ArrowLeft, ArrowRight, KeyRound, LogIn, RefreshCw, UserPlus } from 'lucide-react';
 import { sounds } from '../utils/audio';
-import { reglas, useFormulario } from '../utils/validacion';
+import { reglas, useFormulario, sanitizar } from '../utils/validacion';
 
 const claseInput = (tieneError) =>
   `p-3.5 rounded-md border-2 bg-white font-body text-sm text-[#1F1410] focus:outline-none transition-colors ${
@@ -171,7 +171,8 @@ export default function AuthScreen({
 
   if (modo === 'verificar') {
     return (
-      <div className="flex flex-col gap-6 fade-in pb-16 max-w-xl mx-auto w-full">
+      <div className="w-full min-h-[calc(100dvh-72px)] bg-gradient-to-br from-[#FCEAE9]/60 via-[#FAF7F5] to-[#F7EFE6]/70 dark:from-[#221513] dark:via-[#14100E] dark:to-[#1B1411] px-4 sm:px-8 py-10 flex items-center justify-center fade-in">
+      <div className="flex flex-col gap-6 max-w-xl w-full">
         <button
           type="button"
           onClick={() => cambiarModo('entrar')}
@@ -257,11 +258,13 @@ export default function AuthScreen({
           </div>
         </form>
       </div>
+      </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-8 fade-in pb-16 max-w-xl mx-auto w-full">
+    <div className="w-full min-h-[calc(100dvh-72px)] bg-gradient-to-br from-[#FCEAE9]/60 via-[#FAF7F5] to-[#F7EFE6]/70 dark:from-[#221513] dark:via-[#14100E] dark:to-[#1B1411] px-4 sm:px-8 py-10 flex items-center justify-center fade-in">
+    <div className="flex flex-col gap-6 max-w-xl w-full">
       <div className="text-left">
         <h1 className="font-display text-3xl sm:text-4xl font-bold text-[#1F1410] tracking-tight mb-3">
           Tu cuenta Club Marfil
@@ -304,8 +307,9 @@ export default function AuthScreen({
               <input
                 id="auth-nombres"
                 type="text"
+                maxLength={80}
                 value={form.valores.nombres}
-                onChange={(e) => form.setCampo('nombres', e.target.value)}
+                onChange={(e) => form.setCampo('nombres', sanitizar.nombrePersona(e.target.value, 80))}
                 placeholder="Ej. Sofía"
                 autoComplete="given-name"
                 className={claseInput(form.errores.nombres)}
@@ -320,8 +324,9 @@ export default function AuthScreen({
                 <input
                   id="auth-ap-paterno"
                   type="text"
+                  maxLength={60}
                   value={form.valores.apellidoPaterno}
-                  onChange={(e) => form.setCampo('apellidoPaterno', e.target.value)}
+                  onChange={(e) => form.setCampo('apellidoPaterno', sanitizar.nombrePersona(e.target.value, 60))}
                   placeholder="Ej. Navarro"
                   autoComplete="family-name"
                   className={claseInput(form.errores.apellidoPaterno)}
@@ -335,8 +340,9 @@ export default function AuthScreen({
                 <input
                   id="auth-ap-materno"
                   type="text"
+                  maxLength={60}
                   value={form.valores.apellidoMaterno}
-                  onChange={(e) => form.setCampo('apellidoMaterno', e.target.value)}
+                  onChange={(e) => form.setCampo('apellidoMaterno', sanitizar.nombrePersona(e.target.value, 60))}
                   placeholder="Opcional"
                   autoComplete="additional-name"
                   className={claseInput(form.errores.apellidoMaterno)}
@@ -353,8 +359,9 @@ export default function AuthScreen({
           <input
             id="auth-correo"
             type="email"
+            maxLength={190}
             value={form.valores.correo}
-            onChange={(e) => form.setCampo('correo', e.target.value)}
+            onChange={(e) => form.setCampo('correo', sanitizar.email(e.target.value))}
             placeholder="tu.correo@ejemplo.com"
             autoComplete="email"
             className={claseInput(form.errores.correo)}
@@ -365,13 +372,15 @@ export default function AuthScreen({
 
         {esRegistro && (
           <div className="flex flex-col gap-1">
-            <label htmlFor="auth-telefono" className={CLASE_LABEL}>TELÉFONO / WHATSAPP (OPCIONAL)</label>
+            <label htmlFor="auth-telefono" className={CLASE_LABEL}>TELÉFONO / WHATSAPP (10 DÍGITOS · OPCIONAL)</label>
             <input
               id="auth-telefono"
               type="tel"
+              inputMode="numeric"
+              maxLength={10}
               value={form.valores.telefono}
-              onChange={(e) => form.setCampo('telefono', e.target.value)}
-              placeholder="(618) 123-4567"
+              onChange={(e) => form.setCampo('telefono', sanitizar.telefono(e.target.value))}
+              placeholder="6181234567"
               autoComplete="tel"
               className={claseInput(form.errores.telefono)}
               {...form.propsCampo('telefono')}
@@ -387,8 +396,9 @@ export default function AuthScreen({
           <input
             id="auth-password"
             type="password"
+            maxLength={72}
             value={form.valores.password}
-            onChange={(e) => form.setCampo('password', e.target.value)}
+            onChange={(e) => form.setCampo('password', e.target.value.slice(0, 72))}
             autoComplete={esRegistro ? 'new-password' : 'current-password'}
             className={claseInput(form.errores.password)}
             {...form.propsCampo('password')}
@@ -402,8 +412,9 @@ export default function AuthScreen({
             <input
               id="auth-confirmar"
               type="password"
+              maxLength={72}
               value={form.valores.confirmarPassword}
-              onChange={(e) => form.setCampo('confirmarPassword', e.target.value)}
+              onChange={(e) => form.setCampo('confirmarPassword', e.target.value.slice(0, 72))}
               autoComplete="new-password"
               className={claseInput(form.errores.confirmarPassword)}
               {...form.propsCampo('confirmarPassword')}
@@ -446,6 +457,7 @@ export default function AuthScreen({
             : 'Para reservar una mesa no necesitas cuenta: puedes hacerlo como invitado.'}
         </p>
       </form>
+    </div>
     </div>
   );
 }

@@ -108,6 +108,19 @@ export async function listarReservaciones(filtros = {}) {
   return (await repo.listar(filtros)).map(aReservacion);
 }
 
+/**
+ * Asocia automáticamente las reservaciones hechas sin cuenta que coincidan
+ * con el correo o teléfono (10 dígitos) del cliente recién registrado o autenticado.
+ */
+export async function vincularReservacionesDeInvitado({ clienteId, email = null, telefono = null }) {
+  if (!clienteId) return 0;
+  const emailNorm = email ? String(email).trim().toLowerCase() : null;
+  const digitos = String(telefono ?? '').replace(/\D/g, '');
+  const telefono10 = digitos.length >= 10 ? digitos.slice(-10) : null;
+  if (!emailNorm && !telefono10) return 0;
+  return repo.vincularInvitadoPorContacto({ clienteId, email: emailNorm, telefono10 });
+}
+
 async function filaPorFolio(folio) {
   const fila = await repo.porFolio(String(folio).trim().toUpperCase());
   if (!fila) throw noEncontrado(`No existe una reservación con el folio ${folio}.`);

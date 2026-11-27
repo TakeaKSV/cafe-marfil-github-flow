@@ -19,9 +19,12 @@ import {
   Link2
 } from 'lucide-react';
 import { playSound } from '../utils/audioFeedback';
-import { reglas } from '../utils/validacion';
+import { reglas, sanitizar } from '../utils/validacion';
 import { QRCodeImage } from './QRCodeImage';
 import { SkeletonTable } from './ui/Skeletons';
+import { TablePagination } from './ui/TablePagination';
+
+const RESERVAS_POR_PAGINA = 7;
 
 export const ReservationsTableView = ({ 
   reservaciones, 
@@ -54,6 +57,7 @@ export const ReservationsTableView = ({
   const [activeActionMenu, setActiveActionMenu] = useState(null);
   const [qrModalItem, setQrModalItem] = useState(null);
   const [guardando, setGuardando] = useState(false);
+  const [pagina, setPagina] = useState(1);
 
   // Formulario nueva reserva
   const sucursalPorDefecto = selectedSucursal === 'todas' ? (sucursales[0]?.id || '') : selectedSucursal;
@@ -101,6 +105,13 @@ export const ReservationsTableView = ({
 
     return matchesBranch && matchesTab && matchesSearch && (!fecha || r.fechaISO === fecha);
   });
+
+  const totalPaginas = Math.max(1, Math.ceil(filtered.length / RESERVAS_POR_PAGINA));
+  const paginaActual = Math.min(pagina, totalPaginas);
+  const reservacionesPaginadas = filtered.slice(
+    (paginaActual - 1) * RESERVAS_POR_PAGINA,
+    paginaActual * RESERVAS_POR_PAGINA
+  );
 
   const handleSelectAll = (e) => {
     if (e.target.checked) {
@@ -433,7 +444,7 @@ export const ReservationsTableView = ({
                   </td>
                 </tr>
               )}
-              {!cargando && filtered.map(r => {
+              {!cargando && reservacionesPaginadas.map(r => {
                 const isSelected = selectedItems.includes(r.folio);
 
                 // Status Badge en Español
@@ -616,16 +627,25 @@ export const ReservationsTableView = ({
           </table>
         </div>
         )}
+        {!cargando && (
+          <TablePagination
+            page={paginaActual}
+            totalItems={filtered.length}
+            pageSize={RESERVAS_POR_PAGINA}
+            onPageChange={setPagina}
+            itemLabel="reservaciones"
+          />
+        )}
       </div>
 
       {/* Modal Pase QR (Portal a document.body para tapar toda la pantalla) */}
       {qrModalItem && createPortal(
         <div 
-          className="fixed inset-0 z-[9999] bg-[#1F1410]/75 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 overflow-y-auto animate-modal-backdrop"
+          className="fixed inset-0 z-[9999] bg-[#1F1410]/75 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 animate-modal-backdrop"
           onClick={() => setQrModalItem(null)}
         >
           <div 
-            className="bg-white rounded-[32px] border border-[#1F1410]/10 max-w-sm w-full p-6 sm:p-8 shadow-[0_25px_60px_-15px_rgba(31,20,16,0.35)] animate-modal-card text-center relative max-h-[92vh] overflow-y-auto my-auto"
+            className="bg-white rounded-[28px] border border-[#1F1410]/10 max-w-sm w-full p-5 sm:p-6 shadow-[0_25px_60px_-15px_rgba(31,20,16,0.35)] animate-modal-card text-center relative"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-end mb-2">
@@ -708,11 +728,11 @@ export const ReservationsTableView = ({
       {/* Modal Nueva Reservación (Portal a document.body para tapar toda la pantalla) */}
       {showAddModal && createPortal(
         <div 
-          className="fixed inset-0 z-[9999] bg-[#1F1410]/75 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 overflow-y-auto animate-modal-backdrop"
+          className="fixed inset-0 z-[9999] bg-[#1F1410]/75 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 animate-modal-backdrop"
           onClick={() => setShowAddModal(false)}
         >
           <div 
-            className="bg-white rounded-[32px] border border-[#1F1410]/10 max-w-md w-full p-6 sm:p-8 shadow-[0_25px_60px_-15px_rgba(31,20,16,0.35)] animate-modal-card relative max-h-[92vh] overflow-y-auto my-auto"
+            className="bg-white rounded-[28px] border border-[#1F1410]/10 max-w-lg w-full p-5 sm:p-6 shadow-[0_25px_60px_-15px_rgba(31,20,16,0.35)] animate-modal-card relative"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between pb-4 border-b border-[#1F1410]/8 mb-5">
@@ -733,21 +753,22 @@ export const ReservationsTableView = ({
               </button>
             </div>
 
-            <form onSubmit={handleCreateReservation} noValidate className="space-y-4 font-body">
+            <form onSubmit={handleCreateReservation} noValidate className="space-y-3 font-body">
               <div>
-                <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1.5">
+                <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1">
                   Nombre(s) del Comensal *
                 </label>
                 <input
                   type="text"
+                  maxLength={80}
                   placeholder="Ej. Sofía"
                   value={newRes.nombres}
                   onChange={(e) => {
-                    setNewRes({ ...newRes, nombres: e.target.value });
+                    setNewRes({ ...newRes, nombres: sanitizar.nombrePersona(e.target.value, 80) });
                     setResErrors((p) => ({ ...p, nombres: null }));
                   }}
                   aria-invalid={Boolean(resErrors.nombres)}
-                  className={`w-full px-4 py-2.5 text-xs border rounded-xl focus:ring-1 focus:outline-hidden transition-all ${
+                  className={`w-full px-3.5 py-2 text-xs border rounded-xl focus:ring-1 focus:outline-hidden transition-all ${
                     resErrors.nombres ? 'border-[#E12927] focus:border-[#E12927] focus:ring-[#E12927]' : 'border-[#1F1410]/15 focus:border-[#E12927] focus:ring-[#E12927]'
                   }`}
                 />
@@ -756,19 +777,20 @@ export const ReservationsTableView = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1.5">
+                  <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1">
                     Apellido Paterno *
                   </label>
                   <input
                     type="text"
+                    maxLength={60}
                     placeholder="Ej. Herrera"
                     value={newRes.apellidoPaterno}
                     onChange={(e) => {
-                      setNewRes({ ...newRes, apellidoPaterno: e.target.value });
+                      setNewRes({ ...newRes, apellidoPaterno: sanitizar.nombrePersona(e.target.value, 60) });
                       setResErrors((p) => ({ ...p, apellidoPaterno: null }));
                     }}
                     aria-invalid={Boolean(resErrors.apellidoPaterno)}
-                    className={`w-full px-4 py-2.5 text-xs border rounded-xl focus:ring-1 focus:outline-hidden transition-all ${
+                    className={`w-full px-3.5 py-2 text-xs border rounded-xl focus:ring-1 focus:outline-hidden transition-all ${
                       resErrors.apellidoPaterno ? 'border-[#E12927] focus:border-[#E12927] focus:ring-[#E12927]' : 'border-[#1F1410]/15 focus:border-[#E12927] focus:ring-[#E12927]'
                     }`}
                   />
@@ -776,19 +798,20 @@ export const ReservationsTableView = ({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1.5">
+                  <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1">
                     Apellido Materno
                   </label>
                   <input
                     type="text"
+                    maxLength={60}
                     placeholder="Opcional"
                     value={newRes.apellidoMaterno}
                     onChange={(e) => {
-                      setNewRes({ ...newRes, apellidoMaterno: e.target.value });
+                      setNewRes({ ...newRes, apellidoMaterno: sanitizar.nombrePersona(e.target.value, 60) });
                       setResErrors((p) => ({ ...p, apellidoMaterno: null }));
                     }}
                     aria-invalid={Boolean(resErrors.apellidoMaterno)}
-                    className={`w-full px-4 py-2.5 text-xs border rounded-xl focus:ring-1 focus:outline-hidden transition-all ${
+                    className={`w-full px-3.5 py-2 text-xs border rounded-xl focus:ring-1 focus:outline-hidden transition-all ${
                       resErrors.apellidoMaterno ? 'border-[#E12927] focus:border-[#E12927] focus:ring-[#E12927]' : 'border-[#1F1410]/15 focus:border-[#E12927] focus:ring-[#E12927]'
                     }`}
                   />
@@ -796,42 +819,44 @@ export const ReservationsTableView = ({
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1.5" htmlFor="nueva-reserva-fecha">
-                  Fecha de la nueva reservación *
-                </label>
-                <input
-                  id="nueva-reserva-fecha"
-                  type="date"
-                  min={hoy}
-                  value={newRes.fechaISO}
-                  onChange={(e) => {
-                    setNewRes({ ...newRes, fechaISO: e.target.value });
-                    setResErrors((p) => ({ ...p, fechaISO: null }));
-                  }}
-                  aria-invalid={Boolean(resErrors.fechaISO)}
-                  className={`w-full px-4 py-2.5 text-xs border rounded-xl focus:outline-hidden ${
-                    resErrors.fechaISO ? 'border-[#E12927]' : 'border-[#1F1410]/15 focus:border-[#E12927]'
-                  }`}
-                />
-                {resErrors.fechaISO && <p role="alert" className="text-[11px] font-semibold text-[#E12927] mt-1">{resErrors.fechaISO}</p>}
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1.5">
-                    WhatsApp (10 dígitos) *
+                  <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1" htmlFor="nueva-reserva-fecha">
+                    Fecha *
+                  </label>
+                  <input
+                    id="nueva-reserva-fecha"
+                    type="date"
+                    min={hoy}
+                    value={newRes.fechaISO}
+                    onChange={(e) => {
+                      setNewRes({ ...newRes, fechaISO: e.target.value });
+                      setResErrors((p) => ({ ...p, fechaISO: null }));
+                    }}
+                    aria-invalid={Boolean(resErrors.fechaISO)}
+                    className={`w-full px-3 py-2 text-xs border rounded-xl focus:outline-hidden ${
+                      resErrors.fechaISO ? 'border-[#E12927]' : 'border-[#1F1410]/15 focus:border-[#E12927]'
+                    }`}
+                  />
+                  {resErrors.fechaISO && <p role="alert" className="text-[11px] font-semibold text-[#E12927] mt-1">{resErrors.fechaISO}</p>}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1">
+                    WhatsApp (10 díg.) *
                   </label>
                   <input
                     type="tel"
-                    placeholder="618-123-4567"
+                    inputMode="numeric"
+                    maxLength={10}
+                    placeholder="6181234567"
                     value={newRes.telefono}
                     onChange={(e) => {
-                      setNewRes({ ...newRes, telefono: e.target.value });
+                      setNewRes({ ...newRes, telefono: sanitizar.telefono(e.target.value) });
                       setResErrors((p) => ({ ...p, telefono: null }));
                     }}
                     aria-invalid={Boolean(resErrors.telefono)}
-                    className={`w-full px-4 py-2.5 text-xs border rounded-xl focus:ring-1 focus:outline-hidden transition-all ${
+                    className={`w-full px-3 py-2 text-xs border rounded-xl focus:ring-1 focus:outline-hidden transition-all font-mono ${
                       resErrors.telefono ? 'border-[#E12927] focus:border-[#E12927] focus:ring-[#E12927]' : 'border-[#1F1410]/15 focus:border-[#E12927] focus:ring-[#E12927]'
                     }`}
                   />
@@ -839,20 +864,20 @@ export const ReservationsTableView = ({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1.5">
-                    Comensales (1-12) *
+                  <label className="block text-xs font-mono font-bold text-[#1F1410] mb-1">
+                    Personas (1-12) *
                   </label>
                   <input
-                    type="number"
-                    min="1"
-                    max="12"
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={2}
                     value={newRes.personas}
                     onChange={(e) => {
-                      setNewRes({ ...newRes, personas: e.target.value });
+                      setNewRes({ ...newRes, personas: sanitizar.entero(e.target.value, 12) });
                       setResErrors((p) => ({ ...p, personas: null }));
                     }}
                     aria-invalid={Boolean(resErrors.personas)}
-                    className={`w-full px-4 py-2.5 text-xs border rounded-xl focus:ring-1 focus:outline-hidden font-mono transition-all ${
+                    className={`w-full px-3 py-2 text-xs border rounded-xl focus:ring-1 focus:outline-hidden font-mono transition-all ${
                       resErrors.personas ? 'border-[#E12927] focus:border-[#E12927] focus:ring-[#E12927]' : 'border-[#1F1410]/15 focus:border-[#E12927] focus:ring-[#E12927]'
                     }`}
                   />

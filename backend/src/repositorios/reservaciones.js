@@ -158,3 +158,22 @@ export const iniciar = (mesaId, ahora, id) =>
 
 export const servicioAbierto = (reservacionId) =>
   consulta('servicios_mesa').select('mesa_id').where('reservacion_id', reservacionId).whereNull('fin').first();
+
+/**
+ * Vincula reservaciones hechas como invitado (cliente_id IS NULL) a la cuenta
+ * de un cliente cuando coinciden por correo electrónico o por los 10 dígitos del teléfono.
+ */
+export async function vincularInvitadoPorContacto({ clienteId, email = null, telefono10 = null }) {
+  if (!clienteId || (!email && !telefono10)) return 0;
+  return consulta('reservaciones')
+    .whereNull('cliente_id')
+    .where(function () {
+      if (email) {
+        this.orWhereRaw('LOWER(TRIM(email_contacto)) = ?', [email]);
+      }
+      if (telefono10) {
+        this.orWhereRaw("RIGHT(REGEXP_REPLACE(COALESCE(telefono_contacto, ''), '[^0-9]', ''), 10) = ?", [telefono10]);
+      }
+    })
+    .update({ cliente_id: clienteId });
+}

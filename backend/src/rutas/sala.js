@@ -201,7 +201,8 @@ const camposJuego = {
   jugadores: zTexto(40),
   duracion: zTexto(40),
   dificultad: zTexto(40),
-  piezasEstado: zTexto(120)
+  piezasEstado: zTexto(120),
+  imagen: zTextoOpcional(255).nullable().optional()
 };
 
 const esquemaCrearJuego = z.object({

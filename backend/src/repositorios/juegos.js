@@ -46,6 +46,7 @@ export const insertarJuego = (datos) =>
     duracion: datos.duracion,
     dificultad: datos.dificultad,
     piezas_estado: datos.piezasEstado,
+    imagen: datos.imagen ?? null,
     sucursal_id: datos.sucursalId,
     creado_en: datos.creadoEn
   });
@@ -65,6 +66,7 @@ const CAMPOS_JUEGOS = {
   duracion: 'duracion',
   dificultad: 'dificultad',
   piezasEstado: 'piezas_estado',
+  imagen: 'imagen',
   reposicionRequerida: ['reposicion_requerida', aBit]
 };
 

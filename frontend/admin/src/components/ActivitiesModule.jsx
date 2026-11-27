@@ -18,6 +18,9 @@ import {
 import { resolverUrlImagen, subirImagen } from '../api/cliente';
 import { playSound } from '../utils/audioFeedback';
 import { reglas } from '../utils/validacion';
+import { TablePagination } from './ui/TablePagination';
+
+const ACTIVIDADES_POR_PAGINA = 6;
 
 const CATEGORIAS_ACTIVIDAD = [
   { slug: 'cine', nombre: 'Cine & Proyecciones' },
@@ -71,6 +74,7 @@ export const ActivitiesModule = ({
   const [errores, setErrores] = useState({});
   const [subiendo, setSubiendo] = useState(false);
   const [guardando, setGuardando] = useState(false);
+  const [pagina, setPagina] = useState(1);
 
   const filtradas = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
@@ -85,6 +89,13 @@ export const ActivitiesModule = ({
       );
     });
   }, [actividades, searchTerm, filtroEstado]);
+
+  const totalPaginas = Math.max(1, Math.ceil(filtradas.length / ACTIVIDADES_POR_PAGINA));
+  const paginaActual = Math.min(pagina, totalPaginas);
+  const actividadesPaginadas = filtradas.slice(
+    (paginaActual - 1) * ACTIVIDADES_POR_PAGINA,
+    paginaActual * ACTIVIDADES_POR_PAGINA
+  );
 
   const abrirNueva = () => {
     if (!esGerencia) return;
@@ -599,8 +610,9 @@ export const ActivitiesModule = ({
           No hay actividades que coincidan con el filtro actual.
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {filtradas.map((act) => {
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+            {actividadesPaginadas.map((act) => {
             const ocupacionPct = act.cupoTotal ? Math.min(100, Math.round((act.lugaresOcupados / act.cupoTotal) * 100)) : 0;
             return (
               <div
@@ -682,7 +694,19 @@ export const ActivitiesModule = ({
               </div>
             );
           })}
-        </div>
+          </div>
+          {filtradas.length > ACTIVIDADES_POR_PAGINA && (
+            <div className="bg-white rounded-2xl border border-[#1F1410]/10 overflow-hidden shadow-2xs">
+              <TablePagination
+                page={paginaActual}
+                totalItems={filtradas.length}
+                pageSize={ACTIVIDADES_POR_PAGINA}
+                onPageChange={setPagina}
+                itemLabel="actividades"
+              />
+            </div>
+          )}
+        </>
       )}
     </div>
   );

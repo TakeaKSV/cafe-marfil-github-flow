@@ -4,6 +4,19 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const NOMBRE_RE = /^[A-Za-zÁÉÍÓÚáéíóúÑñÜü'’.\-& ]+$/;
 const IMAGEN_RE = /^(?:\/(?:images|uploads)\/[^\s<>"]+|https?:\/\/[^\s<>"]+)$/i;
 
+/** Sanitizadores en tiempo real para bloquear caracteres inválidos y excesos desde el input. */
+export const sanitizar = {
+  telefono: (v) => String(v ?? '').replace(/\D/g, '').slice(0, 10),
+  nombrePersona: (v, max = 80) =>
+    String(v ?? '')
+      .replace(/[^A-Za-zÁÉÍÓÚáéíóúÑñÜü ]/g, '')
+      .replace(/\s{2,}/g, ' ')
+      .slice(0, max),
+  codigo6: (v) => String(v ?? '').replace(/\D/g, '').slice(0, 6),
+  email: (v) => String(v ?? '').replace(/\s/g, '').slice(0, 190),
+  texto: (v, max = 300) => String(v ?? '').slice(0, max)
+};
+
 export const reglas = {
   requerido: (valor, mensaje = 'Este campo es obligatorio.') => {
     const texto = valor === null || valor === undefined ? '' : String(valor).trim();

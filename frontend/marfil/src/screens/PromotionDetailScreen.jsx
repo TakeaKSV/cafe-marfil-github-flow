@@ -70,7 +70,7 @@ export default function PromotionDetailScreen({ promo, onBack }) {
         <div
           ref={modalRef}
           onClick={(e) => e.stopPropagation()}
-          className="relative w-full max-w-4xl max-h-[92dvh] bg-white rounded-t-[28px] sm:rounded-[28px] shadow-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-12"
+          className="relative w-full max-w-4xl bg-white rounded-t-[28px] sm:rounded-[28px] shadow-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-12"
         >
           {/* Botón cerrar flotante */}
           <button
@@ -116,8 +116,8 @@ export default function PromotionDetailScreen({ promo, onBack }) {
           </div>
 
           {/* Columna Derecha / Inferior: Información + Botón QR */}
-          <div className="lg:col-span-7 flex flex-col max-h-[calc(92dvh-14rem)] sm:max-h-[calc(92dvh-16rem)] lg:max-h-[92dvh]">
-            <div className="flex-1 overflow-y-auto p-5 sm:p-7 flex flex-col gap-5 text-left">
+          <div className="lg:col-span-7 flex flex-col">
+            <div className="flex-1 p-5 sm:p-6 flex flex-col gap-4 text-left">
               <div className="pr-8">
                 <span className="text-xs font-semibold text-[#E12927] uppercase tracking-wider block mb-1">
                   {promo.categoria}

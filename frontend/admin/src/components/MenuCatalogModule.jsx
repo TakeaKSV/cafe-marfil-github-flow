@@ -25,6 +25,10 @@ import { reglas } from '../utils/validacion';
 import { resolverUrlImagen, subirImagen } from '../api/cliente';
 import { MenuProductPreviewCard } from './preview/MenuProductPreviewCard';
 import { MenuFullPreviewModal } from './preview/MenuFullPreviewModal';
+import { TablePagination } from './ui/TablePagination';
+import { CurvedRevealCard } from './ui/CurvedRevealCard';
+
+const PRODUCTOS_POR_PAGINA = 6;
 
 const COLORES_PRESET = [
   '#F5ECE8',
@@ -97,6 +101,8 @@ export const MenuCatalogModule = ({
   const [guardando, setGuardando] = useState(false);
   const [showFullPreview, setShowFullPreview] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [pagina, setPagina] = useState(1);
+  const [expandedItemId, setExpandedItemId] = useState(null);
 
   const listaCategorias = useMemo(
     () => (categorias.length > 0 ? categorias : CATEGORIAS_BASE),
@@ -128,6 +134,13 @@ export const MenuCatalogModule = ({
       );
     });
   }, [menuItems, activeCategory, filterEstado, searchTerm]);
+
+  const totalPaginas = Math.max(1, Math.ceil(filtrados.length / PRODUCTOS_POR_PAGINA));
+  const paginaActual = Math.min(pagina, totalPaginas);
+  const filtradosPaginados = filtrados.slice(
+    (paginaActual - 1) * PRODUCTOS_POR_PAGINA,
+    paginaActual * PRODUCTOS_POR_PAGINA
+  );
 
   const totalBorradores = useMemo(
     () => menuItems.filter((i) => i.estado === 'borrador').length,
@@ -626,39 +639,39 @@ export const MenuCatalogModule = ({
   }
 
   // =========================================================================
-  // VISTA PRINCIPAL DEL CATÁLOGO
+  // VISTA PRINCIPAL DEL CATÁLOGO (sin scroll en escritorio, tarjetas con curva)
   // =========================================================================
   return (
-    <div className="space-y-6 animate-menu-in">
-      {/* Header */}
-      <div className="bg-white p-5 rounded-2xl border border-[#1F1410]/10 shadow-xs flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <UtensilsCrossed className="w-5 h-5 text-[#E12927]" />
-            <h1 className="font-display font-bold text-2xl text-[#1F1410]">
+    <div className="lg:h-[calc(100dvh-6.2rem)] lg:overflow-hidden flex flex-col gap-3 animate-menu-in">
+      {/* Header compacto */}
+      <div className="bg-white px-4 py-3 sm:px-5 rounded-2xl border border-[#1F1410]/10 shadow-xs flex flex-col lg:flex-row items-start lg:items-center justify-between gap-2.5 shrink-0">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <UtensilsCrossed className="w-5 h-5 text-[#E12927] shrink-0" />
+            <h1 className="font-display font-bold text-xl text-[#1F1410] truncate">
               Editor de Menú & Cocina en Vivo
             </h1>
           </div>
-          <p className="text-xs sm:text-sm text-[#1F1410]/60 font-body">
-            Controla platillos, precios, borradores, orden y disponibilidad en tiempo real
+          <p className="text-xs text-[#1F1410]/60 font-body truncate">
+            Pasa el cursor sobre cualquier platillo para ver descripción, disponibilidad y acciones de edición
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={() => setShowFullPreview(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#FCEAE9] hover:bg-[#E12927] text-[#E12927] hover:text-white text-xs font-mono font-bold transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-[#FCEAE9] hover:bg-[#E12927] text-[#E12927] hover:text-white text-xs font-mono font-bold transition-colors cursor-pointer"
           >
-            <Eye className="w-4 h-4" />
-            Vista Previa Menú
+            <Eye className="w-3.5 h-3.5" />
+            Vista Previa
           </button>
 
           {esGerencia && (
             <button
               type="button"
               onClick={abrirNuevo}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#E12927] hover:bg-[#c9201f] text-white text-xs sm:text-sm font-semibold shadow-xs transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#E12927] hover:bg-[#c9201f] text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
             >
               <Plus className="w-4 h-4 stroke-[2.5]" />
               Nuevo Platillo
@@ -668,23 +681,30 @@ export const MenuCatalogModule = ({
       </div>
 
       {/* Filtros */}
-      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5 shrink-0">
         <div className="relative flex-1 max-w-md">
           <Search className="w-4 h-4 text-[#1F1410]/40 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             placeholder="Buscar platillo o bebida..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 text-xs bg-white border border-[#1F1410]/15 rounded-full focus:outline-hidden focus:border-[#E12927]"
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setPagina(1);
+            }}
+            className="w-full pl-10 pr-4 py-1.5 text-xs bg-white border border-[#1F1410]/15 rounded-full focus:outline-hidden focus:border-[#E12927]"
           />
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <select
             value={activeCategory}
-            onChange={(e) => setActiveCategory(e.target.value)}
-            className="px-3.5 py-2 text-xs font-semibold bg-white border border-[#1F1410]/15 rounded-full focus:outline-hidden focus:border-[#E12927]"
+            onChange={(e) => {
+              setActiveCategory(e.target.value);
+              setPagina(1);
+              setExpandedItemId(null);
+            }}
+            className="px-3.5 py-1.5 text-xs font-semibold bg-white border border-[#1F1410]/15 rounded-full focus:outline-hidden focus:border-[#E12927]"
           >
             <option value="todas">Todas las categorías ({menuItems.length})</option>
             {listaCategorias.map((cat) => (
@@ -701,7 +721,11 @@ export const MenuCatalogModule = ({
               <button
                 key={est.id}
                 type="button"
-                onClick={() => setFilterEstado(est.id)}
+                onClick={() => {
+                  setFilterEstado(est.id);
+                  setPagina(1);
+                  setExpandedItemId(null);
+                }}
                 className={`px-3 py-1 rounded-full text-[11px] font-mono font-bold cursor-pointer transition-colors ${
                   filterEstado === est.id ? 'bg-[#E12927] text-white' : 'text-[#1F1410]/70 hover:bg-[#FCEAE9]'
                 }`}
@@ -713,74 +737,86 @@ export const MenuCatalogModule = ({
         </div>
       </div>
 
-      {/* Lista de Productos */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {filtrados.map((item, idx) => {
+      {/* Grid de Productos sin scroll en escritorio (3x2) */}
+      <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 xl:grid-rows-2 gap-3.5">
+        {filtradosPaginados.map((item, idx) => {
+          const globalIdx = (paginaActual - 1) * PRODUCTOS_POR_PAGINA + idx;
           const esBorrador = item.estado === 'borrador';
+          const isOpen = expandedItemId === item.id;
+
           return (
-            <div
+            <CurvedRevealCard
               key={item.id}
-              className={`bg-white rounded-2xl border p-4 shadow-2xs flex flex-col justify-between gap-3 transition-all ${
+              image={resolverUrlImagen(item.imagen)}
+              imageAlt={item.nombre}
+              title={item.nombre}
+              subtitle={item.categoria}
+              headerRight={
+                <span className="font-mono font-bold text-xs text-[#E12927] bg-[#FCEAE9] px-2 py-0.5 rounded-full">
+                  {item.precioStr || `$${item.precio}`}
+                </span>
+              }
+              isOpen={isOpen}
+              onToggle={() => {
+                setExpandedItemId((prev) => (prev === item.id ? null : item.id));
+                if (soundEnabled) playSound('toggle');
+              }}
+              borderClassName={
                 esBorrador
-                  ? 'border-dashed border-amber-400 bg-amber-50/20'
+                  ? 'border-dashed border-amber-400'
                   : item.disponibleEnCocina
                     ? 'border-[#1F1410]/10 hover:border-[#E12927]/40'
-                    : 'border-rose-200 bg-rose-50/20'
-              }`}
-            >
-              <div className="flex gap-3.5">
-                <div className="w-20 h-20 rounded-xl bg-[#FAF7F5] border border-[#1F1410]/10 overflow-hidden shrink-0">
-                  <img
-                    src={resolverUrlImagen(item.imagen)}
-                    alt={item.nombre}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                    <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-sm bg-[#FAF7F5] text-[#1F1410]/70">
-                      {item.categoria}
+                    : 'border-rose-300'
+              }
+              topLeft={
+                <>
+                  {esBorrador && (
+                    <span className="text-[10px] font-mono font-bold uppercase px-2.5 py-0.5 rounded-full bg-amber-400 text-[#1F1410] shadow-xs">
+                      Borrador
                     </span>
-                    {esBorrador && (
-                      <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-sm bg-amber-100 text-amber-800">
-                        Borrador
-                      </span>
-                    )}
-                    {item.destacado && (
-                      <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-sm bg-[#FCEAE9] text-[#E12927]">
-                        Top
-                      </span>
-                    )}
-                  </div>
-                  <h3 className="font-display font-bold text-base text-[#1F1410] leading-snug truncate">
-                    {item.nombre}
-                  </h3>
-                  <p className="text-xs text-[#1F1410]/65 line-clamp-2 mt-0.5">{item.descripcion}</p>
-                  <div className="font-mono font-bold text-sm text-[#E12927] mt-1.5">
-                    {item.precioStr || `$${item.precio} MXN`}
-                  </div>
-                </div>
-              </div>
+                  )}
+                  {item.destacado && (
+                    <span className="text-[10px] font-mono font-bold uppercase px-2.5 py-0.5 rounded-full bg-[#E12927] text-white shadow-xs">
+                      Top
+                    </span>
+                  )}
+                </>
+              }
+              topRight={
+                <span
+                  className={`text-[10px] font-mono font-bold uppercase px-2.5 py-0.5 rounded-full shadow-xs ${
+                    item.disponibleEnCocina
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-rose-600 text-white'
+                  }`}
+                >
+                  {item.disponibleEnCocina ? 'Disponible' : 'Agotado'}
+                </span>
+              }
+            >
+              <p className="text-xs text-[#1F1410]/70 line-clamp-2 leading-relaxed">
+                {item.descripcion || 'Sin descripción registrada.'}
+              </p>
 
-              <div className="pt-3 border-t border-[#1F1410]/8 flex flex-wrap items-center justify-between gap-2">
+              <div className="pt-2 border-t border-[#1F1410]/8 flex flex-wrap items-center justify-between gap-1.5">
                 <button
                   type="button"
                   onClick={() => onUpdateMenuItem({ ...item, disponibleEnCocina: !item.disponibleEnCocina })}
-                  className={`px-2.5 py-1 rounded-full text-[11px] font-mono font-bold cursor-pointer transition-colors ${
+                  className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-bold cursor-pointer transition-colors ${
                     item.disponibleEnCocina
                       ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
                       : 'bg-rose-100 text-rose-700 hover:bg-rose-200'
                   }`}
                 >
-                  {item.disponibleEnCocina ? 'Disponible' : 'Agotado'}
+                  {item.disponibleEnCocina ? 'En cocina' : 'Agotado'}
                 </button>
 
                 {esGerencia && (
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-0.5">
                     <button
                       type="button"
-                      onClick={() => moverProducto(idx, -1)}
-                      disabled={idx === 0}
+                      onClick={() => moverProducto(globalIdx, -1)}
+                      disabled={globalIdx === 0}
                       title="Subir orden"
                       className="p-1.5 rounded-lg text-[#1F1410]/60 hover:bg-[#FAF7F5] disabled:opacity-30 cursor-pointer"
                     >
@@ -788,8 +824,8 @@ export const MenuCatalogModule = ({
                     </button>
                     <button
                       type="button"
-                      onClick={() => moverProducto(idx, 1)}
-                      disabled={idx === filtrados.length - 1}
+                      onClick={() => moverProducto(globalIdx, 1)}
+                      disabled={globalIdx === filtrados.length - 1}
                       title="Bajar orden"
                       className="p-1.5 rounded-lg text-[#1F1410]/60 hover:bg-[#FAF7F5] disabled:opacity-30 cursor-pointer"
                     >
@@ -817,9 +853,9 @@ export const MenuCatalogModule = ({
                       type="button"
                       onClick={() => abrirEditar(item)}
                       title="Editar"
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#FAF7F5] hover:bg-[#FCEAE9] text-xs font-semibold text-[#1F1410] hover:text-[#E12927] cursor-pointer"
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-[#FAF7F5] hover:bg-[#FCEAE9] text-[11px] font-semibold text-[#1F1410] hover:text-[#E12927] cursor-pointer"
                     >
-                      <Edit3 className="w-3.5 h-3.5" /> Editar
+                      <Edit3 className="w-3 h-3" /> Editar
                     </button>
                     <button
                       type="button"
@@ -832,10 +868,25 @@ export const MenuCatalogModule = ({
                   </div>
                 )}
               </div>
-            </div>
+            </CurvedRevealCard>
           );
         })}
       </div>
+
+      {filtrados.length > PRODUCTOS_POR_PAGINA && (
+        <div className="bg-white rounded-2xl border border-[#1F1410]/10 overflow-hidden shadow-2xs shrink-0">
+          <TablePagination
+            page={paginaActual}
+            totalItems={filtrados.length}
+            pageSize={PRODUCTOS_POR_PAGINA}
+            onPageChange={(p) => {
+              setPagina(p);
+              setExpandedItemId(null);
+            }}
+            itemLabel="platillos"
+          />
+        </div>
+      )}
 
       {/* Modal Vista Previa Completa */}
       {showFullPreview && (

@@ -5,7 +5,7 @@
 import crypto from 'node:crypto';
 import { config } from '../config.js';
 
-const CARPETAS_PERMITIDAS = new Set(['menu', 'actividades', 'promociones']);
+const CARPETAS_PERMITIDAS = new Set(['menu', 'actividades', 'promociones', 'juegos']);
 
 export function normalizarCarpeta(carpeta) {
   const limpia = String(carpeta || 'menu')

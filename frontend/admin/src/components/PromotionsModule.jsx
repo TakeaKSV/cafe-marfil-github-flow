@@ -18,6 +18,9 @@ import {
 import { resolverUrlImagen, subirImagen } from '../api/cliente';
 import { playSound } from '../utils/audioFeedback';
 import { reglas } from '../utils/validacion';
+import { TablePagination } from './ui/TablePagination';
+
+const PROMOS_POR_PAGINA = 6;
 
 const CATEGORIAS_PROMO = [
   { slug: 'mes', nombre: 'Promociones del mes' },
@@ -63,6 +66,14 @@ export const PromotionsModule = ({
   const [promoErrors, setPromoErrors] = useState({});
   const [subiendo, setSubiendo] = useState(false);
   const [guardando, setGuardando] = useState(false);
+  const [pagina, setPagina] = useState(1);
+
+  const totalPaginas = Math.max(1, Math.ceil(promociones.length / PROMOS_POR_PAGINA));
+  const paginaActual = Math.min(pagina, totalPaginas);
+  const promocionesPaginadas = promociones.slice(
+    (paginaActual - 1) * PROMOS_POR_PAGINA,
+    paginaActual * PROMOS_POR_PAGINA
+  );
   const [copiedCode, setCopiedCode] = useState(null);
 
   // Modal rápido de canje en caja
@@ -446,7 +457,7 @@ export const PromotionsModule = ({
 
       {/* Grid de Campañas */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {promociones.map((promo, idx) => {
+        {promocionesPaginadas.map((promo, idx) => {
           const isActiva = promo.estado === 'activo';
           const agotado = promo.canjesHoy >= promo.limiteDiario;
           const porcentajeUso = promo.limiteDiario ? Math.round((promo.canjesHoy / promo.limiteDiario) * 100) : 0;
@@ -562,6 +573,18 @@ export const PromotionsModule = ({
           );
         })}
       </div>
+
+      {promociones.length > PROMOS_POR_PAGINA && (
+        <div className="bg-white rounded-2xl border border-[#1F1410]/10 overflow-hidden shadow-2xs">
+          <TablePagination
+            page={paginaActual}
+            totalItems={promociones.length}
+            pageSize={PROMOS_POR_PAGINA}
+            onPageChange={setPagina}
+            itemLabel="promociones"
+          />
+        </div>
+      )}
 
       {/* Modal Rápido de Canje de Cupón */}
       {promoACanjear &&

@@ -146,6 +146,21 @@
   filter: brightness(0) invert(1);
 }
 
+/* Transición circular expansiva al cambiar entre modo claro y oscuro */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(root) {
+  z-index: 1;
+}
+
+::view-transition-new(root) {
+  z-index: 9999;
+}
+
 /* Adaptación global de modo oscuro para todo el sistema.
    Nota: debe ir en @layer utilities para ganar a @import "tailwindcss/utilities.css" layer(utilities) important */
 [data-theme="dark"] body,
@@ -198,6 +213,7 @@
   [data-theme="dark"] :is(
     .bg-\[\#FAF7F5\],
     .bg-\[\#FAF8F5\],
+    .bg-\[\#FAF6F0\],
     .bg-\[\#FAF9F8\],
     .bg-\[\#F8F3EE\],
     .bg-\[\#F5EFEB\],

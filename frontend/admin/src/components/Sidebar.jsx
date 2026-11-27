@@ -274,8 +274,8 @@ export const Sidebar = ({
 
   return (
     <>
-      {/* Sidebar fijo en escritorio (lg+) */}
-      <aside className="hidden lg:flex w-64 xl:w-68 bg-[#E12927] flex-col justify-between shrink-0 z-30 select-none h-full overflow-y-auto overflow-x-hidden pt-6 pb-5 font-body relative">
+      {/* Sidebar fijo en escritorio (lg+) sin scroll */}
+      <aside className="hidden lg:flex w-64 xl:w-68 bg-[#E12927] flex-col justify-between shrink-0 z-30 select-none lg:sticky lg:top-0 lg:h-dvh overflow-hidden pt-5 pb-4 font-body relative">
         {renderContenido(false)}
       </aside>
 
@@ -287,7 +287,7 @@ export const Sidebar = ({
             onClick={onCloseMobile}
           >
             <aside
-              className="w-72 max-w-[85vw] bg-[#E12927] flex flex-col justify-between h-full overflow-y-auto overflow-x-hidden pt-6 pb-5 font-body relative shadow-2xl"
+              className="w-72 max-w-[85vw] bg-[#E12927] flex flex-col justify-between h-full overflow-hidden pt-5 pb-4 font-body relative shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
               {renderContenido(true)}

@@ -159,15 +159,23 @@ export const FloorPlanModule = ({
   const [activeDrag, setActiveDrag] = useState(null);
   const [dragHoverTargetKey, setDragHoverTargetKey] = useState(null);
 
-  // Ajustar automáticamente el plano al ancho disponible en móvil, tablet y escritorio
+  // Ajustar automáticamente el plano al ancho y alto disponibles sin generar scroll
   useEffect(() => {
     const el = viewportRef.current;
     if (!el) return undefined;
 
     const updateFit = () => {
-      const padding = window.innerWidth < 640 ? 20 : 40;
-      const available = Math.max(260, el.clientWidth - padding);
-      setFitScale(Math.min(1, available / CANVAS_BASE_WIDTH));
+      const padX = window.innerWidth < 640 ? 16 : 24;
+      const padY = window.innerWidth < 640 ? 16 : 24;
+      const availableW = Math.max(260, el.clientWidth - padX);
+      const scaleW = availableW / CANVAS_BASE_WIDTH;
+      if (window.innerWidth >= 1024 && el.clientHeight > 160) {
+        const availableH = Math.max(200, el.clientHeight - padY);
+        const scaleH = availableH / CANVAS_BASE_HEIGHT;
+        setFitScale(Math.min(1, scaleW, scaleH));
+      } else {
+        setFitScale(Math.min(1, scaleW));
+      }
     };
 
     updateFit();
@@ -819,12 +827,14 @@ export const FloorPlanModule = ({
 
   return (
     <div
-      className={`admin-surface bg-[#F7F4F0] p-3.5 sm:p-6 relative flex flex-col justify-between select-none ${
-        isFullscreen ? 'fixed inset-2 sm:inset-3 z-50 overflow-auto bg-[#F7F4F0]' : 'min-h-[520px] lg:min-h-[760px]'
+      className={`admin-surface bg-[#F7F4F0] p-3 sm:p-4 relative flex flex-col justify-between select-none ${
+        isFullscreen
+          ? 'fixed inset-2 sm:inset-3 z-50 overflow-hidden bg-[#F7F4F0]'
+          : 'lg:h-[calc(100dvh-6.2rem)] lg:overflow-hidden'
       }`}
     >
       {/* 1. Barra Superior */}
-      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3.5 pb-4 border-b border-[#1F1410]/8">
+      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-2.5 pb-3 border-b border-[#1F1410]/8 shrink-0">
         <div className="flex items-center gap-2.5 flex-wrap">
           <div>
             <div className="flex items-center gap-2.5 flex-wrap">
@@ -1148,12 +1158,12 @@ export const FloorPlanModule = ({
           WebkitOverflowScrolling: 'touch',
           touchAction: 'pan-x pan-y'
         }}
-        className={`my-3 w-full min-w-0 rounded-2xl bg-[#EFEAE4]/80 border border-[#1F1410]/10 shadow-inner overflow-x-auto overflow-y-auto overscroll-x-contain p-2.5 sm:p-5 ${
+        className={`my-2 flex-1 min-h-0 w-full min-w-0 rounded-2xl bg-[#EFEAE4]/80 border border-[#1F1410]/10 shadow-inner overscroll-x-contain p-2 sm:p-3 ${
           isZoomedBeyondFit
             ? isPanningCanvas
-              ? 'cursor-grabbing max-h-[72vh]'
-              : 'cursor-grab max-h-[72vh]'
-            : ''
+              ? 'overflow-x-auto overflow-y-auto cursor-grabbing'
+              : 'overflow-x-auto overflow-y-auto cursor-grab'
+            : 'overflow-hidden flex items-center justify-center'
         }`}
       >
         <div
@@ -1251,7 +1261,7 @@ export const FloorPlanModule = ({
       </div>
 
       {/* 3. Barra Inferior: Zoom, Leyenda y Pantalla Completa */}
-      <div className="pt-4 border-t border-[#1F1410]/8 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div className="pt-2.5 border-t border-[#1F1410]/8 flex flex-col sm:flex-row items-center justify-between gap-2.5 shrink-0">
         {/* Controles de Zoom + Ajuste automático */}
         <div className="flex items-center bg-white border border-[#1F1410]/10 rounded-full shadow-2xs p-1 gap-0.5">
           <button
@@ -1333,14 +1343,14 @@ export const FloorPlanModule = ({
       {selectedMesa &&
         createPortal(
           <div
-            className="fixed inset-0 z-[9999] bg-[#1F1410]/75 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 overflow-y-auto animate-modal-backdrop"
+            className="fixed inset-0 z-[9999] bg-[#1F1410]/75 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 animate-modal-backdrop"
             onClick={() => {
               setSelectedMesa(null);
               setConfirmDeleteId(null);
             }}
           >
             <div
-              className="bg-white rounded-[32px] border border-[#1F1410]/10 max-w-md w-full p-6 sm:p-8 shadow-[0_25px_60px_-15px_rgba(31,20,16,0.35)] animate-modal-card relative max-h-[92vh] overflow-y-auto my-auto"
+              className="bg-white rounded-[28px] border border-[#1F1410]/10 max-w-md w-full p-5 sm:p-6 shadow-[0_25px_60px_-15px_rgba(31,20,16,0.35)] animate-modal-card relative"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between pb-4 border-b border-[#1F1410]/8 mb-5">
@@ -1538,11 +1548,11 @@ export const FloorPlanModule = ({
         puedeAdministrarMesas &&
         createPortal(
           <div
-            className="fixed inset-0 z-[9999] bg-[#1F1410]/75 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 overflow-y-auto animate-modal-backdrop"
+            className="fixed inset-0 z-[9999] bg-[#1F1410]/75 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 animate-modal-backdrop"
             onClick={() => setShowAddModal(false)}
           >
             <div
-              className="bg-white rounded-[32px] border border-[#1F1410]/10 max-w-lg w-full p-6 sm:p-8 shadow-[0_25px_60px_-15px_rgba(31,20,16,0.35)] animate-modal-card relative max-h-[92vh] overflow-y-auto my-auto"
+              className="bg-white rounded-[28px] border border-[#1F1410]/10 max-w-lg w-full p-5 sm:p-6 shadow-[0_25px_60px_-15px_rgba(31,20,16,0.35)] animate-modal-card relative"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between pb-4 border-b border-[#1F1410]/8 mb-5">
@@ -1618,11 +1628,11 @@ export const FloorPlanModule = ({
                       onChange={(e) =>
                         setNewMesaForm((prev) => ({
                           ...prev,
-                          numero: e.target.value.toUpperCase()
+                          numero: e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 10)
                         }))
                       }
                       placeholder="Ej. M09, L05, P01"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF7F5] border border-[#1F1410]/12 font-mono font-bold text-[#1F1410] uppercase"
+                      className="w-full px-3.5 py-2 rounded-xl bg-[#FAF7F5] border border-[#1F1410]/12 font-mono font-bold text-[#1F1410] uppercase"
                     />
                   </div>
 

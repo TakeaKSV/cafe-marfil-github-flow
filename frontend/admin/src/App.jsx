@@ -506,10 +506,18 @@ export function App() {
     if (actualizado.estado === 'disponible' && anterior.estado === 'en_mesa') {
       return ejecutar(() => post(`${ruta}/devolver`));
     }
-    if (actualizado.reposicionRequerida !== anterior.reposicionRequerida) {
-      return ejecutar(() =>
-        patch(ruta, { reposicionRequerida: actualizado.reposicionRequerida, piezasEstado: actualizado.piezasEstado })
-      );
+    const cambios = {};
+    if (actualizado.reposicionRequerida !== undefined && actualizado.reposicionRequerida !== anterior.reposicionRequerida) {
+      cambios.reposicionRequerida = actualizado.reposicionRequerida;
+    }
+    if (actualizado.piezasEstado !== undefined && actualizado.piezasEstado !== anterior.piezasEstado) {
+      cambios.piezasEstado = actualizado.piezasEstado;
+    }
+    if (actualizado.imagen !== undefined && actualizado.imagen !== anterior.imagen) {
+      cambios.imagen = actualizado.imagen;
+    }
+    if (Object.keys(cambios).length > 0) {
+      return ejecutar(() => patch(ruta, cambios));
     }
     return Promise.resolve(true);
   };
@@ -523,6 +531,7 @@ export function App() {
         duracion: nuevo.duracionMin,
         dificultad: nuevo.dificultad,
         piezasEstado: nuevo.piezasEstado,
+        imagen: nuevo.imagen || undefined,
         sucursalId: selectedSucursal === 'todas' ? sucursales[0]?.id : selectedSucursal
       })
     );
@@ -650,7 +659,7 @@ export function App() {
   }
 
   return (
-    <div className="admin-app-shell w-full min-w-0 min-h-dvh flex flex-col lg:flex-row lg:h-dvh lg:overflow-hidden bg-[#F8F5F1] font-body selection:bg-[#E12927] selection:text-white">
+    <div className="admin-app-shell w-full min-w-0 min-h-dvh flex flex-col lg:flex-row bg-[#F8F5F1] font-body selection:bg-[#E12927] selection:text-white">
 
       {/* Sidebar Lateral Fijo en escritorio y Drawer en móvil/tablet */}
       <Sidebar
@@ -668,8 +677,8 @@ export function App() {
           onCloseMobile={() => setMobileMenuOpen(false)}
         />
 
-        {/* Área Central de Contenido con scroll independiente */}
-        <div className="flex-1 flex flex-col min-w-0 min-h-dvh lg:min-h-0 lg:h-full lg:overflow-hidden bg-[#F8F5F1]">
+        {/* Área Central de Contenido sin scroll encerrado */}
+        <div className="flex-1 flex flex-col min-w-0 min-h-dvh bg-[#F8F5F1]">
 
           {/* Topbar Superior Fijo */}
           <Topbar
@@ -709,11 +718,11 @@ export function App() {
             </div>
           )}
 
-          {/* Canvas Principal con scroll natural en móvil/tablet y fit en escritorio */}
+          {/* Canvas Principal fluido sin scroll interno */}
           <main className={`flex-1 min-h-0 ${
-            activeTab === 'dashboard'
-              ? 'p-3 sm:p-4 lg:p-5 overflow-y-auto lg:overflow-hidden flex flex-col justify-between'
-              : 'px-3.5 sm:px-6 lg:px-9 py-5 sm:py-6 overflow-y-auto'
+            activeTab === 'dashboard' || activeTab === 'floorplan' || activeTab === 'menu' || activeTab === 'ludoteca'
+              ? 'p-3 sm:p-4 lg:px-5 lg:py-3.5 flex flex-col justify-between'
+              : 'px-3.5 sm:px-6 lg:px-9 py-4 sm:py-5'
           }`}>
 
             {/* Contenedor con animación de deslizamiento suave en cambio de pestaña */}

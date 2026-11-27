@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { UserPlus, X, Store, Users, Coffee, Dice5 } from 'lucide-react';
 import { playSound } from '../utils/audioFeedback';
-import { reglas } from '../utils/validacion';
+import { reglas, sanitizar } from '../utils/validacion';
 
 export const WalkInModal = ({ 
   isOpen, 
@@ -88,11 +88,11 @@ export const WalkInModal = ({
 
   const modalContent = (
     <div 
-      className="fixed inset-0 z-[9999] bg-[#1F1410]/75 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 overflow-y-auto animate-modal-backdrop"
+      className="fixed inset-0 z-[9999] bg-[#1F1410]/75 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 animate-modal-backdrop"
       onClick={onClose}
     >
       <div 
-        className="bg-white rounded-[32px] border border-[#1F1410]/10 shadow-[0_25px_60px_-15px_rgba(31,20,16,0.35)] max-w-lg w-full p-6 sm:p-8 animate-modal-card relative max-h-[92vh] overflow-y-auto my-auto"
+        className="bg-white rounded-[28px] border border-[#1F1410]/10 shadow-[0_25px_60px_-15px_rgba(31,20,16,0.35)] max-w-lg w-full p-5 sm:p-6 animate-modal-card relative"
         onClick={(e) => e.stopPropagation()}
       >
         
@@ -167,10 +167,11 @@ export const WalkInModal = ({
                 </label>
                 <input
                   type="text"
+                  maxLength={80}
                   placeholder="Ej. Roberto Sánchez"
                   value={comensal}
                   onChange={(e) => {
-                    setComensal(e.target.value);
+                    setComensal(sanitizar.nombrePersona(e.target.value, 80));
                     setErrores((p) => ({ ...p, comensal: null }));
                   }}
                   aria-invalid={Boolean(errores.comensal)}
@@ -186,12 +187,12 @@ export const WalkInModal = ({
                   Número de Personas (máx. {maxCapacidad}) *
                 </label>
                 <input
-                  type="number"
-                  min="1"
-                  max={maxCapacidad}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={2}
                   value={personas}
                   onChange={(e) => {
-                    setPersonas(e.target.value);
+                    setPersonas(sanitizar.entero(e.target.value, maxCapacidad));
                     setErrores((p) => ({ ...p, personas: null }));
                   }}
                   aria-invalid={Boolean(errores.personas)}

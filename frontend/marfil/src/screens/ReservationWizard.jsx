@@ -16,15 +16,12 @@ import {
   Coffee,
   Sparkles,
   PartyPopper,
-  Check,
-  Link2
+  Check
 } from 'lucide-react';
 import { sounds } from '../utils/audio';
 import { api } from '../api/cliente';
 import { fechaEnDias, fechasSugeridas as calcularFechasSugeridas } from '../api/adaptadores';
-import { reglas } from '../utils/validacion';
-import TablePickerStep from '../components/TablePickerStep';
-import { evaluarUnionMesas } from '../utils/mesasPlano';
+import { reglas, sanitizar } from '../utils/validacion';
 
 function separarNombre(contacto) {
   if (!contacto) return { nombres: '', apellidoPaterno: '', apellidoMaterno: '' };
@@ -86,30 +83,11 @@ const HORARIOS_DISPONIBLES = [
   { hora: '08:30 PM', turno: 'Noche' }
 ];
 
-const PASOS_CON_MESA = [
-  { num: 1, label: 'Experiencia' },
-  { num: 2, label: 'Fecha y hora' },
-  { num: 3, label: 'Mesa (opcional)' },
-  { num: 4, label: 'Confirmar' }
-];
-
-const PASOS_ACTIVIDAD = [
+const PASOS = [
   { num: 1, label: 'Experiencia' },
   { num: 2, label: 'Fecha y hora' },
   { num: 3, label: 'Confirmar' }
 ];
-
-function aHora24(texto) {
-  if (!texto) return '11:00';
-  const match = String(texto).trim().match(/^(\d{1,2}):(\d{2})(?:\s*(AM|PM))?$/i);
-  if (!match) return texto;
-  let h = Number(match[1]);
-  const m = match[2];
-  const suf = match[3]?.toUpperCase();
-  if (suf === 'PM' && h < 12) h += 12;
-  if (suf === 'AM' && h === 12) h = 0;
-  return `${String(h).padStart(2, '0')}:${m}`;
-}
 
 export default function ReservationWizard({
   sucursales = [],
@@ -134,14 +112,6 @@ export default function ReservationWizard({
   const [selectedJuegoId, setSelectedJuegoId] = useState('');
   const [disponibilidad, setDisponibilidad] = useState([]);
   const [cargandoDisp, setCargandoDisp] = useState(false);
-
-  // Fase opcional: selección de mesa(s) y solicitud de unión
-  const [mesasDisponibles, setMesasDisponibles] = useState([]);
-  const [cargandoMesas, setCargandoMesas] = useState(false);
-  const [errorMesas, setErrorMesas] = useState('');
-  const [mesasReloadTick, setMesasReloadTick] = useState(0);
-  const [selectedMesaIds, setSelectedMesaIds] = useState([]);
-  const [solicitaUnionMesas, setSolicitaUnionMesas] = useState(false);
 
   const [usarDatosCuenta, setUsarDatosCuenta] = useState(Boolean(contacto));
   const iniciales = separarNombre(contacto);
@@ -181,15 +151,6 @@ export default function ReservationWizard({
   const esActividad = reservaTipo === 'actividad' && Boolean(actividadObj);
   const actividadTieneFechaFija = esActividad && Boolean(actividadObj?.fechaISO);
   const actividadTieneHorarioFijo = esActividad && Boolean(actividadObj?.horario);
-  const pasosActivos = esActividad ? PASOS_ACTIVIDAD : PASOS_CON_MESA;
-  const pasoConfirmar = esActividad ? 3 : 4;
-  const pasoSeleccionMesa = esActividad ? -1 : 3;
-
-  const mesasElegidas = selectedMesaIds
-    .map((id) => mesasDisponibles.find((m) => m.id === id))
-    .filter(Boolean);
-  const estadoUnion = evaluarUnionMesas(mesasElegidas, personas);
-  const unionActiva = estadoUnion.elegibleUnion && solicitaUnionMesas;
 
   const maxPersonas =
     esActividad && typeof actividadObj?.lugaresDisponibles === 'number'
@@ -236,73 +197,6 @@ export default function ReservationWizard({
     };
   }, [esActividad, selectedSucursalId, selectedDate, personas, selectedTime]);
 
-  // Cargar mesas disponibles para la fecha, hora y sucursal elegidas (fase opcional)
-  useEffect(() => {
-    if (esActividad || !sucursalEfectivaId || !selectedDate || !selectedTime) {
-      setMesasDisponibles([]);
-      setSelectedMesaIds([]);
-      setSolicitaUnionMesas(false);
-      setErrorMesas('');
-      return undefined;
-    }
-    let activo = true;
-    setCargandoMesas(true);
-    setErrorMesas('');
-    setSelectedMesaIds([]);
-    setSolicitaUnionMesas(false);
-
-    const params = new URLSearchParams({
-      sucursalId: sucursalEfectivaId,
-      fecha: selectedDate,
-      hora: aHora24(selectedTime)
-    });
-
-    api(`/reservaciones/mesas-disponibles?${params}`)
-      .then((lista) => {
-        if (!activo) return;
-        if (Array.isArray(lista)) {
-          setMesasDisponibles(lista);
-        } else {
-          setMesasDisponibles([]);
-        }
-      })
-      .catch((err) => {
-        if (activo) {
-          setMesasDisponibles([]);
-          setErrorMesas(err?.message || 'No se pudieron cargar las mesas disponibles.');
-        }
-      })
-      .finally(() => {
-        if (activo) setCargandoMesas(false);
-      });
-
-    return () => {
-      activo = false;
-    };
-  }, [esActividad, sucursalEfectivaId, selectedDate, selectedTime, mesasReloadTick]);
-
-  const handleToggleMesa = (mesa) => {
-    setValidationError('');
-    setSelectedMesaIds((prev) => {
-      const next = prev.includes(mesa.id)
-        ? prev.filter((id) => id !== mesa.id)
-        : prev.length >= 6
-        ? prev
-        : [...prev, mesa.id];
-
-      const nextMesas = next
-        .map((id) => mesasDisponibles.find((m) => m.id === id))
-        .filter(Boolean);
-      const evalNext = evaluarUnionMesas(nextMesas, personas);
-      if (evalNext.elegibleUnion && next.length >= 2 && prev.length < next.length) {
-        setSolicitaUnionMesas(true);
-      } else if (!evalNext.elegibleUnion) {
-        setSolicitaUnionMesas(false);
-      }
-      return next;
-    });
-  };
-
   const handleNext = () => {
     sounds.playClick();
     setValidationError('');
@@ -347,22 +241,11 @@ export default function ReservationWizard({
           return;
         }
       }
-      setCurrentStep(esActividad ? 3 : 3);
+      setCurrentStep(3);
       return;
     }
 
-    if (currentStep === pasoSeleccionMesa) {
-      if (selectedMesaIds.length > 0 && !estadoUnion.cubreGrupo) {
-        setValidationError(
-          `Las mesas seleccionadas suman ${estadoUnion.capacidadTotal} sillas y tu grupo es de ${personas}. Selecciona otra mesa o omite este paso.`
-        );
-        return;
-      }
-      setCurrentStep(pasoConfirmar);
-      return;
-    }
-
-    if (currentStep === pasoConfirmar) {
+    if (currentStep === 3) {
       const telEfectivo = usarDatosCuenta && contacto?.telefono ? contacto.telefono : telefono;
       const correoEfectivo = usarDatosCuenta && contacto?.correo ? contacto.correo : correo;
       const errs =
@@ -404,9 +287,6 @@ export default function ReservationWizard({
         fechaISO: selectedDate,
         hora: selectedTime,
         personas: Number(personas),
-        mesasIds: !esActividad && selectedMesaIds.length > 0 ? selectedMesaIds : [],
-        mesasSolicitadas: !esActividad ? mesasElegidas : [],
-        solicitaUnionMesas: !esActividad && unionActiva,
         juegoId: !esActividad && selectedJuegoId ? Number(selectedJuegoId) : null,
         juegoNombre: !esActividad && juegoObj ? juegoObj.nombre : null,
         nombreCliente: nombreCompleto,
@@ -442,14 +322,10 @@ export default function ReservationWizard({
     }`;
 
   return (
-    <div className="flex flex-col gap-5 w-full min-w-0 text-left pb-24 lg:pb-6">
-      {/* Barra limpia de pasos */}
-      <div
-        className={`grid ${
-          pasosActivos.length === 4 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'
-        } gap-1.5 sm:gap-2 bg-white dark:bg-[#1F1410] p-1.5 sm:p-2 rounded-2xl border border-black/[0.06] dark:border-white/10`}
-      >
-        {pasosActivos.map((paso) => {
+    <div className="flex flex-col gap-3.5 w-full min-w-0 text-left">
+      {/* Barra limpia de 3 pasos */}
+      <div className="grid grid-cols-3 gap-1.5 sm:gap-2 bg-white dark:bg-[#1F1410] p-1.5 sm:p-2 rounded-2xl border border-black/[0.06] dark:border-white/10">
+        {PASOS.map((paso) => {
           const isCurrent = currentStep === paso.num;
           const isDone = currentStep > paso.num;
           return (
@@ -496,8 +372,8 @@ export default function ReservationWizard({
       )}
 
       {/* Layout 2 columnas en desktop: Formulario a la izquierda + Resumen en vivo a la derecha */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-        <div ref={stepBodyRef} className="lg:col-span-8 flex flex-col gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+        <div ref={stepBodyRef} className="lg:col-span-8 flex flex-col gap-3">
           {/* ================================================================
               PASO 1: EXPERIENCIA & SUCURSAL
               ================================================================ */}
@@ -629,55 +505,79 @@ export default function ReservationWizard({
               ================================================================ */}
           {currentStep === 2 && (
             <>
-              {/* Stepper compacto de personas */}
-              <div className="p-4 rounded-2xl bg-white dark:bg-[#1F1410] border border-black/[0.06] dark:border-white/10 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <span className="w-10 h-10 rounded-xl bg-[#FCEAE9] dark:bg-[#321B19] text-[#E12927] flex items-center justify-center shrink-0">
-                    <Users size={18} />
-                  </span>
-                  <div>
-                    <strong className="block text-sm font-bold text-[#1F1410] dark:text-[#FAF7F5]">
-                      {esActividad ? 'Lugares a apartar' : 'Número de personas'}
-                    </strong>
-                    <span className="text-xs text-[#8E7A74]">
-                      Máximo {maxPersonas} {maxPersonas === 1 ? 'lugar' : 'lugares'}
+              {/* Fila compacta: Personas + Juego de mesa opcional */}
+              <div className={`grid grid-cols-1 ${!esActividad && juegos.length > 0 ? 'sm:grid-cols-2' : ''} gap-3`}>
+                <div className="p-3 rounded-2xl bg-white dark:bg-[#1F1410] border border-black/[0.06] dark:border-white/10 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="w-9 h-9 rounded-xl bg-[#FCEAE9] dark:bg-[#321B19] text-[#E12927] flex items-center justify-center shrink-0">
+                      <Users size={16} />
                     </span>
+                    <div className="min-w-0">
+                      <strong className="block text-xs sm:text-sm font-bold text-[#1F1410] dark:text-[#FAF7F5] truncate">
+                        {esActividad ? 'Lugares a apartar' : 'Personas'}
+                      </strong>
+                      <span className="text-[11px] text-[#8E7A74]">
+                        Máx. {maxPersonas}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      disabled={personas <= 1}
+                      onClick={() => {
+                        sounds.playClick();
+                        setPersonas(Math.max(1, personas - 1));
+                      }}
+                      className="w-8 h-8 rounded-full bg-[#FAF7F5] dark:bg-[#2A1D19] border border-black/10 dark:border-white/10 text-[#1F1410] dark:text-white font-bold flex items-center justify-center disabled:opacity-35 cursor-pointer active:scale-90"
+                    >
+                      −
+                    </button>
+                    <span className="text-base font-bold text-[#1F1410] dark:text-[#FAF7F5] min-w-[22px] text-center">
+                      {personas}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={personas >= maxPersonas}
+                      onClick={() => {
+                        sounds.playClick();
+                        setPersonas(Math.min(maxPersonas, personas + 1));
+                      }}
+                      className="w-8 h-8 rounded-full bg-[#E12927] text-white font-bold flex items-center justify-center disabled:opacity-35 cursor-pointer active:scale-90 shadow-sm"
+                    >
+                      +
+                    </button>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2.5">
-                  <button
-                    type="button"
-                    disabled={personas <= 1}
-                    onClick={() => {
-                      sounds.playClick();
-                      setPersonas(Math.max(1, personas - 1));
-                    }}
-                    className="w-9 h-9 rounded-full bg-[#FAF7F5] dark:bg-[#2A1D19] border border-black/10 dark:border-white/10 text-[#1F1410] dark:text-white font-bold flex items-center justify-center disabled:opacity-35 cursor-pointer active:scale-90"
-                  >
-                    −
-                  </button>
-                  <span className="text-lg font-bold text-[#1F1410] dark:text-[#FAF7F5] min-w-[28px] text-center">
-                    {personas}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={personas >= maxPersonas}
-                    onClick={() => {
-                      sounds.playClick();
-                      setPersonas(Math.min(maxPersonas, personas + 1));
-                    }}
-                    className="w-9 h-9 rounded-full bg-[#E12927] text-white font-bold flex items-center justify-center disabled:opacity-35 cursor-pointer active:scale-90 shadow-sm"
-                  >
-                    +
-                  </button>
-                </div>
+                {!esActividad && juegos.length > 0 && (
+                  <div className="p-3 rounded-2xl bg-white dark:bg-[#1F1410] border border-black/[0.06] dark:border-white/10 flex flex-col justify-center gap-1">
+                    <label htmlFor="wizard-juego" className="text-[10px] font-bold uppercase tracking-wider text-[#8E7A74] flex items-center gap-1.5">
+                      <Dice5 size={13} className="text-[#E12927]" />
+                      Juego de mesa (opcional)
+                    </label>
+                    <select
+                      id="wizard-juego"
+                      value={selectedJuegoId}
+                      onChange={(e) => setSelectedJuegoId(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-black/10 dark:border-white/15 bg-[#FAF7F5] dark:bg-[#261A16] text-xs text-[#1F1410] dark:text-[#FAF7F5] focus:outline-none focus:border-[#E12927]"
+                    >
+                      <option value="">Elegir al llegar</option>
+                      {juegos.map((j) => (
+                        <option key={j.id} value={j.id}>
+                          {j.nombre} ({j.jugadores})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
 
               {/* Fecha */}
               {actividadTieneFechaFija ? (
-                <div className="p-4 rounded-2xl bg-[#FCEAE9]/70 dark:bg-[#321B19] border border-[#E12927]/30 flex items-center gap-3">
-                  <Lock size={18} className="text-[#E12927] shrink-0" />
+                <div className="p-3.5 rounded-2xl bg-[#FCEAE9]/70 dark:bg-[#321B19] border border-[#E12927]/30 flex items-center gap-3">
+                  <Lock size={17} className="text-[#E12927] shrink-0" />
                   <div>
                     <span className="block text-[10px] font-bold uppercase tracking-wider text-[#E12927]">
                       Fecha fija del evento
@@ -689,7 +589,7 @@ export default function ReservationWizard({
                   </div>
                 </div>
               ) : (
-                <div className="flex flex-col gap-2.5">
+                <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs font-bold uppercase tracking-wider text-[#8E7A74]">
                       Selecciona la fecha
@@ -699,10 +599,10 @@ export default function ReservationWizard({
                       value={selectedDate}
                       min={fechaEnDias(0)}
                       onChange={(e) => setSelectedDate(e.target.value)}
-                      className="px-3 py-1.5 rounded-xl border border-black/10 dark:border-white/15 bg-white dark:bg-[#261A16] text-xs text-[#1F1410] dark:text-[#FAF7F5] focus:outline-none focus:border-[#E12927]"
+                      className="px-2.5 py-1 rounded-xl border border-black/10 dark:border-white/15 bg-white dark:bg-[#261A16] text-xs text-[#1F1410] dark:text-[#FAF7F5] focus:outline-none focus:border-[#E12927]"
                     />
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {fechasSugeridas.map((f, idx) => {
                       const isSelected = selectedDate === f.iso;
                       return (
@@ -713,14 +613,14 @@ export default function ReservationWizard({
                             sounds.playClick();
                             setSelectedDate(f.iso);
                           }}
-                          className={`py-3 px-2 rounded-2xl text-center transition-all cursor-pointer border ${
+                          className={`py-2 px-2 rounded-xl text-center transition-all cursor-pointer border ${
                             isSelected
-                              ? 'bg-[#E12927] text-white border-[#E12927] shadow-md -translate-y-0.5'
+                              ? 'bg-[#E12927] text-white border-[#E12927] shadow-sm'
                               : 'bg-white dark:bg-[#1F1410] border-black/[0.07] dark:border-white/10 text-[#1F1410] dark:text-[#FAF7F5] hover:border-[#E12927]'
                           }`}
                         >
                           <span className="block text-[10px] uppercase opacity-80">{f.label}</span>
-                          <strong className="block text-xs sm:text-sm font-bold mt-0.5">{f.dia}</strong>
+                          <strong className="block text-xs font-bold mt-0.5">{f.dia}</strong>
                         </button>
                       );
                     })}
@@ -730,7 +630,7 @@ export default function ReservationWizard({
 
               {/* Horario */}
               {!actividadTieneHorarioFijo && (
-                <div className="flex flex-col gap-2.5">
+                <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold uppercase tracking-wider text-[#8E7A74]">
                       Selecciona el horario
@@ -739,7 +639,7 @@ export default function ReservationWizard({
                       <span className="text-[11px] text-[#8E7A74]">Verificando mesas...</span>
                     )}
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-1.5">
                     {HORARIOS_DISPONIBLES.map((h) => {
                       const slotDisp = disponibilidad.find((d) => d.horaTexto === h.hora);
                       const ocupado = slotDisp ? !slotDisp.disponible : false;
@@ -754,7 +654,7 @@ export default function ReservationWizard({
                             sounds.playClick();
                             setSelectedTime(h.hora);
                           }}
-                          className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs transition-all border ${
+                          className={`inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-xl text-[11px] transition-all border ${
                             ocupado
                               ? 'bg-black/5 dark:bg-white/5 border-transparent text-[#8E7A74] opacity-45 cursor-not-allowed line-through'
                               : isSelected
@@ -762,70 +662,21 @@ export default function ReservationWizard({
                               : 'bg-white dark:bg-[#1F1410] border-black/10 dark:border-white/10 text-[#1F1410] dark:text-[#FAF7F5] hover:border-[#E12927] cursor-pointer'
                           }`}
                         >
-                          <Clock size={12} />
-                          <span>{h.hora}</span>
+                          <Clock size={11} className="shrink-0" />
+                          <span className="truncate">{h.hora}</span>
                         </button>
                       );
                     })}
                   </div>
                 </div>
               )}
-
-              {/* Juego de mesa opcional */}
-              {!esActividad && juegos.length > 0 && (
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="wizard-juego" className="text-xs font-bold uppercase tracking-wider text-[#8E7A74] flex items-center gap-1.5">
-                    <Dice5 size={14} className="text-[#E12927]" />
-                    Apartar un juego de mesa (opcional)
-                  </label>
-                  <select
-                    id="wizard-juego"
-                    value={selectedJuegoId}
-                    onChange={(e) => setSelectedJuegoId(e.target.value)}
-                    className={inputClass(false)}
-                  >
-                    <option value="">Sin juego apartado / Elegir al llegar</option>
-                    {juegos.map((j) => (
-                      <option key={j.id} value={j.id}>
-                        {j.nombre} · {j.categoria} ({j.jugadores})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
             </>
           )}
 
           {/* ================================================================
-              PASO 3 (OPCIONAL): SELECCIÓN DE MESA(S) & SOLICITUD DE UNIÓN
+              PASO 3: DATOS DE CONTACTO & NOTAS
               ================================================================ */}
-          {currentStep === pasoSeleccionMesa && (
-            <TablePickerStep
-              mesas={mesasDisponibles}
-              cargando={cargandoMesas}
-              error={errorMesas}
-              onRetry={() => setMesasReloadTick((t) => t + 1)}
-              personas={personas}
-              selectedMesaIds={selectedMesaIds}
-              solicitaUnionMesas={solicitaUnionMesas}
-              onToggleMesa={handleToggleMesa}
-              onClearMesas={() => {
-                setSelectedMesaIds([]);
-                setSolicitaUnionMesas(false);
-                setValidationError('');
-              }}
-              onToggleUnion={(val) => setSolicitaUnionMesas(val)}
-              onSkipStep={() => {
-                setValidationError('');
-                setCurrentStep(pasoConfirmar);
-              }}
-            />
-          )}
-
-          {/* ================================================================
-              PASO FINAL: DATOS DE CONTACTO & NOTAS
-              ================================================================ */}
-          {currentStep === pasoConfirmar && (
+          {currentStep === 3 && (
             <div className="flex flex-col gap-4">
               {contacto && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -895,12 +746,14 @@ export default function ReservationWizard({
                         id="wizard-telefono-cuenta"
                         data-campo="wizard-telefono"
                         type="tel"
+                        inputMode="numeric"
+                        maxLength={10}
                         value={telefono}
                         onChange={(e) => {
-                          setTelefono(e.target.value);
+                          setTelefono(sanitizar.telefono(e.target.value));
                           limpiarErrorCampo('telefono');
                         }}
-                        placeholder="(618) 123-4567"
+                        placeholder="6181234567"
                         className={inputClass(fieldErrors.telefono)}
                       />
                       {fieldErrors.telefono && <p role="alert" className="text-xs text-[#E12927]">{fieldErrors.telefono}</p>}
@@ -915,9 +768,10 @@ export default function ReservationWizard({
                       id="wizard-nombres"
                       data-campo="wizard-nombres"
                       type="text"
+                      maxLength={80}
                       value={nombres}
                       onChange={(e) => {
-                        setNombres(e.target.value);
+                        setNombres(sanitizar.nombrePersona(e.target.value, 80));
                         limpiarErrorCampo('nombres');
                       }}
                       placeholder="Ej. Sofía"
@@ -931,9 +785,10 @@ export default function ReservationWizard({
                       id="wizard-ap-paterno"
                       data-campo="wizard-apellidoPaterno"
                       type="text"
+                      maxLength={60}
                       value={apellidoPaterno}
                       onChange={(e) => {
-                        setApellidoPaterno(e.target.value);
+                        setApellidoPaterno(sanitizar.nombrePersona(e.target.value, 60));
                         limpiarErrorCampo('apellidoPaterno');
                       }}
                       placeholder="Ej. Navarro"
@@ -947,9 +802,10 @@ export default function ReservationWizard({
                       id="wizard-ap-materno"
                       data-campo="wizard-apellidoMaterno"
                       type="text"
+                      maxLength={60}
                       value={apellidoMaterno}
                       onChange={(e) => {
-                        setApellidoMaterno(e.target.value);
+                        setApellidoMaterno(sanitizar.nombrePersona(e.target.value, 60));
                         limpiarErrorCampo('apellidoMaterno');
                       }}
                       placeholder="Opcional"
@@ -957,17 +813,19 @@ export default function ReservationWizard({
                     />
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label htmlFor="wizard-telefono" className="text-xs font-semibold text-[#6B5A52]">Teléfono / WhatsApp *</label>
+                    <label htmlFor="wizard-telefono" className="text-xs font-semibold text-[#6B5A52]">Teléfono / WhatsApp (10 dígitos) *</label>
                     <input
                       id="wizard-telefono"
                       data-campo="wizard-telefono"
                       type="tel"
+                      inputMode="numeric"
+                      maxLength={10}
                       value={telefono}
                       onChange={(e) => {
-                        setTelefono(e.target.value);
+                        setTelefono(sanitizar.telefono(e.target.value));
                         limpiarErrorCampo('telefono');
                       }}
-                      placeholder="(618) 123-4567"
+                      placeholder="6181234567"
                       className={inputClass(fieldErrors.telefono)}
                     />
                     {fieldErrors.telefono && <p role="alert" className="text-xs text-[#E12927]">{fieldErrors.telefono}</p>}
@@ -978,9 +836,10 @@ export default function ReservationWizard({
                       id="wizard-correo"
                       data-campo="wizard-correo"
                       type="email"
+                      maxLength={190}
                       value={correo}
                       onChange={(e) => {
-                        setCorreo(e.target.value);
+                        setCorreo(sanitizar.email(e.target.value));
                         limpiarErrorCampo('correo');
                       }}
                       placeholder="tu.correo@ejemplo.com"
@@ -1061,25 +920,6 @@ export default function ReservationWizard({
               </div>
             </div>
 
-            {!esActividad && mesasElegidas.length > 0 && (
-              <div className="pt-2 border-t border-black/[0.06] dark:border-white/10 space-y-1.5">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[10px] uppercase text-[#8E7A74]">
-                    {mesasElegidas.length === 1 ? 'Mesa elegida' : 'Mesas elegidas'}
-                  </span>
-                  <strong className="text-[#1F1410] dark:text-[#FAF7F5]">
-                    {mesasElegidas.map((m) => m.numero).join(' + ')} ({estadoUnion.capacidadTotal}p)
-                  </strong>
-                </div>
-                {unionActiva && (
-                  <div className="px-2.5 py-1.5 rounded-xl bg-[#FCEAE9] dark:bg-[#321B19] text-[#E12927] text-[11px] font-bold flex items-center gap-1.5">
-                    <Link2 size={13} className="shrink-0" />
-                    <span>Solicitud de unión de mesas incluida</span>
-                  </div>
-                )}
-              </div>
-            )}
-
             {!esActividad && juegoObj && (
               <div className="pt-2 border-t border-black/[0.06] dark:border-white/10 flex items-center gap-1.5 text-[#E12927]">
                 <Dice5 size={14} className="shrink-0" />
@@ -1113,14 +953,12 @@ export default function ReservationWizard({
           className="inline-flex items-center gap-2 px-6 sm:px-7 py-3 rounded-full bg-[#E12927] hover:bg-[#C81E1C] active:scale-95 disabled:opacity-60 text-white text-xs sm:text-sm font-bold shadow-md shadow-[#E12927]/25 transition-all cursor-pointer"
         >
           <span>
-            {currentStep === pasoConfirmar
+            {currentStep === 3
               ? enviando
                 ? 'Confirmando...'
                 : esActividad
                 ? 'Confirmar lugares'
                 : 'Confirmar reservación'
-              : currentStep === pasoSeleccionMesa && selectedMesaIds.length === 0
-              ? 'Continuar sin elegir mesa'
               : 'Continuar'}
           </span>
           <ArrowRight size={15} />
